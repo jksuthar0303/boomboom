@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:geocoding/geocoding.dart' as geo;
-import 'package:xml/xml.dart' as xml;
 import 'package:geolocator/geolocator.dart';
 import 'package:boomboom/screens/home/homescreenitems/exploreuserhome.dart';
 import 'package:boomboom/screens/home/homescreenitems/verifyiuser.dart';
@@ -32,6 +31,7 @@ import 'homescreenitems/newmatches.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  // ignore: library_private_types_in_public_api
   static _HomeScreenState? state;
 
   static void refreshProfile() {
@@ -44,7 +44,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
-  String _profileImageUrl = "https://images.unsplash.com/photo-1502685104226-ee32379fefbe";
+  String _profileImageUrl =
+      "https://images.unsplash.com/photo-1502685104226-ee32379fefbe";
   String _currentCityName = "Pattaya City";
 
   final PageController _pageController = PageController();
@@ -203,20 +204,29 @@ class _HomeScreenState extends State<HomeScreen>
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        _showPermissionDeniedDialog("Location permission is denied. It is required to show nearby profiles.");
+        _showPermissionDeniedDialog(
+          "Location permission is denied. It is required to show nearby profiles.",
+        );
         return;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      _showPermissionDeniedDialog("Location permissions are permanently denied. Please enable them from Settings to use the app.", openSettings: true);
+      _showPermissionDeniedDialog(
+        "Location permissions are permanently denied. Please enable them from Settings to use the app.",
+        openSettings: true,
+      );
       return;
     }
 
     try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      debugPrint("Current Position: ${position.latitude}, ${position.longitude}");
-      
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      debugPrint(
+        "Current Position: ${position.latitude}, ${position.longitude}",
+      );
+
       // Update city from coordinates
       _updateCityFromCoordinates(position.latitude, position.longitude);
 
@@ -228,7 +238,9 @@ class _HomeScreenState extends State<HomeScreen>
           lat: position.latitude.toString(),
           lon: position.longitude.toString(),
         );
-        debugPrint("[Home] UpdateLatLon response status: ${response.statusCode}");
+        debugPrint(
+          "[Home] UpdateLatLon response status: ${response.statusCode}",
+        );
       }
     } catch (e) {
       debugPrint("Could not get position or update: $e");
@@ -282,7 +294,10 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _showPermissionDeniedDialog(String message, {bool openSettings = false}) {
+  void _showPermissionDeniedDialog(
+    String message, {
+    bool openSettings = false,
+  }) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -330,7 +345,9 @@ class _HomeScreenState extends State<HomeScreen>
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Some features may not work without location access."),
+                    content: Text(
+                      "Some features may not work without location access.",
+                    ),
                     backgroundColor: AppColors.error,
                   ),
                 );
@@ -401,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen>
         final List? dataList = decoded["Data"];
         if (dataList != null && dataList.isNotEmpty) {
           final data = dataList.first;
-          
+
           String? imageUrl;
           dynamic rawMedia = data["Media"] ?? data["Photos"] ?? data["Photo"];
           if (rawMedia is List && rawMedia.isNotEmpty) {
@@ -412,10 +429,10 @@ class _HomeScreenState extends State<HomeScreen>
               imageUrl = firstMedia;
             }
           }
-          
+
           final String? lat = data["Lat"]?.toString();
           final String? lon = data["Lon"]?.toString();
-          
+
           if (mounted) {
             setState(() {
               if (imageUrl != null && imageUrl.isNotEmpty) {
@@ -426,7 +443,10 @@ class _HomeScreenState extends State<HomeScreen>
 
           final double? latDouble = double.tryParse(lat ?? "");
           final double? lonDouble = double.tryParse(lon ?? "");
-          if (latDouble != null && lonDouble != null && latDouble != 0.0 && lonDouble != 0.0) {
+          if (latDouble != null &&
+              lonDouble != null &&
+              latDouble != 0.0 &&
+              lonDouble != 0.0) {
             _updateCityFromCoordinates(latDouble, lonDouble);
           }
         }
@@ -436,7 +456,10 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _updateCityFromCoordinates(double latitude, double longitude) async {
+  Future<void> _updateCityFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
     try {
       final geocoder = geo.Geocoding();
       List<geo.Placemark> placemarks = await geocoder.placemarkFromCoordinates(
@@ -445,7 +468,11 @@ class _HomeScreenState extends State<HomeScreen>
       );
       if (placemarks.isNotEmpty) {
         final placemark = placemarks.first;
-        final String city = placemark.locality ?? placemark.subAdministrativeArea ?? placemark.name ?? "Pattaya City";
+        final String city =
+            placemark.locality ??
+            placemark.subAdministrativeArea ??
+            placemark.name ??
+            "Pattaya City";
         if (mounted) {
           setState(() {
             _currentCityName = city;
@@ -554,7 +581,10 @@ class _HomeScreenState extends State<HomeScreen>
                       SizedBox(width: 10.w),
                       Row(
                         children: [
-                          Text(_currentCityName, style: AppTextStyles.subHeading),
+                          Text(
+                            _currentCityName,
+                            style: AppTextStyles.subHeading,
+                          ),
                           SizedBox(width: 4.w),
                         ],
                       ),

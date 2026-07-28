@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import '../../controller/user_controller.dart';
-import '../../widget/snakbar.dart';
 import '../bottombar.dart';
 
 import '../../authentication/registerscreen/Sexsualorentation.dart';
@@ -23,8 +22,7 @@ class UpdateProfileTabsScreen extends StatefulWidget {
       _UpdateProfileTabsScreenState();
 }
 
-class _UpdateProfileTabsScreenState
-    extends State<UpdateProfileTabsScreen> {
+class _UpdateProfileTabsScreenState extends State<UpdateProfileTabsScreen> {
   int selectedTab = 0;
   final UserController userController = Get.put(UserController());
 
@@ -40,7 +38,7 @@ class _UpdateProfileTabsScreenState
     "Lifestyle",
     "Looking For",
     "Orientation",
-     "Photos",
+    "Photos",
     //"Location",
     "Gender",
   ];
@@ -52,8 +50,8 @@ class _UpdateProfileTabsScreenState
     LookingForScreen(),
     SexualOrientationScreen(),
     UploadPhotosScreen(),
-   // LocationEnabledScreen(),
-    GenderScreen()
+    // LocationEnabledScreen(),
+    GenderScreen(),
   ];
 
   @override
@@ -65,7 +63,6 @@ class _UpdateProfileTabsScreenState
       body: SafeArea(
         child: Column(
           children: [
-
             /// 🔥 HEADER
             Container(
               margin: EdgeInsets.all(AppSize.w(16)),
@@ -91,7 +88,6 @@ class _UpdateProfileTabsScreenState
               ),
               child: Row(
                 children: [
-
                   /// 🔙 BACK BUTTON
                   GestureDetector(
                     onTap: () {
@@ -127,8 +123,7 @@ class _UpdateProfileTabsScreenState
                   SizedBox(width: 12.w),
 
                   /// ✏️ TITLE
-                  Icon(Icons.edit,
-                      color: AppColors.accent, size: 20.sp),
+                  Icon(Icons.edit, color: AppColors.accent, size: 20.sp),
                   SizedBox(width: 8.w),
 
                   Expanded(
@@ -150,9 +145,10 @@ class _UpdateProfileTabsScreenState
                           child: CircularProgressIndicator(color: Colors.white),
                         ),
                       );
-                      
+
                       final success = await userController.saveProfile();
                       if (mounted) {
+                        // ignore: use_build_context_synchronously
                         Navigator.pop(context); // close loader
                         if (success) {
                           Get.offAll(() => const MainScreen());
@@ -198,8 +194,7 @@ class _UpdateProfileTabsScreenState
               height: isTablet ? 40.h : 30.h,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding:
-                EdgeInsets.symmetric(horizontal: AppSize.w(12)),
+                padding: EdgeInsets.symmetric(horizontal: AppSize.w(12)),
                 itemCount: tabs.length,
                 itemBuilder: (context, index) {
                   final active = selectedTab == index;
@@ -211,32 +206,22 @@ class _UpdateProfileTabsScreenState
                       });
                     },
                     child: AnimatedContainer(
-                      duration:
-                      const Duration(milliseconds: 300),
-                      margin:
-                      EdgeInsets.symmetric(horizontal: 6.w),
+                      duration: const Duration(milliseconds: 300),
+                      margin: EdgeInsets.symmetric(horizontal: 6.w),
                       padding: EdgeInsets.symmetric(
-                        horizontal:
-                        isTablet ? 20.w : 14.w,
-                        vertical:
-                        isTablet ? 10.h : 5.h,
+                        horizontal: isTablet ? 20.w : 14.w,
+                        vertical: isTablet ? 10.h : 5.h,
                       ),
                       decoration: BoxDecoration(
-                        borderRadius:
-                        BorderRadius.circular(10.r),
+                        borderRadius: BorderRadius.circular(10.r),
 
                         gradient: active
                             ? LinearGradient(
-                          colors: [
-                            AppColors.accent,
-                            Colors.orange,
-                          ],
-                        )
+                                colors: [AppColors.accent, Colors.orange],
+                              )
                             : null,
 
-                        color: active
-                            ? null
-                            : AppColors.secondary,
+                        color: active ? null : AppColors.secondary,
 
                         boxShadow: [
                           BoxShadow(
@@ -245,8 +230,7 @@ class _UpdateProfileTabsScreenState
                             blurRadius: 6,
                           ),
                           BoxShadow(
-                            color: Colors.white
-                                .withValues(alpha: 0.05),
+                            color: Colors.white.withValues(alpha: 0.05),
                             offset: Offset(-3, -3),
                             blurRadius: 6,
                           ),
@@ -255,8 +239,7 @@ class _UpdateProfileTabsScreenState
                       child: Center(
                         child: Text(
                           tabs[index],
-                          style:
-                          AppTextStyles.small.copyWith(
+                          style: AppTextStyles.small.copyWith(
                             color: active
                                 ? Colors.black
                                 : AppColors.textSecondary,
@@ -275,8 +258,7 @@ class _UpdateProfileTabsScreenState
             /// 🔥 TAB CONTENT (NO SCROLL BUG)
             Expanded(
               child: AnimatedSwitcher(
-                duration:
-                const Duration(milliseconds: 300),
+                duration: const Duration(milliseconds: 300),
                 child: screens[selectedTab],
               ),
             ),

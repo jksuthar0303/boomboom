@@ -680,10 +680,12 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
               if (parts.length >= 2) {
                 final key = parts[0].trim();
                 final val = parts.sublist(1).join(":").trim();
-                if (key == "PersonalityType")
+                if (key == "PersonalityType") {
                   lifestyleList.add("Personality: $val");
-                if (key == "LanguageSpoken")
+                }
+                if (key == "LanguageSpoken") {
                   lifestyleList.add("Language: $val");
+                }
                 if (key == "Smoking") lifestyleList.add("Smoking: $val");
               }
             }

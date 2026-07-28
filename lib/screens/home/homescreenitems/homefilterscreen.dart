@@ -922,6 +922,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
               if (isSelected) {
                 _selectedInterests.remove(o);
               } else if (_selectedInterests.length < 10)
+                // ignore: curly_braces_in_flow_control_structures
                 _selectedInterests.add(o);
             });
           },

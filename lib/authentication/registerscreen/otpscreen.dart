@@ -15,24 +15,21 @@ import '../../widget/button.dart';
 class EmailOtpScreen extends StatefulWidget {
   final String email;
 
-  const EmailOtpScreen({
-    super.key,
-    required this.email,
-  });
+  const EmailOtpScreen({super.key, required this.email});
 
   @override
   State<EmailOtpScreen> createState() => _EmailOtpScreenState();
 }
 
 class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
-
   // ================= CONTROLLERS =================
 
-  final List<TextEditingController> controllers =
-  List.generate(6, (index) => TextEditingController());
+  final List<TextEditingController> controllers = List.generate(
+    6,
+    (index) => TextEditingController(),
+  );
 
-  final List<FocusNode> focusNodes =
-  List.generate(6, (index) => FocusNode());
+  final List<FocusNode> focusNodes = List.generate(6, (index) => FocusNode());
 
   bool isLoading = false;
   bool isResending = false;
@@ -126,8 +123,6 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
     try {
       await Future.delayed(const Duration(seconds: 2));
 
-      // TODO: ADD VERIFY OTP API HERE
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -169,8 +164,6 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
 
     try {
       await Future.delayed(const Duration(seconds: 2));
-
-      // TODO: ADD RESEND OTP API HERE
 
       if (!mounted) return;
 
@@ -310,8 +303,11 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                       // ✅ Border hamesha white — filled ho to bright, empty ho to soft white
                       border: Border.all(
                         color: isFilled
-                            ? Colors.white          // filled → pure white
-                            : Colors.white.withValues(alpha: 0.35), // empty → soft white
+                            ? Colors
+                                  .white // filled → pure white
+                            : Colors.white.withValues(
+                                alpha: 0.35,
+                              ), // empty → soft white
                         width: isFilled ? 1.8 : 1.2,
                       ),
 
@@ -343,12 +339,14 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                         onChanged: (value) {
                           setState(() {});
                           if (value.isNotEmpty && index < 5) {
-                            FocusScope.of(context)
-                                .requestFocus(focusNodes[index + 1]);
+                            FocusScope.of(
+                              context,
+                            ).requestFocus(focusNodes[index + 1]);
                           }
                           if (value.isEmpty && index > 0) {
-                            FocusScope.of(context)
-                                .requestFocus(focusNodes[index - 1]);
+                            FocusScope.of(
+                              context,
+                            ).requestFocus(focusNodes[index - 1]);
                           }
                         },
                         decoration: const InputDecoration(

@@ -1,15 +1,8 @@
-import 'dart:convert';
-import 'package:xml/xml.dart' as xml;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:get/get.dart';
-
 import '../../../constant/colors.dart';
-import '../../../backend/registerservice.dart';
-import '../../../backend/secure_storage.dart';
-import '../../../authentication/welcomscreens.dart';
-import '../../../widget/snakbar.dart';
 import '../../../controller/user_controller.dart';
 
 // ── Paste your actual import paths below ──────────────────────────────────────
@@ -19,8 +12,6 @@ import '../../../controller/user_controller.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // For self-contained preview the colours / styles are inlined here.
 // Remove these and use your imports once you integrate.
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -56,14 +47,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       reason: DeleteReason.foundBetterAlternative,
       label: 'I found a better alternative',
     ),
-    _ReasonItem(
-      reason: DeleteReason.difficultToUse,
-      label: 'Difficult to use',
-    ),
-    _ReasonItem(
-      reason: DeleteReason.other,
-      label: 'Other',
-    ),
+    _ReasonItem(reason: DeleteReason.difficultToUse, label: 'Difficult to use'),
+    _ReasonItem(reason: DeleteReason.other, label: 'Other'),
   ];
 
   void _onReasonTap(DeleteReason reason) {
@@ -77,7 +62,6 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       );
       return;
     }
-    // TODO: wire up your delete logic here
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
@@ -96,16 +80,20 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: Text('Cancel',
-                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: AppColors.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(dialogContext); // Close confirmation dialog
               _controller.deleteAccount(context);
             },
-            child: Text('Delete',
-                style: GoogleFonts.poppins(color: AppColors.error)),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.poppins(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -143,7 +131,9 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                         child: Container(
                           padding: EdgeInsets.all(8.sp),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12), // soft glass effect
+                            color: Colors.white.withValues(
+                              alpha: 0.12,
+                            ), // soft glass effect
                             borderRadius: BorderRadius.circular(12.r),
                             border: Border.all(
                               color: Colors.white.withValues(alpha: 0.25),
@@ -165,7 +155,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(width: 50.w,),
+                      SizedBox(width: 50.w),
                       Text(
                         'Delete Account',
                         textAlign: TextAlign.center,
@@ -208,7 +198,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
 
                   // ── Radio options ──────────────────────────────────────────
                   ..._reasons.map(
-                        (item) => _ReasonTile(
+                    (item) => _ReasonTile(
                       item: item,
                       isSelected: _selectedReason == item.reason,
                       isTablet: isTablet,
@@ -313,8 +303,7 @@ class _ReasonTile extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color:
-                  isSelected ? AppColors.error : AppColors.grey,
+                  color: isSelected ? AppColors.error : AppColors.grey,
                   width: isSelected ? 5.5 : 1.8,
                 ),
                 color: Colors.transparent,
@@ -352,7 +341,10 @@ class _WarningBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.error.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.5), width: 1.2),
+        border: Border.all(
+          color: AppColors.error.withValues(alpha: 0.5),
+          width: 1.2,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,9 +431,7 @@ class _DeleteButton extends StatelessWidget {
             style: GoogleFonts.poppins(
               fontSize: isTablet ? 16.sp : 15.sp,
               fontWeight: FontWeight.w600,
-              color: enabled
-                  ? AppColors.textPrimary
-                  : AppColors.grey,
+              color: enabled ? AppColors.textPrimary : AppColors.grey,
             ),
           ),
         ),

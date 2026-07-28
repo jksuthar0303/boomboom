@@ -1,17 +1,14 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:boomboom/authentication/registerscreen/gender.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:boomboom/backend/secure_storage.dart';
 import 'package:get/get.dart';
 import '../../../controller/user_controller.dart';
-
 import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../constant/colors.dart';
-import '../../../widget/outlinedbutton.dart';
 
 class UpdatePersonInfoUI extends StatefulWidget {
   const UpdatePersonInfoUI({super.key});
@@ -52,7 +49,9 @@ class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
                 if (selectedDate != null) {
                   final now = DateTime.now();
                   age = now.year - selectedDate!.year;
-                  if (now.month < selectedDate!.month || (now.month == selectedDate!.month && now.day < selectedDate!.day)) {
+                  if (now.month < selectedDate!.month ||
+                      (now.month == selectedDate!.month &&
+                          now.day < selectedDate!.day)) {
                     age--;
                   }
                 }
@@ -210,7 +209,10 @@ class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
                         );
 
                         age = DateTime.now().year - selectedYear;
-                        userController.dob.value = selectedDate!.toIso8601String().split('T').first;
+                        userController.dob.value = selectedDate!
+                            .toIso8601String()
+                            .split('T')
+                            .first;
                       });
 
                       Navigator.pop(context);
@@ -228,8 +230,6 @@ class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = MediaQuery.of(context).size.width > 600;
-
     return Scaffold(
       backgroundColor: AppColors.primary,
 

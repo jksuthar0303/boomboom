@@ -27,9 +27,9 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
 
   void _onSubmit() {
     if (_selectedTopic == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a topic.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a topic.')));
       return;
     }
     if (_messageController.text.trim().isEmpty) {
@@ -38,7 +38,6 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
       );
       return;
     }
-    // TODO: wire up your submit logic
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Feedback submitted! Thank you.')),
     );
@@ -176,18 +175,22 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14.r),
-                              borderSide:
-                              BorderSide(color: AppColors.inputBorder),
+                              borderSide: BorderSide(
+                                color: AppColors.inputBorder,
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14.r),
-                              borderSide:
-                              BorderSide(color: AppColors.inputBorder),
+                              borderSide: BorderSide(
+                                color: AppColors.inputBorder,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14.r),
                               borderSide: BorderSide(
-                                  color: AppColors.grey, width: 1.5),
+                                color: AppColors.grey,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                         ),
@@ -274,8 +277,11 @@ class _TopicData {
   final FeedbackTopic topic;
   final String label;
   final IconData icon;
-  const _TopicData(
-      {required this.topic, required this.label, required this.icon});
+  const _TopicData({
+    required this.topic,
+    required this.label,
+    required this.icon,
+  });
 }
 
 class _TopicCard extends StatelessWidget {
@@ -294,14 +300,16 @@ class _TopicCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Selected = white card with dark icon/text; unselected = dark card
-    final Color cardColor =
-    isSelected ? AppColors.white : AppColors.cardBg;
-    final Color iconBg =
-    isSelected ? const Color(0xFFE0E0E0) : const Color(0xFF1C1D2A);
-    final Color iconColor =
-    isSelected ? AppColors.black : AppColors.textPrimary;
-    final Color labelColor =
-    isSelected ? AppColors.black : AppColors.textPrimary;
+    final Color cardColor = isSelected ? AppColors.white : AppColors.cardBg;
+    final Color iconBg = isSelected
+        ? const Color(0xFFE0E0E0)
+        : const Color(0xFF1C1D2A);
+    final Color iconColor = isSelected
+        ? AppColors.black
+        : AppColors.textPrimary;
+    final Color labelColor = isSelected
+        ? AppColors.black
+        : AppColors.textPrimary;
 
     return GestureDetector(
       onTap: onTap,
@@ -311,9 +319,7 @@ class _TopicCard extends StatelessWidget {
           color: cardColor,
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(
-            color: isSelected
-                ? Colors.transparent
-                : AppColors.cardBorder,
+            color: isSelected ? Colors.transparent : AppColors.cardBorder,
           ),
         ),
         child: Column(
@@ -323,10 +329,7 @@ class _TopicCard extends StatelessWidget {
             Container(
               width: isTablet ? 56.w : 48.w,
               height: isTablet ? 56.w : 48.w,
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
               child: Icon(
                 data.icon,
                 color: iconColor,

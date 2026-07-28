@@ -9,27 +9,24 @@ class TravelFilterScreen extends StatefulWidget {
   const TravelFilterScreen({super.key});
 
   @override
-  State<TravelFilterScreen> createState() =>
-      _TravelFilterScreenState();
+  State<TravelFilterScreen> createState() => _TravelFilterScreenState();
 }
 
-class _TravelFilterScreenState
-    extends State<TravelFilterScreen> {
-
+class _TravelFilterScreenState extends State<TravelFilterScreen> {
   /// 🔥 COUNTRY CONTROLLER
-  final LocationController controller =
-  Get.put(LocationController());
+  final LocationController controller = Get.put(LocationController());
 
   String selectedField = "";
 
   /// 🔥 SORT
   String selectedSort = "Newest First";
 
+  // ignore: non_constant_identifier_names
   final List<String> Datecategory = [
     "All date ",
     "upcoming Date",
     "ongoing Date",
-    "landed this wee"
+    "landed this wee",
   ];
 
   /// 🔥 JOURNEY TYPE
@@ -47,20 +44,10 @@ class _TravelFilterScreenState
   ];
 
   /// 🔥 CATEGORY
-  final List<String> category = [
-    "Solo",
-    "Group",
-    "Backpacker",
-    "Couple",
-  ];
+  final List<String> category = ["Solo", "Group", "Backpacker", "Couple"];
 
   /// 🔥 GENDER
-  final List<String> gender = [
-    "Male",
-    "Female",
-    "Non-binary",
-    "Other",
-  ];
+  final List<String> gender = ["Male", "Female", "Non-binary", "Other"];
 
   final Set<String> selectedJourney = {};
   final Set<String> selectedCategory = {};
@@ -82,59 +69,41 @@ class _TravelFilterScreenState
 
   @override
   Widget build(BuildContext context) {
-
-    final isTablet =
-        MediaQuery.of(context).size.width > 600;
+    final isTablet = MediaQuery.of(context).size.width > 600;
 
     return Scaffold(
-
       backgroundColor: Colors.black,
 
       body: SafeArea(
-
         child: Column(
-
           children: [
-
             /// 🔥 HEADER
             Padding(
-
-              padding: EdgeInsets.symmetric(
-                horizontal: 15.w,
-                vertical: 12.h,
-              ),
+              padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 12.h),
 
               child: Row(
-
-                mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
                 children: [
-
                   Text(
                     "Filter Journeys",
 
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize:
-                      isTablet ? 28.sp : 24.sp,
+                      fontSize: isTablet ? 28.sp : 24.sp,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
 
                   GestureDetector(
-
                     onTap: () {
                       Navigator.pop(context);
                     },
 
                     child: Container(
+                      height: isTablet ? 45.h : 38.h,
 
-                      height:
-                      isTablet ? 45.h : 38.h,
-
-                      width:
-                      isTablet ? 56.w : 48.w,
+                      width: isTablet ? 56.w : 48.w,
 
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
@@ -144,8 +113,7 @@ class _TravelFilterScreenState
                       child: Icon(
                         Icons.close,
                         color: Colors.white,
-                        size:
-                        isTablet ? 26.sp : 22.sp,
+                        size: isTablet ? 26.sp : 22.sp,
                       ),
                     ),
                   ),
@@ -153,28 +121,17 @@ class _TravelFilterScreenState
               ),
             ),
 
-            Divider(
-              color: Colors.white10,
-              thickness: 1,
-            ),
+            Divider(color: Colors.white10, thickness: 1),
 
             /// 🔥 BODY
             Expanded(
-
               child: SingleChildScrollView(
-
-                padding: EdgeInsets.symmetric(
-                  horizontal: 20.w,
-                  vertical: 18.h,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
 
                 child: Column(
-
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
 
                   children: [
-
                     /// 🔥 SORT BY
                     title("Date category"),
 
@@ -184,18 +141,14 @@ class _TravelFilterScreenState
                       spacing: 10.w,
                       runSpacing: 10.h,
 
-                      children:
-                      Datecategory.map((e) {
-
-                        final selected =
-                            selectedSort == e;
+                      children: Datecategory.map((e) {
+                        final selected = selectedSort == e;
 
                         return filterChip(
                           title: e,
                           selected: selected,
 
                           onTap: () {
-
                             setState(() {
                               selectedSort = e;
                             });
@@ -212,7 +165,7 @@ class _TravelFilterScreenState
                     SizedBox(height: 14.h),
 
                     Obx(
-                          () => _dropdown(
+                      () => _dropdown(
                         controller.fromCountry.value,
                         "Nationality",
                         Icons.flag,
@@ -230,20 +183,15 @@ class _TravelFilterScreenState
                       spacing: 10.w,
                       runSpacing: 10.h,
 
-                      children:
-                      journeyTypes.map((e) {
-
-                        final selected =
-                        selectedJourney.contains(e);
+                      children: journeyTypes.map((e) {
+                        final selected = selectedJourney.contains(e);
 
                         return filterChip(
                           title: e,
                           selected: selected,
 
                           onTap: () {
-
                             setState(() {
-
                               if (selected) {
                                 selectedJourney.remove(e);
                               } else {
@@ -266,20 +214,15 @@ class _TravelFilterScreenState
                       spacing: 10.w,
                       runSpacing: 10.h,
 
-                      children:
-                      category.map((e) {
-
-                        final selected =
-                        selectedCategory.contains(e);
+                      children: category.map((e) {
+                        final selected = selectedCategory.contains(e);
 
                         return filterChip(
                           title: e,
                           selected: selected,
 
                           onTap: () {
-
                             setState(() {
-
                               if (selected) {
                                 selectedCategory.remove(e);
                               } else {
@@ -302,20 +245,15 @@ class _TravelFilterScreenState
                       spacing: 10.w,
                       runSpacing: 10.h,
 
-                      children:
-                      gender.map((e) {
-
-                        final selected =
-                        selectedGender.contains(e);
+                      children: gender.map((e) {
+                        final selected = selectedGender.contains(e);
 
                         return filterChip(
                           title: e,
                           selected: selected,
 
                           onTap: () {
-
                             setState(() {
-
                               if (selected) {
                                 selectedGender.remove(e);
                               } else {
@@ -339,15 +277,12 @@ class _TravelFilterScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
 
                       children: [
-
                         /// COUNTRY
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
 
                             children: [
-
                               Text(
                                 "Country",
 
@@ -361,7 +296,7 @@ class _TravelFilterScreenState
                               SizedBox(height: 10.h),
 
                               Obx(
-                                    () => _dropdown(
+                                () => _dropdown(
                                   controller.fromCountry.value,
                                   "From Country",
                                   Icons.public,
@@ -376,11 +311,9 @@ class _TravelFilterScreenState
                         /// CITY
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
 
                             children: [
-
                               Text(
                                 "City",
 
@@ -394,7 +327,7 @@ class _TravelFilterScreenState
                               SizedBox(height: 10.h),
 
                               Obx(
-                                    () => _dropdown(
+                                () => _dropdown(
                                   controller.fromCity.value,
                                   "From City",
                                   Icons.location_city,
@@ -414,19 +347,15 @@ class _TravelFilterScreenState
                     SizedBox(height: 10.h),
 
                     Row(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
 
                       children: [
-
                         /// COUNTRY
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
 
                             children: [
-
                               Text(
                                 "Country",
 
@@ -440,7 +369,7 @@ class _TravelFilterScreenState
                               SizedBox(height: 10.h),
 
                               Obx(
-                                    () => _dropdown(
+                                () => _dropdown(
                                   controller.destinationCountry.value,
                                   "Destination Country",
                                   Icons.public,
@@ -455,11 +384,9 @@ class _TravelFilterScreenState
                         /// CITY
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
 
                             children: [
-
                               Text(
                                 "City",
 
@@ -473,7 +400,7 @@ class _TravelFilterScreenState
                               SizedBox(height: 10.h),
 
                               Obx(
-                                    () => _dropdown(
+                                () => _dropdown(
                                   controller.destinationCity.value,
                                   "Destination City",
                                   Icons.location_city,
@@ -494,43 +421,29 @@ class _TravelFilterScreenState
 
                     Row(
                       children: [
-
                         Expanded(
                           child: dateField(
-                            title:
-                            DateFormat(
-                              "yyyy-MM-dd",
-                            ).format(startDate!),
+                            title: DateFormat("yyyy-MM-dd").format(startDate!),
 
                             onTap: () async {
-
-                              final picked =
-                              await showDatePicker(
-
+                              final picked = await showDatePicker(
                                 context: context,
 
-                                initialDate:
-                                startDate!,
+                                initialDate: startDate!,
 
-                                firstDate:
-                                DateTime(2020),
+                                firstDate: DateTime(2020),
 
-                                lastDate:
-                                DateTime(2035),
+                                lastDate: DateTime(2035),
 
-                                builder:
-                                    (context, child) {
-
+                                builder: (context, child) {
                                   return Theme(
-                                    data:
-                                    ThemeData.dark(),
+                                    data: ThemeData.dark(),
                                     child: child!,
                                   );
                                 },
                               );
 
                               if (picked != null) {
-
                                 setState(() {
                                   startDate = picked;
                                 });
@@ -543,40 +456,27 @@ class _TravelFilterScreenState
 
                         Expanded(
                           child: dateField(
-                            title:
-                            DateFormat(
-                              "yyyy-MM-dd",
-                            ).format(endDate!),
+                            title: DateFormat("yyyy-MM-dd").format(endDate!),
 
                             onTap: () async {
-
-                              final picked =
-                              await showDatePicker(
-
+                              final picked = await showDatePicker(
                                 context: context,
 
-                                initialDate:
-                                endDate!,
+                                initialDate: endDate!,
 
-                                firstDate:
-                                DateTime(2020),
+                                firstDate: DateTime(2020),
 
-                                lastDate:
-                                DateTime(2035),
+                                lastDate: DateTime(2035),
 
-                                builder:
-                                    (context, child) {
-
+                                builder: (context, child) {
                                   return Theme(
-                                    data:
-                                    ThemeData.dark(),
+                                    data: ThemeData.dark(),
                                     child: child!,
                                   );
                                 },
                               );
 
                               if (picked != null) {
-
                                 setState(() {
                                   endDate = picked;
                                 });
@@ -592,49 +492,35 @@ class _TravelFilterScreenState
                     /// 🔥 BUTTONS
                     Row(
                       children: [
-
                         Expanded(
-
                           child: GestureDetector(
-
                             onTap: () {
-
                               setState(() {
-
                                 selectedJourney.clear();
                                 selectedCategory.clear();
                                 selectedGender.clear();
 
-                                selectedSort =
-                                "Newest First";
+                                selectedSort = "Newest First";
                               });
                             },
 
                             child: Container(
-
-                              height:
-                              isTablet ? 62.h : 56.h,
+                              height: isTablet ? 62.h : 56.h,
 
                               decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(18.r),
 
-                                borderRadius:
-                                BorderRadius.circular(
-                                    18.r),
-
-                                color:
-                                const Color(0xFF242424),
+                                color: const Color(0xFF242424),
                               ),
 
                               child: Center(
-
                                 child: Text(
                                   "CLEAR",
 
                                   style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: 16.sp,
-                                    fontWeight:
-                                    FontWeight.w700,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -645,24 +531,16 @@ class _TravelFilterScreenState
                         SizedBox(width: 14.w),
 
                         Expanded(
-
                           child: GestureDetector(
-
                             onTap: () {},
 
                             child: Container(
-
-                              height:
-                              isTablet ? 62.h : 56.h,
+                              height: isTablet ? 62.h : 56.h,
 
                               decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(18.r),
 
-                                borderRadius:
-                                BorderRadius.circular(
-                                    18.r),
-
-                                gradient:
-                                const LinearGradient(
+                                gradient: const LinearGradient(
                                   colors: [
                                     Color(0xFFFF3D6D),
                                     Color(0xFFB22445),
@@ -671,15 +549,13 @@ class _TravelFilterScreenState
                               ),
 
                               child: Center(
-
                                 child: Text(
                                   "FILTER",
 
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 16.sp,
-                                    fontWeight:
-                                    FontWeight.w700,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -702,7 +578,6 @@ class _TravelFilterScreenState
 
   /// 🔥 TITLE
   Widget title(String text) {
-
     return Text(
       text,
 
@@ -720,30 +595,18 @@ class _TravelFilterScreenState
     required bool selected,
     required VoidCallback onTap,
   }) {
-
     return GestureDetector(
-
       onTap: onTap,
 
       child: Container(
-
-        padding: EdgeInsets.symmetric(
-          horizontal: 18.w,
-          vertical: 12.h,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 12.h),
 
         decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20.r),
 
-          borderRadius:
-          BorderRadius.circular(20.r),
+          color: selected ? const Color(0xFFFF3D6D) : const Color(0xFF1F1F1F),
 
-          color: selected
-              ? const Color(0xFFFF3D6D)
-              : const Color(0xFF1F1F1F),
-
-          border: Border.all(
-            color: Colors.white10,
-          ),
+          border: Border.all(color: Colors.white10),
         ),
 
         child: Text(
@@ -760,65 +623,39 @@ class _TravelFilterScreenState
   }
 
   /// 🔥 DROPDOWN
-  Widget _dropdown(
-      String selectedValue,
-      String title,
-      IconData icon,
-      ) {
-
+  Widget _dropdown(String selectedValue, String title, IconData icon) {
     return GestureDetector(
-
       onTap: () {
-
         selectedField = title;
 
         _openBottomSheet();
       },
 
       child: Container(
-
         height: 40.h,
 
-        padding: EdgeInsets.symmetric(
-          horizontal: 16.w,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
 
         decoration: BoxDecoration(
-
           color: const Color(0xFF1F1F1F),
 
-          borderRadius:
-          BorderRadius.circular(18.r),
+          borderRadius: BorderRadius.circular(18.r),
 
-          border: Border.all(
-            color: Colors.white10,
-          ),
+          border: Border.all(color: Colors.white10),
         ),
 
         child: Row(
-
-          mainAxisAlignment:
-          MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
           children: [
-
             Expanded(
-
               child: Text(
+                selectedValue.isEmpty ? "Select $title" : selectedValue,
 
-                selectedValue.isEmpty
-                    ? "Select $title"
-                    : selectedValue,
-
-                overflow:
-                TextOverflow.ellipsis,
+                overflow: TextOverflow.ellipsis,
 
                 style: TextStyle(
-
-                  color:
-                  selectedValue.isEmpty
-                      ? Colors.white38
-                      : Colors.white,
+                  color: selectedValue.isEmpty ? Colors.white38 : Colors.white,
 
                   fontSize: 12.sp,
                 ),
@@ -837,49 +674,31 @@ class _TravelFilterScreenState
   }
 
   /// 🔥 DATE FIELD
-  Widget dateField({
-    required String title,
-    required VoidCallback onTap,
-  }) {
-
+  Widget dateField({required String title, required VoidCallback onTap}) {
     return GestureDetector(
-
       onTap: onTap,
 
       child: Container(
-
         height: 40.h,
 
-        padding: EdgeInsets.symmetric(
-          horizontal: 16.w,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
 
         decoration: BoxDecoration(
-
-          borderRadius:
-          BorderRadius.circular(18.r),
+          borderRadius: BorderRadius.circular(18.r),
 
           color: const Color(0xFF1F1F1F),
 
-          border: Border.all(
-            color: Colors.white10,
-          ),
+          border: Border.all(color: Colors.white10),
         ),
 
         child: Row(
-
-          mainAxisAlignment:
-          MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
           children: [
-
             Text(
               title,
 
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15.sp,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 15.sp),
             ),
 
             Icon(
@@ -898,34 +717,22 @@ class _TravelFilterScreenState
   /// 🔥 COUNTRY BOTTOM SHEET
   /// 🔥 COUNTRY BOTTOM SHEET
   void _openBottomSheet() {
-
     Get.bottomSheet(
-
       Container(
-
         height: 500.h,
 
         padding: EdgeInsets.all(16.w),
 
         decoration: BoxDecoration(
-
           /// 🔥 PREMIUM SHINY GREY
           gradient: const LinearGradient(
-
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
 
-            colors: [
-
-              Color(0xFF40465A),
-              Color(0xFF313546),
-              Color(0xFF262A36),
-            ],
+            colors: [Color(0xFF40465A), Color(0xFF313546), Color(0xFF262A36)],
           ),
 
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(34.r),
-          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34.r)),
 
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.08),
@@ -934,7 +741,6 @@ class _TravelFilterScreenState
 
           /// 🔥 SHADOW FOR POPUP EFFECT
           boxShadow: [
-
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.60),
               blurRadius: 45,
@@ -945,28 +751,18 @@ class _TravelFilterScreenState
         ),
 
         child: Column(
-
           children: [
-
             /// 🔥 TOP HANDLE
             Container(
-
               width: 65.w,
               height: 6.h,
 
               decoration: BoxDecoration(
-
                 gradient: const LinearGradient(
-
-                  colors: [
-
-                    Colors.white70,
-                    Colors.white24,
-                  ],
+                  colors: [Colors.white70, Colors.white24],
                 ),
 
-                borderRadius:
-                BorderRadius.circular(30.r),
+                borderRadius: BorderRadius.circular(30.r),
               ),
             ),
 
@@ -974,20 +770,14 @@ class _TravelFilterScreenState
 
             /// 🔥 SEARCH FIELD
             Container(
-
               decoration: BoxDecoration(
-
                 color: const Color(0xFF4A5065),
 
-                borderRadius:
-                BorderRadius.circular(20.r),
+                borderRadius: BorderRadius.circular(20.r),
 
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.06),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
 
                 boxShadow: [
-
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 12,
@@ -997,7 +787,6 @@ class _TravelFilterScreenState
               ),
 
               child: TextField(
-
                 onChanged: (value) {
                   controller.filterCountries(value);
                 },
@@ -1009,13 +798,9 @@ class _TravelFilterScreenState
                 ),
 
                 decoration: InputDecoration(
-
                   hintText: "Search country...",
 
-                  hintStyle: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 14.sp,
-                  ),
+                  hintStyle: TextStyle(color: Colors.white54, fontSize: 14.sp),
 
                   border: InputBorder.none,
 
@@ -1025,9 +810,7 @@ class _TravelFilterScreenState
                     size: 22.sp,
                   ),
 
-                  contentPadding: EdgeInsets.symmetric(
-                    vertical: 18.h,
-                  ),
+                  contentPadding: EdgeInsets.symmetric(vertical: 18.h),
                 ),
               ),
             ),
@@ -1036,98 +819,55 @@ class _TravelFilterScreenState
 
             /// 🔥 COUNTRY LIST
             Expanded(
-
               child: Obx(
+                () => ListView.separated(
+                  physics: const BouncingScrollPhysics(),
 
-                    () => ListView.separated(
+                  itemCount: controller.filteredCountries.length,
 
-                  physics:
-                  const BouncingScrollPhysics(),
-
-                  itemCount:
-                  controller.filteredCountries.length,
-
-                  separatorBuilder: (_, _) =>
-                      SizedBox(height: 12.h),
+                  separatorBuilder: (_, _) => SizedBox(height: 12.h),
 
                   itemBuilder: (_, i) {
-
-                    final country =
-                    controller.filteredCountries[i];
+                    final country = controller.filteredCountries[i];
 
                     return InkWell(
-
-                      borderRadius:
-                      BorderRadius.circular(20.r),
+                      borderRadius: BorderRadius.circular(20.r),
 
                       onTap: () {
-
-                        if (selectedField ==
-                            "Nationality") {
-
-                          controller.fromCountry
-                              .value =
-                          country["name"];
-
-                        } else if (selectedField ==
-                            "From Country") {
-
-                          controller.fromCountry
-                              .value =
-                          country["name"];
-
-                        } else if (selectedField ==
-                            "From City") {
-
-                          controller.fromCity
-                              .value =
-                          country["name"];
-
-                        } else if (selectedField ==
-                            "Destination Country") {
-
-                          controller
-                              .destinationCountry
-                              .value =
-                          country["name"];
-
-                        } else if (selectedField ==
-                            "Destination City") {
-
-                          controller
-                              .destinationCity
-                              .value =
-                          country["name"];
+                        if (selectedField == "Nationality") {
+                          controller.fromCountry.value = country["name"];
+                        } else if (selectedField == "From Country") {
+                          controller.fromCountry.value = country["name"];
+                        } else if (selectedField == "From City") {
+                          controller.fromCity.value = country["name"];
+                        } else if (selectedField == "Destination Country") {
+                          controller.destinationCountry.value = country["name"];
+                        } else if (selectedField == "Destination City") {
+                          controller.destinationCity.value = country["name"];
                         }
 
                         Get.back();
                       },
 
                       child: Container(
-
                         padding: EdgeInsets.symmetric(
                           horizontal: 14.w,
                           vertical: 14.h,
                         ),
 
                         decoration: BoxDecoration(
-
                           /// 🔥 CARD SHINE COLOR
                           color: const Color(0xFF4A5065),
 
-                          borderRadius:
-                          BorderRadius.circular(20.r),
+                          borderRadius: BorderRadius.circular(20.r),
 
                           border: Border.all(
-                            color:
-                            Colors.white.withValues(alpha: 0.06),
+                            color: Colors.white.withValues(alpha: 0.06),
                           ),
 
                           boxShadow: [
-
                             BoxShadow(
-                              color:
-                              Colors.black.withValues(alpha: 0.15),
+                              color: Colors.black.withValues(alpha: 0.15),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -1135,48 +875,34 @@ class _TravelFilterScreenState
                         ),
 
                         child: Row(
-
                           children: [
-
                             /// 🔥 FLAG
                             ClipRRect(
+                              borderRadius: BorderRadius.circular(6.r),
 
-                              borderRadius:
-                              BorderRadius.circular(6.r),
-
-                              child:
-                              country["flag"] != null
-
+                              child: country["flag"] != null
                                   ? Image.network(
+                                      country["flag"],
 
-                                country["flag"],
+                                      width: 36.w,
+                                      height: 24.h,
 
-                                width: 36.w,
-                                height: 24.h,
-
-                                fit: BoxFit.cover,
-                              )
-
-                                  : Icon(
-                                Icons.flag,
-                                color: Colors.white54,
-                              ),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Icon(Icons.flag, color: Colors.white54),
                             ),
 
                             SizedBox(width: 14.w),
 
                             /// 🔥 COUNTRY NAME
                             Expanded(
-
                               child: Text(
-
                                 country["name"],
 
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 15.sp,
-                                  fontWeight:
-                                  FontWeight.w600,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -1206,4 +932,5 @@ class _TravelFilterScreenState
 
       isScrollControlled: true,
     );
-  }  }
+  }
+}

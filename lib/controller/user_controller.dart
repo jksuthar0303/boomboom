@@ -97,7 +97,9 @@ class UserController extends GetxController {
                 final decoded = jsonDecode(jsonStr);
                 final List? dataList = decoded["Data"];
                 if (dataList != null && dataList.isNotEmpty) {
-                  final Map<String, dynamic> data = Map<String, dynamic>.from(dataList.first);
+                  final Map<String, dynamic> data = Map<String, dynamic>.from(
+                    dataList.first,
+                  );
                   data["FullName"] = fullName.value.trim();
                   data["Dob"] = dob.value.trim();
                   data["Gender"] = gender.value.trim();
@@ -109,13 +111,15 @@ class UserController extends GetxController {
                   data["BodyType"] = bodyType.value.trim();
                   data["DrinkingHabits"] = drinkingHabits.value.trim();
                   data["Workout"] = workout.value.trim();
-                  
+
                   decoded["Data"] = [data];
                   await SecureStorage().saveProfileJson(jsonEncode(decoded));
                 }
               }
             } catch (cacheErr) {
-              debugPrint("Error updating local cache in saveProfile: $cacheErr");
+              debugPrint(
+                "Error updating local cache in saveProfile: $cacheErr",
+              );
             }
 
             // 🚀 Trigger complete profile sync from server in the background
@@ -161,6 +165,7 @@ class UserController extends GetxController {
       final password = await SecureStorage().getUserPassword() ?? "";
 
       if (email.isEmpty || password.isEmpty) {
+        // ignore: use_build_context_synchronously
         Navigator.pop(context); // close loader
         NeuSnackbar.error(
           "Session credentials not found. Please log out and try again.",
@@ -173,6 +178,7 @@ class UserController extends GetxController {
         password: password,
       );
 
+      // ignore: use_build_context_synchronously
       Navigator.pop(context); // close loader
 
       if (response.statusCode == 200) {
@@ -199,6 +205,7 @@ class UserController extends GetxController {
         NeuSnackbar.error("Server returned error: HTTP ${response.statusCode}");
       }
     } catch (e) {
+      // ignore: use_build_context_synchronously
       Navigator.pop(context); // close loader
       debugPrint("DeleteAccount API Error: $e");
       NeuSnackbar.error("Failed to delete account: $e");

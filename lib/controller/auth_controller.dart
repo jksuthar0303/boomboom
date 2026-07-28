@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:boomboom/backend/xml_api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
@@ -29,14 +28,16 @@ class AuthController extends GetxController {
           final String jsonProfileStr = res.first.innerText;
           final Map<String, dynamic> profileJson = jsonDecode(jsonProfileStr);
           final int status = profileJson["Status"] ?? 0;
-          
+
           if (status == 1 && profileJson["ResultSets"] is List) {
             final List resultSets = profileJson["ResultSets"];
             if (resultSets.length >= 5) {
               // ResultSet 1: Profile details
               final List profileList = resultSets[1];
               if (profileList.isNotEmpty) {
-                final Map<String, dynamic> data = Map<String, dynamic>.from(profileList.first);
+                final Map<String, dynamic> data = Map<String, dynamic>.from(
+                  profileList.first,
+                );
 
                 // ResultSet 2: Media
                 final List mediaList = resultSets[2];
@@ -60,9 +61,14 @@ class AuthController extends GetxController {
                 final List<String> interests = [];
                 final Map<String, int> interestMap = {};
                 for (var item in interestsList) {
-                  final String rawName = (item["Interest"] ?? "").toString().trim();
-                  final String matchedName = AppConstants.findMatchingInterest(rawName) ?? rawName;
-                  final int? id = int.tryParse(item["id"]?.toString() ?? item["Id"]?.toString() ?? "");
+                  final String rawName = (item["Interest"] ?? "")
+                      .toString()
+                      .trim();
+                  final String matchedName =
+                      AppConstants.findMatchingInterest(rawName) ?? rawName;
+                  final int? id = int.tryParse(
+                    item["id"]?.toString() ?? item["Id"]?.toString() ?? "",
+                  );
                   if (matchedName.isNotEmpty) {
                     interests.add(matchedName);
                     if (id != null) {
@@ -77,7 +83,9 @@ class AuthController extends GetxController {
                 final List lifestyleList = resultSets[4];
                 final List<String> lifestyle = [];
                 for (var item in lifestyleList) {
-                  final String val = (item["LifeStyle"] ?? "").toString().trim();
+                  final String val = (item["LifeStyle"] ?? "")
+                      .toString()
+                      .trim();
                   if (val.isNotEmpty) {
                     lifestyle.add(val);
                   }
@@ -100,7 +108,9 @@ class AuthController extends GetxController {
         }
       }
     } catch (e) {
-      debugPrint("Error fetching and storing full profile via ShowCompleteProfile: $e");
+      debugPrint(
+        "Error fetching and storing full profile via ShowCompleteProfile: $e",
+      );
     }
   }
 

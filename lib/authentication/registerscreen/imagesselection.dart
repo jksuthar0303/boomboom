@@ -138,9 +138,8 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
+        builder: (_) =>
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
       );
       try {
         final email = await SecureStorage().getUserEmail() ?? "";
@@ -151,7 +150,9 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
           );
           if (res.statusCode == 200) {
             // Re-fetch complete profile
-            await Get.put(AuthController()).fetchAndStoreFullProfile(email: email);
+            await Get.put(
+              AuthController(),
+            ).fetchAndStoreFullProfile(email: email);
           }
         }
       } catch (e) {
@@ -486,25 +487,35 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
                                     context: context,
                                     barrierDismissible: false,
                                     builder: (_) => const Center(
-                                      child: CircularProgressIndicator(color: Colors.white),
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   );
                                   try {
-                                    final email = await SecureStorage().getUserEmail() ?? "";
+                                    final email =
+                                        await SecureStorage().getUserEmail() ??
+                                        "";
                                     if (email.isNotEmpty) {
-                                      final res = await RegisterService().mediaDelete(
-                                        id: int.parse(id),
-                                        email: email,
-                                      );
+                                      final res = await RegisterService()
+                                          .mediaDelete(
+                                            id: int.parse(id),
+                                            email: email,
+                                          );
                                       if (res.statusCode == 200) {
                                         // Re-fetch complete profile
-                                        await Get.put(AuthController()).fetchAndStoreFullProfile(email: email);
+                                        await Get.put(
+                                          AuthController(),
+                                        ).fetchAndStoreFullProfile(
+                                          email: email,
+                                        );
                                       }
                                     }
                                   } catch (e) {
                                     debugPrint("Error deleting video: $e");
                                   }
                                   if (mounted) {
+                                    // ignore: use_build_context_synchronously
                                     Navigator.pop(context); // close loader
                                   }
                                 }

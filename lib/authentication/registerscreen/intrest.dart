@@ -218,15 +218,18 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
                   if (parts.length >= 2) {
                     final key = parts[0].trim();
                     final val = parts.sublist(1).join(":").trim();
-                    if (key == "PersonalityType")
+                    if (key == "PersonalityType") {
                       selectedEthnicity = _findMatchingOption(
                         val,
                         personalityOpts,
                       );
-                    if (key == "LanguageSpoken")
+                    }
+                    if (key == "LanguageSpoken") {
                       selectedEyeColor = _findMatchingOption(val, languageOpts);
-                    if (key == "Smoking")
+                    }
+                    if (key == "Smoking") {
                       selectedSmoking = _findMatchingOption(val, smokingOpts);
+                    }
                   }
                 }
               }
@@ -467,7 +470,8 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
               final List raw = data["Interests"];
               for (var r in raw) {
                 final String rawName = r.toString().trim();
-                final String matchedName = AppConstants.findMatchingInterest(rawName) ?? rawName;
+                final String matchedName =
+                    AppConstants.findMatchingInterest(rawName) ?? rawName;
                 if (matchedName.isNotEmpty) {
                   originalInterests.add(matchedName);
                 }
@@ -482,7 +486,9 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
         if (mapStr != null && mapStr.isNotEmpty) {
           try {
             final Map decodedMap = jsonDecode(mapStr);
-            interestMap = decodedMap.map((k, v) => MapEntry(k.toString(), int.parse(v.toString())));
+            interestMap = decodedMap.map(
+              (k, v) => MapEntry(k.toString(), int.parse(v.toString())),
+            );
           } catch (e) {
             debugPrint("Error parsing interest map: $e");
           }
@@ -524,19 +530,25 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
 
         // 2. Save selected lifestyles
         final List<String> lifestyleItems = [];
-        if (selectedDrinking != null)
+        if (selectedDrinking != null) {
           lifestyleItems.add("Drinking: $selectedDrinking");
-        if (selectedWorkout != null)
+        }
+        if (selectedWorkout != null) {
           lifestyleItems.add("Workout: $selectedWorkout");
-        if (selectedBodyType != null)
+        }
+        if (selectedBodyType != null) {
           lifestyleItems.add("BodyType: $selectedBodyType");
+        }
         lifestyleItems.add("Height: ${_heightCm.toInt()} cm");
-        if (selectedEthnicity != null)
+        if (selectedEthnicity != null) {
           lifestyleItems.add("PersonalityType: $selectedEthnicity");
-        if (selectedEyeColor != null)
+        }
+        if (selectedEyeColor != null) {
           lifestyleItems.add("LanguageSpoken: $selectedEyeColor");
-        if (selectedSmoking != null)
+        }
+        if (selectedSmoking != null) {
           lifestyleItems.add("Smoking: $selectedSmoking");
+        }
 
         for (var lifestyle in lifestyleItems) {
           await _registerService.lifestyleInsert(

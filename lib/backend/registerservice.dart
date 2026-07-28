@@ -6,7 +6,7 @@ class RegisterService {
   final XmlApiClient _client;
 
   RegisterService({XmlApiClient? client})
-      : _client = client ?? XmlApiClient(baseUrl: AppConstants.baseUrl);
+    : _client = client ?? XmlApiClient(baseUrl: AppConstants.baseUrl);
 
   static const String namespace = AppConstants.tempuriNamespace;
 
@@ -28,8 +28,8 @@ class RegisterService {
     required String drinkingHabits,
     required String workout,
   }) async {
-    const String method = 'RegisterInsert';
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <RegisterInsert xmlns="$namespace">
@@ -52,14 +52,13 @@ class RegisterService {
       <FCMToken></FCMToken>
     </RegisterInsert>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
@@ -70,8 +69,8 @@ class RegisterService {
     required String type,
     ProgressCallback? onSendProgress,
   }) async {
-    const String method = 'MediaInsert';
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <MediaInsert xmlns="$namespace">
@@ -81,15 +80,14 @@ class RegisterService {
       <Type>$type</Type>
     </MediaInsert>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
       onSendProgress: onSendProgress,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
@@ -99,7 +97,8 @@ class RegisterService {
     required String password,
     String fcmToken = "",
   }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <Login xmlns="$namespace">
@@ -109,22 +108,20 @@ class RegisterService {
       <FCMToken>$fcmToken</FCMToken>
     </Login>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
   /// SOAP ShowProfile request
-  Future<XmlResponse> showProfile({
-    required String email,
-  }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+  Future<XmlResponse> showProfile({required String email}) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <ShowProfile xmlns="$namespace">
@@ -132,14 +129,13 @@ class RegisterService {
       <EmailAddress>$email</EmailAddress>
     </ShowProfile>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
@@ -148,7 +144,8 @@ class RegisterService {
     required String email,
     required String newPassword,
   }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <ForgotPassword xmlns="$namespace">
@@ -157,14 +154,13 @@ class RegisterService {
       <NewPassword>$newPassword</NewPassword>
     </ForgotPassword>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
@@ -173,7 +169,8 @@ class RegisterService {
     required String email,
     required String password,
   }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <DeleteAccount xmlns="$namespace">
@@ -182,14 +179,13 @@ class RegisterService {
       <AppPassword>$password</AppPassword>
     </DeleteAccount>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
@@ -198,8 +194,11 @@ class RegisterService {
     required String email,
     required String interest,
   }) async {
-    final String cleanInterest = interest.replaceAll(RegExp(r'[^\x00-\x7F]'), '').trim();
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String cleanInterest = interest
+        .replaceAll(RegExp(r'[^\x00-\x7F]'), '')
+        .trim();
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <InterestInsert xmlns="$namespace">
@@ -208,14 +207,13 @@ class RegisterService {
       <Email>$email</Email>
     </InterestInsert>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
@@ -224,8 +222,11 @@ class RegisterService {
     required String email,
     required String lifestyle,
   }) async {
-    final String cleanLifestyle = lifestyle.replaceAll(RegExp(r'[^\x00-\x7F]'), '').trim();
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String cleanLifestyle = lifestyle
+        .replaceAll(RegExp(r'[^\x00-\x7F]'), '')
+        .trim();
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <LifestyleInsert xmlns="$namespace">
@@ -234,22 +235,20 @@ class RegisterService {
       <Email>$email</Email>
     </LifestyleInsert>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
   /// SOAP ShowInterestByEmail request
-  Future<XmlResponse> showInterestByEmail({
-    required String email,
-  }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+  Future<XmlResponse> showInterestByEmail({required String email}) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <ShowInterestByEmail xmlns="$namespace">
@@ -257,22 +256,20 @@ class RegisterService {
       <Email>$email</Email>
     </ShowInterestByEmail>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
   /// SOAP ShowLifestyleByEmail request
-  Future<XmlResponse> showLifestyleByEmail({
-    required String email,
-  }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+  Future<XmlResponse> showLifestyleByEmail({required String email}) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <ShowLifestyleByEmail xmlns="$namespace">
@@ -280,14 +277,13 @@ class RegisterService {
       <Email>$email</Email>
     </ShowLifestyleByEmail>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
@@ -296,7 +292,8 @@ class RegisterService {
     required String email,
     required String type,
   }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <ShowMediaByEmail xmlns="$namespace">
@@ -305,14 +302,13 @@ class RegisterService {
       <Type>$type</Type>
     </ShowMediaByEmail>
   </soap12:Body>
-</soap12:Envelope>'''.trim();
+</soap12:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'application/soap+xml; charset=utf-8',
-      },
+      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
     );
   }
 
@@ -322,7 +318,8 @@ class RegisterService {
     required String lat,
     required String lon,
   }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
     <UpdateLatLon xmlns="$namespace">
@@ -332,7 +329,8 @@ class RegisterService {
       <Lon>$lon</Lon>
     </UpdateLatLon>
   </soap:Body>
-</soap:Envelope>'''.trim();
+</soap:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
@@ -359,7 +357,8 @@ class RegisterService {
     required String drinkingHabits,
     required String workout,
   }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
     <UpdateProfile xmlns="$namespace">
@@ -378,7 +377,8 @@ class RegisterService {
       <Workout>$workout</Workout>
     </UpdateProfile>
   </soap:Body>
-</soap:Envelope>'''.trim();
+</soap:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
@@ -395,7 +395,8 @@ class RegisterService {
     required int id,
     required String email,
   }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
     <InterestDelete xmlns="$namespace">
@@ -404,7 +405,8 @@ class RegisterService {
       <Email>$email</Email>
     </InterestDelete>
   </soap:Body>
-</soap:Envelope>'''.trim();
+</soap:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
@@ -417,10 +419,9 @@ class RegisterService {
   }
 
   /// SOAP ShowCompleteProfile request
-  Future<XmlResponse> showCompleteProfile({
-    required String email,
-  }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+  Future<XmlResponse> showCompleteProfile({required String email}) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
     <ShowCompleteProfile xmlns="$namespace">
@@ -428,7 +429,8 @@ class RegisterService {
       <EmailAddress>$email</EmailAddress>
     </ShowCompleteProfile>
   </soap:Body>
-</soap:Envelope>'''.trim();
+</soap:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
@@ -445,7 +447,8 @@ class RegisterService {
     required int id,
     required String email,
   }) async {
-    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
     <MediaDelete xmlns="$namespace">
@@ -454,7 +457,8 @@ class RegisterService {
       <Email>$email</Email>
     </MediaDelete>
   </soap:Body>
-</soap:Envelope>'''.trim();
+</soap:Envelope>'''
+            .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
@@ -466,4 +470,3 @@ class RegisterService {
     );
   }
 }
-

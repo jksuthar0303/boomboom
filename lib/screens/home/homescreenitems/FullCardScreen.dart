@@ -22,7 +22,6 @@ class FullCardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return ListView.builder(
       scrollDirection: Axis.horizontal,
 
@@ -30,12 +29,9 @@ class FullCardScreen extends StatelessWidget {
       itemCount: images.length + 1,
 
       itemBuilder: (_, index) {
-
         /// 🔥 SEE ALL CARD
         if (index == images.length) {
-
           return GestureDetector(
-
             onTap: () {
               Get.to(() => const ExploreUsersScreen());
             },
@@ -43,9 +39,7 @@ class FullCardScreen extends StatelessWidget {
               width: AppSize.w(280),
               height: AppSize.h(420),
 
-              margin: EdgeInsets.only(
-                right: AppSize.w(12),
-              ),
+              margin: EdgeInsets.only(right: AppSize.w(12)),
 
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(25.r),
@@ -54,10 +48,7 @@ class FullCardScreen extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
 
-                  colors: [
-                    Color(0xFFFF6A00),
-                    Color(0xFFFFC000),
-                  ],
+                  colors: [Color(0xFFFF6A00), Color(0xFFFFC000)],
                 ),
 
                 boxShadow: [
@@ -72,7 +63,6 @@ class FullCardScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-
                   /// 🔥 ICON
                   Container(
                     height: 85.h,
@@ -131,7 +121,6 @@ class FullCardScreen extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-
                         Text(
                           "Open",
 
@@ -157,12 +146,9 @@ class FullCardScreen extends StatelessWidget {
           );
         }
 
-
         /// 🔥 NORMAL USER CARD
         return GestureDetector(
-
           onTap: () {
-
             Get.to(() => BoomProfileScreen());
           },
 
@@ -174,24 +160,18 @@ class FullCardScreen extends StatelessWidget {
 
   /// 🔥 USER CARD
   Widget _card(String image) {
-
     return Container(
       width: AppSize.w(280),
       height: AppSize.h(420),
 
-      margin: EdgeInsets.only(
-        right: AppSize.w(12),
-      ),
+      margin: EdgeInsets.only(right: AppSize.w(12)),
 
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25.r),
         color: AppColors.secondary,
 
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.8),
-            blurRadius: 10,
-          )
+          BoxShadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 10),
         ],
       ),
 
@@ -200,7 +180,6 @@ class FullCardScreen extends StatelessWidget {
 
         child: Stack(
           children: [
-
             /// 🔥 IMAGE
             Image.network(
               image,
@@ -217,39 +196,26 @@ class FullCardScreen extends StatelessWidget {
               right: 15.w,
 
               child: Row(
-
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
 
                 children: [
-
                   Expanded(
-
                     child: Column(
-
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
 
                       children: [
-
                         /// NAME + VERIFIED
                         Row(
-
                           children: [
-
                             Expanded(
-
                               child: Text(
-
                                 "Taniya Agarwal, 32",
 
                                 maxLines: 1,
 
-                                overflow:
-                                TextOverflow.ellipsis,
+                                overflow: TextOverflow.ellipsis,
 
-                                style:
-                                AppTextStyles.heading.copyWith(
+                                style: AppTextStyles.heading.copyWith(
                                   fontSize: 17.sp,
                                   color: Colors.white,
                                 ),
@@ -270,39 +236,29 @@ class FullCardScreen extends StatelessWidget {
 
                         /// COUNTRY
                         Container(
-
                           padding: EdgeInsets.symmetric(
                             horizontal: 8.w,
                             vertical: 4.h,
                           ),
 
                           decoration: BoxDecoration(
-                            color:
-                            Colors.black.withValues(alpha: 0.35),
+                            color: Colors.black.withValues(alpha: 0.35),
 
-                            borderRadius:
-                            BorderRadius.circular(20.r),
+                            borderRadius: BorderRadius.circular(20.r),
                           ),
 
                           child: Row(
-
                             mainAxisSize: MainAxisSize.min,
 
                             children: [
-
-                              Text(
-                                "🇮🇳",
-                                style: TextStyle(fontSize: 10.sp),
-                              ),
+                              Text("🇮🇳", style: TextStyle(fontSize: 10.sp)),
 
                               SizedBox(width: 4.w),
 
                               Text(
-
                                 "New Delhi, India",
 
-                                style:
-                                AppTextStyles.small.copyWith(
+                                style: AppTextStyles.small.copyWith(
                                   color: Colors.white,
                                   fontSize: 10.sp,
                                 ),
@@ -315,26 +271,21 @@ class FullCardScreen extends StatelessWidget {
 
                         /// ONLINE NOW
                         Container(
-
                           padding: EdgeInsets.symmetric(
                             horizontal: 8.w,
                             vertical: 4.h,
                           ),
 
                           decoration: BoxDecoration(
-                            color:
-                            Colors.black.withValues(alpha: 0.35),
+                            color: Colors.black.withValues(alpha: 0.35),
 
-                            borderRadius:
-                            BorderRadius.circular(20.r),
+                            borderRadius: BorderRadius.circular(20.r),
                           ),
 
                           child: Row(
-
                             mainAxisSize: MainAxisSize.min,
 
                             children: [
-
                               Container(
                                 width: 7.w,
                                 height: 7.w,
@@ -353,11 +304,9 @@ class FullCardScreen extends StatelessWidget {
                               SizedBox(width: 5.w),
 
                               Text(
-
                                 "Online now",
 
-                                style:
-                                AppTextStyles.small.copyWith(
+                                style: AppTextStyles.small.copyWith(
                                   color: Colors.white,
                                   fontSize: 10.sp,
                                 ),
@@ -377,12 +326,9 @@ class FullCardScreen extends StatelessWidget {
 
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color:
-                      Colors.black.withValues(alpha: 0.35),
+                      color: Colors.black.withValues(alpha: 0.35),
 
-                      border: Border.all(
-                        color: Colors.white24,
-                      ),
+                      border: Border.all(color: Colors.white24),
                     ),
 
                     child: Icon(
@@ -402,9 +348,7 @@ class FullCardScreen extends StatelessWidget {
               right: 0,
 
               child: Container(
-                padding: EdgeInsets.all(
-                  AppSize.w(12),
-                ),
+                padding: EdgeInsets.all(AppSize.w(12)),
 
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -419,19 +363,13 @@ class FullCardScreen extends StatelessWidget {
                 ),
 
                 child: Column(
-
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
 
                   children: [
-
                     /// DISTANCE + RELATIONSHIP
                     Row(
-
                       children: [
-
                         Container(
-
                           padding: EdgeInsets.symmetric(
                             horizontal: 10.w,
                             vertical: 6.h,
@@ -440,14 +378,11 @@ class FullCardScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.35),
 
-                            borderRadius:
-                            BorderRadius.circular(18.r),
+                            borderRadius: BorderRadius.circular(18.r),
                           ),
 
                           child: Row(
-
                             children: [
-
                               Icon(
                                 Icons.location_on,
                                 color: Colors.purpleAccent,
@@ -457,11 +392,9 @@ class FullCardScreen extends StatelessWidget {
                               SizedBox(width: 4.w),
 
                               Text(
-
                                 "1.2 km",
 
-                                style:
-                                AppTextStyles.small.copyWith(
+                                style: AppTextStyles.small.copyWith(
                                   color: Colors.white,
                                   fontSize: 10.sp,
                                 ),
@@ -473,7 +406,6 @@ class FullCardScreen extends StatelessWidget {
                         SizedBox(width: 8.w),
 
                         Container(
-
                           padding: EdgeInsets.symmetric(
                             horizontal: 10.w,
                             vertical: 6.h,
@@ -482,14 +414,11 @@ class FullCardScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.35),
 
-                            borderRadius:
-                            BorderRadius.circular(18.r),
+                            borderRadius: BorderRadius.circular(18.r),
                           ),
 
                           child: Row(
-
                             children: [
-
                               Icon(
                                 Icons.favorite,
                                 color: Colors.pinkAccent,
@@ -499,11 +428,9 @@ class FullCardScreen extends StatelessWidget {
                               SizedBox(width: 4.w),
 
                               Text(
-
                                 "Long Term",
 
-                                style:
-                                AppTextStyles.small.copyWith(
+                                style: AppTextStyles.small.copyWith(
                                   color: Colors.white,
                                   fontSize: 10.sp,
                                 ),
@@ -519,7 +446,6 @@ class FullCardScreen extends StatelessWidget {
                     /// MESSAGE BOX
                     Row(
                       children: [
-
                         Expanded(
                           child: Container(
                             height: 45.h,
@@ -527,23 +453,17 @@ class FullCardScreen extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.12),
 
-                              borderRadius:
-                              BorderRadius.circular(30.r),
+                              borderRadius: BorderRadius.circular(30.r),
 
-                              border: Border.all(
-                                color: Colors.white12,
-                              ),
+                              border: Border.all(color: Colors.white12),
                             ),
 
                             child: Row(
                               children: [
-
                                 /// TEXT
                                 Expanded(
                                   child: Padding(
-                                    padding: EdgeInsets.only(
-                                      left: 15.w,
-                                    ),
+                                    padding: EdgeInsets.only(left: 15.w),
                                     child: Text(
                                       "Send message...",
                                       style: AppTextStyles.body.copyWith(
@@ -554,12 +474,10 @@ class FullCardScreen extends StatelessWidget {
                                   ),
                                 ),
                                 GestureDetector(
-                                  onTap: () {
-                                    // TODO: apna send message function yahan call karo
-                                  },
+                                  onTap: () {},
                                   child: Container(
                                     height: double.infinity,
-                                    width: 42 .w,
+                                    width: 42.w,
                                     decoration: const BoxDecoration(
                                       shape: BoxShape.circle,
                                     ),
@@ -573,7 +491,6 @@ class FullCardScreen extends StatelessWidget {
                                 ),
 
                                 /// SEND BUTTON
-
                               ],
                             ),
                           ),

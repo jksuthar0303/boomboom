@@ -72,8 +72,10 @@ class UserProfile {
   int get age {
     final now = DateTime.now();
     int a = now.year - dob.year;
-    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day))
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
       a--;
+    }
     return a;
   }
 

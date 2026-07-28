@@ -76,7 +76,6 @@
 // }
 import 'dart:async';
 import 'dart:convert';
-import 'package:xml/xml.dart' as xml;
 import 'package:geolocator/geolocator.dart';
 
 import 'package:flutter/material.dart';
@@ -167,9 +166,6 @@ import '../controller/auth_controller.dart';
 //   }
 // }
 
-
-
-
 class SplashController extends GetxController {
   var isLoaded = false.obs;
 }
@@ -197,9 +193,7 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       final videoController = VideoPlayerController.asset(
         "assets/boomlogo.mp4",
-        videoPlayerOptions: VideoPlayerOptions(
-          mixWithOthers: true,
-        ),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
         // New converted video use karoge to:
         // "assets/boomlogo_fixed.mp4",
       );
@@ -207,9 +201,7 @@ class _SplashScreenState extends State<SplashScreen> {
       controller = videoController;
 
       // Video 7 seconds mein initialize na ho to app stuck nahi hogi.
-      await videoController.initialize().timeout(
-        const Duration(seconds: 7),
-      );
+      await videoController.initialize().timeout(const Duration(seconds: 7));
 
       if (!mounted || isNavigated) return;
 
@@ -231,10 +223,7 @@ class _SplashScreenState extends State<SplashScreen> {
           goToOnboarding,
         );
       } else {
-        videoSafetyTimer = Timer(
-          const Duration(seconds: 8),
-          goToOnboarding,
-        );
+        videoSafetyTimer = Timer(const Duration(seconds: 8), goToOnboarding);
       }
     } catch (e) {
       debugPrint("Splash video error: $e");
@@ -263,8 +252,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // Video complete hone par normal navigation.
     if (value.isInitialized &&
         value.duration != Duration.zero &&
-        value.position >=
-            value.duration - const Duration(milliseconds: 150)) {
+        value.position >= value.duration - const Duration(milliseconds: 150)) {
       goToOnboarding();
     }
   }
@@ -284,14 +272,13 @@ class _SplashScreenState extends State<SplashScreen> {
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (serviceEnabled) {
           LocationPermission permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+          if (permission == LocationPermission.always ||
+              permission == LocationPermission.whileInUse) {
             position = await Geolocator.getCurrentPosition(
               desiredAccuracy: LocationAccuracy.high,
               timeLimit: const Duration(seconds: 3),
             );
-            if (position != null) {
-              hasLocation = true;
-            }
+            hasLocation = true;
           }
         }
       } catch (e) {
@@ -308,8 +295,12 @@ class _SplashScreenState extends State<SplashScreen> {
             final data = dataList.first;
             final lat = data["Lat"]?.toString() ?? "";
             final lon = data["Lon"]?.toString() ?? "";
-            if (lat.isNotEmpty && lat != "0" && lat != "0.0" &&
-                lon.isNotEmpty && lon != "0" && lon != "0.0") {
+            if (lat.isNotEmpty &&
+                lat != "0" &&
+                lat != "0.0" &&
+                lon.isNotEmpty &&
+                lon != "0" &&
+                lon != "0.0") {
               hasCachedLocation = true;
             }
           }
@@ -319,7 +310,9 @@ class _SplashScreenState extends State<SplashScreen> {
       }
 
       if (!hasLocation && !hasCachedLocation) {
-        debugPrint("[Splash] Lat/Lng is not there and no cached location, sending user back.");
+        debugPrint(
+          "[Splash] Lat/Lng is not there and no cached location, sending user back.",
+        );
         Get.offAll(
           () => WelcomeScreen(),
           transition: Transition.fadeIn,
@@ -344,7 +337,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
       try {
         await AuthController().fetchAndStoreFullProfile(email: storedEmail);
-        debugPrint("[Splash] Pre-fetched and stored complete profile successfully.");
+        debugPrint(
+          "[Splash] Pre-fetched and stored complete profile successfully.",
+        );
       } catch (e) {
         debugPrint("[Splash] Pre-fetch profile error: $e");
       }
@@ -382,9 +377,9 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Center(
         child: isVideoReady
             ? AspectRatio(
-          aspectRatio: controller!.value.aspectRatio,
-          child: VideoPlayer(controller!),
-        )
+                aspectRatio: controller!.value.aspectRatio,
+                child: VideoPlayer(controller!),
+              )
             : const SizedBox.shrink(),
       ),
     );

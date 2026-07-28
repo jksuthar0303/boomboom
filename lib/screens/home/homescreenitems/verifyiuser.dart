@@ -7,19 +7,18 @@ import 'package:get/get_navigation/src/routes/transitions_type.dart';
 import '../../../authentication/boomboom.dart';
 import '../../../constant/apptextstyle.dart';
 
+// ignore: camel_case_types
 class verifyuser extends StatelessWidget {
   const verifyuser({super.key});
 
   final List<Map<String, String>> data = const [
-
     {
       "name": "Ava",
       "age": "24",
       "country": "Thailand",
       "distance": "2km",
       "time": "55 Seconds Ago",
-      "img":
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2"
+      "img": "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
     },
 
     {
@@ -28,8 +27,7 @@ class verifyuser extends StatelessWidget {
       "country": "India",
       "distance": "5km",
       "time": "55 Seconds Ago",
-      "img":
-      "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e"
+      "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e",
     },
 
     {
@@ -38,8 +36,7 @@ class verifyuser extends StatelessWidget {
       "country": "USA",
       "distance": "7km",
       "time": "55 Seconds Ago",
-      "img":
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330"
+      "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
     },
 
     {
@@ -48,8 +45,7 @@ class verifyuser extends StatelessWidget {
       "country": "Japan",
       "distance": "9km",
       "time": "55 Seconds Ago",
-      "img":
-      "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91"
+      "img": "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91",
     },
 
     {
@@ -58,36 +54,25 @@ class verifyuser extends StatelessWidget {
       "country": "China",
       "distance": "11km",
       "time": "55 Seconds Ago",
-      "img":
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9"
+      "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9",
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-
-    final isTablet =
-        MediaQuery.of(context).size.width > 600;
+    final isTablet = MediaQuery.of(context).size.width > 600;
 
     return SizedBox(
-
       height: isTablet ? 180.h : 140.h,
 
       child: ListView(
         scrollDirection: Axis.horizontal,
 
-        padding:
-        EdgeInsets.symmetric(horizontal: 12.w),
+        padding: EdgeInsets.symmetric(horizontal: 12.w),
 
         children: [
-
           ...data.map(
-                (e) => smallCard(
-              e["name"]!,
-              e["age"]!,
-              e["img"]!,
-              isTablet,
-            ),
+            (e) => smallCard(e["name"]!, e["age"]!, e["img"]!, isTablet),
           ),
 
           seeAllCard(context, isTablet),
@@ -97,38 +82,23 @@ class verifyuser extends StatelessWidget {
   }
 
   /// SMALL CARD
-  Widget smallCard(
-      String name,
-      String age,
-      String image,
-      bool isTablet,
-      ){
-    return  GestureDetector(
-
+  Widget smallCard(String name, String age, String image, bool isTablet) {
+    return GestureDetector(
       onTap: () {
-
-        Get.to(
-              () =>  BoomProfileScreen(),
-          transition: Transition.rightToLeft,
-        );
+        Get.to(() => BoomProfileScreen(), transition: Transition.rightToLeft);
       },
 
       child: Container(
-
         width: isTablet ? 160.w : 120.w,
 
         margin: EdgeInsets.only(right: 12.w),
 
         decoration: BoxDecoration(
-
-          borderRadius:
-          BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(16.r),
 
           boxShadow: [
-
             BoxShadow(
-              color:
-              Colors.black.withValues(alpha: 0.5),
+              color: Colors.black.withValues(alpha: 0.5),
 
               blurRadius: 10,
 
@@ -136,26 +106,18 @@ class verifyuser extends StatelessWidget {
             ),
           ],
 
-          image: DecorationImage(
-            image: NetworkImage(image),
-            fit: BoxFit.cover,
-          ),
+          image: DecorationImage(image: NetworkImage(image), fit: BoxFit.cover),
         ),
 
         child: ClipRRect(
-
-          borderRadius:
-          BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(16.r),
 
           child: Stack(
             children: [
-
               Container(
                 decoration: BoxDecoration(
-
                   gradient: LinearGradient(
-                    begin:
-                    Alignment.bottomCenter,
+                    begin: Alignment.bottomCenter,
 
                     end: Alignment.topCenter,
 
@@ -173,31 +135,22 @@ class verifyuser extends StatelessWidget {
                 right: 10,
 
                 child: Column(
-
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
 
                   children: [
-
                     Text(
                       "$name, $age",
 
                       maxLines: 1,
 
-                      overflow:
-                      TextOverflow.ellipsis,
+                      overflow: TextOverflow.ellipsis,
 
-                      style:
-                      AppTextStyles.small.copyWith(
+                      style: AppTextStyles.small.copyWith(
                         color: Colors.white,
 
-                        fontWeight:
-                        FontWeight.bold,
+                        fontWeight: FontWeight.bold,
 
-                        fontSize:
-                        isTablet
-                            ? 14.sp
-                            : 12.sp,
+                        fontSize: isTablet ? 14.sp : 12.sp,
                       ),
                     ),
 
@@ -206,14 +159,10 @@ class verifyuser extends StatelessWidget {
                     Text(
                       "55 Seconds Ago",
 
-                      style:
-                      AppTextStyles.small.copyWith(
+                      style: AppTextStyles.small.copyWith(
                         color: Colors.white70,
 
-                        fontSize:
-                        isTablet
-                            ? 11.sp
-                            : 9.sp,
+                        fontSize: isTablet ? 11.sp : 9.sp,
                       ),
                     ),
                   ],
@@ -224,86 +173,58 @@ class verifyuser extends StatelessWidget {
         ),
       ),
     );
-
   }
 
   /// SEE ALL CARD
-  Widget seeAllCard(
-      BuildContext context,
-      bool isTablet,
-      ) {
-
+  Widget seeAllCard(BuildContext context, bool isTablet) {
     return GestureDetector(
-
       onTap: () {
-
         Navigator.push(
           context,
 
-          MaterialPageRoute(
-            builder: (_) =>
-            const Activeuser(),
-          ),
+          MaterialPageRoute(builder: (_) => const Activeuser()),
         );
       },
 
       child: Container(
-
         width: isTablet ? 140.w : 100.w,
 
         margin: EdgeInsets.only(right: 12.w),
 
         decoration: BoxDecoration(
-
-          borderRadius:
-          BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(16.r),
 
           gradient: LinearGradient(
             colors: [
-
               Colors.white.withValues(alpha: 0.15),
 
               Colors.white.withValues(alpha: 0.05),
             ],
           ),
 
-          border: Border.all(
-            color: Colors.amber,
-            width: 1.5,
-          ),
+          border: Border.all(color: Colors.amber, width: 1.5),
 
           boxShadow: [
-
             BoxShadow(
-              color:
-              Colors.amber.withValues(alpha: 0.4),
+              color: Colors.amber.withValues(alpha: 0.4),
 
               blurRadius: 12,
-            )
+            ),
           ],
         ),
 
         child: Column(
-
-          mainAxisAlignment:
-          MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
 
           children: [
-
             Container(
-
-              padding: EdgeInsets.all(
-                  isTablet ? 14.w : 10.w),
+              padding: EdgeInsets.all(isTablet ? 14.w : 10.w),
 
               decoration: BoxDecoration(
-
                 shape: BoxShape.circle,
 
                 gradient: const LinearGradient(
-                  colors: [
-                    Colors.amber,
-                    Colors.orange,
-                  ],
+                  colors: [Colors.amber, Colors.orange],
                 ),
               ),
 
@@ -312,8 +233,7 @@ class verifyuser extends StatelessWidget {
 
                 color: Colors.black,
 
-                size:
-                isTablet ? 22.sp : 18.sp,
+                size: isTablet ? 22.sp : 18.sp,
               ),
             ),
 
@@ -322,15 +242,12 @@ class verifyuser extends StatelessWidget {
             Text(
               "See All",
 
-              style:
-              AppTextStyles.small.copyWith(
+              style: AppTextStyles.small.copyWith(
                 color: Colors.white,
 
-                fontWeight:
-                FontWeight.w600,
+                fontWeight: FontWeight.w600,
 
-                fontSize:
-                isTablet ? 14.sp : 12.sp,
+                fontSize: isTablet ? 14.sp : 12.sp,
               ),
             ),
           ],
@@ -352,10 +269,9 @@ class Activeuser extends StatefulWidget {
 }
 
 class _ActiveuserState extends State<Activeuser> {
-
   //List<Map<String, dynamic>> allUsers = [
-    // saara user data
- // ];
+  // saara user data
+  // ];
 
   List<Map<String, dynamic>> filteredUsers = [];
 
@@ -364,15 +280,13 @@ class _ActiveuserState extends State<Activeuser> {
 
   int selectedTab = 0;
   List<Map<String, dynamic>> allUsers = [
-
     {
       "name": "Jyunko",
       "age": "26",
       "country": "Thailand",
       "distance": "50km",
       "liked": false,
-      "img":
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2"
+      "img": "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
     },
 
     {
@@ -381,8 +295,7 @@ class _ActiveuserState extends State<Activeuser> {
       "country": "Chiang Mai",
       "distance": "2475km",
       "liked": false,
-      "img":
-      "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e"
+      "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e",
     },
 
     {
@@ -391,8 +304,7 @@ class _ActiveuserState extends State<Activeuser> {
       "country": "Bangkok",
       "distance": "29km",
       "liked": false,
-      "img":
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330"
+      "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
     },
 
     {
@@ -401,8 +313,7 @@ class _ActiveuserState extends State<Activeuser> {
       "country": "India",
       "distance": "8757km",
       "liked": false,
-      "img":
-      "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91",
+      "img": "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91",
       "district": "Pattaya",
     },
 
@@ -412,8 +323,7 @@ class _ActiveuserState extends State<Activeuser> {
       "country": "Japan",
       "distance": "18km",
       "liked": false,
-      "img":
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9",
+      "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9",
       "district": "Pattaya",
     },
 
@@ -423,8 +333,7 @@ class _ActiveuserState extends State<Activeuser> {
       "country": "Korea",
       "distance": "90km",
       "liked": false,
-      "img":
-      "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df",
+      "img": "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df",
       "district": "Pattaya",
     },
 
@@ -434,8 +343,7 @@ class _ActiveuserState extends State<Activeuser> {
       "country": "Russia",
       "distance": "120km",
       "liked": false,
-      "img":
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
+      "img": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
       "district": "Pattaya",
     },
 
@@ -445,8 +353,7 @@ class _ActiveuserState extends State<Activeuser> {
       "country": "Tokyo",
       "distance": "77km",
       "liked": false,
-      "img":
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1",
+      "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1",
       "district": "Pattaya",
     },
   ];
@@ -506,9 +413,7 @@ class _ActiveuserState extends State<Activeuser> {
   // }
 
   void removeUser(int index) {
-
     setState(() {
-
       final user = filteredUsers[index];
 
       allUsers.remove(user);
@@ -518,23 +423,17 @@ class _ActiveuserState extends State<Activeuser> {
   }
 
   void toggleLike(int index) {
-
     setState(() {
-
-      filteredUsers[index]["liked"] =
-      !filteredUsers[index]["liked"];
+      filteredUsers[index]["liked"] = !filteredUsers[index]["liked"];
     });
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
       backgroundColor: Colors.black,
 
       body: SafeArea(
-
         child: Column(
           children: [
             SizedBox(height: 10.h),
@@ -570,7 +469,7 @@ class _ActiveuserState extends State<Activeuser> {
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
-                              fontSize: 18
+                              fontSize: 18,
                             ),
                           ),
                         ),
@@ -599,7 +498,7 @@ class _ActiveuserState extends State<Activeuser> {
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
-                              fontSize: 18.sp
+                              fontSize: 18.sp,
                             ),
                           ),
                         ),
@@ -614,19 +513,12 @@ class _ActiveuserState extends State<Activeuser> {
 
             /// GRID
             Expanded(
-
               child: GridView.builder(
+                padding: EdgeInsets.symmetric(horizontal: 4.w),
 
-                padding: EdgeInsets.symmetric(
-                  horizontal: 4.w,
-                ),
+                itemCount: filteredUsers.length,
 
-                itemCount:
-                filteredUsers.length,
-
-                gridDelegate:
-                SliverGridDelegateWithFixedCrossAxisCount(
-
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
 
                   crossAxisSpacing: 5.w,
@@ -637,37 +529,26 @@ class _ActiveuserState extends State<Activeuser> {
                 ),
 
                 itemBuilder: (_, index) {
-
                   final user = filteredUsers[index];
 
                   return GestureDetector(
-
                     onTap: () {
-
                       Navigator.push(
                         context,
 
-                        MaterialPageRoute(
-                          builder: (_) =>
-                         BoomProfileScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => BoomProfileScreen()),
                       );
                     },
 
                     child: Container(
-
                       decoration: BoxDecoration(
-
-                        borderRadius:
-                        BorderRadius.circular(18.r),
+                        borderRadius: BorderRadius.circular(18.r),
 
                         color: const Color(0xFF151515),
 
                         boxShadow: [
-
                           BoxShadow(
-                            color:
-                            Colors.black.withValues(alpha: 0.45),
+                            color: Colors.black.withValues(alpha: 0.45),
 
                             blurRadius: 20,
 
@@ -677,16 +558,12 @@ class _ActiveuserState extends State<Activeuser> {
                       ),
 
                       child: ClipRRect(
-
-                        borderRadius:
-                        BorderRadius.circular(24.r),
+                        borderRadius: BorderRadius.circular(24.r),
 
                         child: Stack(
                           children: [
-
                             /// IMAGE
                             Positioned.fill(
-
                               child: Image.network(
                                 user["img"],
                                 fit: BoxFit.cover,
@@ -695,26 +572,17 @@ class _ActiveuserState extends State<Activeuser> {
 
                             /// DARK OVERLAY
                             Positioned.fill(
-
                               child: Container(
-
                                 decoration: BoxDecoration(
-
                                   gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter,
 
-                                    begin:
-                                    Alignment.bottomCenter,
-
-                                    end:
-                                    Alignment.topCenter,
+                                    end: Alignment.topCenter,
 
                                     colors: [
+                                      Colors.black.withValues(alpha: 0.95),
 
-                                      Colors.black
-                                          .withValues(alpha: 0.95),
-
-                                      Colors.black
-                                          .withValues(alpha: 0.1),
+                                      Colors.black.withValues(alpha: 0.1),
 
                                       Colors.transparent,
                                     ],
@@ -723,7 +591,6 @@ class _ActiveuserState extends State<Activeuser> {
                               ),
                             ),
 
-
                             /// BOTTOM DETAILS
                             /// TOP LEFT NEW TAG
                             Positioned(
@@ -731,16 +598,13 @@ class _ActiveuserState extends State<Activeuser> {
                               left: 10.w,
 
                               child: Container(
-
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 10.w,
                                   vertical: 5.h,
                                 ),
 
                                 decoration: BoxDecoration(
-
-                                  borderRadius:
-                                  BorderRadius.circular(20.r),
+                                  borderRadius: BorderRadius.circular(20.r),
 
                                   gradient: const LinearGradient(
                                     colors: [
@@ -751,7 +615,6 @@ class _ActiveuserState extends State<Activeuser> {
                                 ),
 
                                 child: Text(
-
                                   "NEW",
 
                                   style: TextStyle(
@@ -797,23 +660,20 @@ class _ActiveuserState extends State<Activeuser> {
                                 ),
                               ),
                             ),
-                            /// BOTTOM DETAILS
 
+                            /// BOTTOM DETAILS
                             Positioned(
                               top: 10.h,
                               left: 10.w,
 
                               child: Container(
-
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 10.w,
                                   vertical: 4.h,
                                 ),
 
                                 decoration: BoxDecoration(
-
-                                  borderRadius:
-                                  BorderRadius.circular(20.r),
+                                  borderRadius: BorderRadius.circular(20.r),
 
                                   gradient: const LinearGradient(
                                     colors: [
@@ -824,7 +684,6 @@ class _ActiveuserState extends State<Activeuser> {
                                 ),
 
                                 child: Text(
-
                                   "NEW",
 
                                   style: TextStyle(
@@ -879,48 +738,34 @@ class _ActiveuserState extends State<Activeuser> {
 
                             /// BOTTOM DETAILS
                             Positioned(
-
                               left: 4.w,
                               right: 4.w,
                               bottom: 13.h,
 
                               child: Column(
-
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
 
                                 children: [
-
                                   /// NAME
                                   Row(
-
                                     children: [
-
                                       Flexible(
-
                                         child: Row(
-
                                           mainAxisSize: MainAxisSize.min,
 
                                           children: [
-
                                             Flexible(
-
                                               child: Text(
-
                                                 "${user["name"]}, ${user["age"]}",
 
                                                 maxLines: 1,
 
-                                                overflow:
-                                                TextOverflow.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
 
                                                 style: TextStyle(
-
                                                   color: Colors.white,
 
-                                                  fontWeight:
-                                                  FontWeight.w900,
+                                                  fontWeight: FontWeight.w900,
 
                                                   fontSize: 13.sp,
                                                 ),
@@ -944,14 +789,15 @@ class _ActiveuserState extends State<Activeuser> {
 
                                   /// LOCATION
                                   Container(
-
                                     padding: EdgeInsets.symmetric(
                                       horizontal: 6.w,
                                       vertical: 2.h,
                                     ),
 
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.35),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.35,
+                                      ),
                                       borderRadius: BorderRadius.circular(20.r),
                                       border: Border.all(
                                         color: const Color(0xFF3A3A3A),
@@ -960,11 +806,9 @@ class _ActiveuserState extends State<Activeuser> {
                                     ),
 
                                     child: Row(
-
                                       mainAxisSize: MainAxisSize.min,
 
                                       children: [
-
                                         Text(
                                           "🇮🇳",
                                           style: TextStyle(fontSize: 9.sp),
@@ -973,13 +817,12 @@ class _ActiveuserState extends State<Activeuser> {
                                         SizedBox(width: 2.w),
 
                                         Text(
-
                                           "${user["country"]}",
 
                                           style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 9.sp,
-                                              fontWeight: FontWeight.w900
+                                            color: Colors.white,
+                                            fontSize: 9.sp,
+                                            fontWeight: FontWeight.w900,
                                           ),
                                         ),
                                       ],
@@ -990,26 +833,23 @@ class _ActiveuserState extends State<Activeuser> {
 
                                   /// DISTANCE
                                   Container(
-
                                     padding: EdgeInsets.symmetric(
                                       horizontal: 6.w,
                                       vertical: 3.h,
                                     ),
 
                                     decoration: BoxDecoration(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.35,
+                                      ),
 
-                                      color: Colors.black.withValues(alpha: 0.35),
-
-                                      borderRadius:
-                                      BorderRadius.circular(20.r),
+                                      borderRadius: BorderRadius.circular(20.r),
                                     ),
 
                                     child: Row(
-
                                       mainAxisSize: MainAxisSize.min,
 
                                       children: [
-
                                         Icon(
                                           Icons.location_on_outlined,
                                           color: Colors.white,
@@ -1019,13 +859,12 @@ class _ActiveuserState extends State<Activeuser> {
                                         SizedBox(width: 1.w),
 
                                         Text(
-
                                           "${user["distance"]} away",
 
                                           style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10.sp,
-                                              fontWeight: FontWeight.w900
+                                            color: Colors.white,
+                                            fontSize: 10.sp,
+                                            fontWeight: FontWeight.w900,
                                           ),
                                         ),
                                       ],
@@ -1036,22 +875,25 @@ class _ActiveuserState extends State<Activeuser> {
 
                                   /// ONLINE NOW
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-
                                       Container(
                                         padding: EdgeInsets.symmetric(
                                           horizontal: 6.w,
                                           vertical: 3.h,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.black.withValues(alpha: 0.35),
-                                          borderRadius: BorderRadius.circular(20.r),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.35,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            20.r,
+                                          ),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-
                                             Container(
                                               width: 5.w,
                                               height: 5.w,
@@ -1070,9 +912,9 @@ class _ActiveuserState extends State<Activeuser> {
                                             Text(
                                               "Active now",
                                               style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 9.sp,
-                                                  fontWeight: FontWeight.w900
+                                                color: Colors.white,
+                                                fontSize: 9.sp,
+                                                fontWeight: FontWeight.w900,
                                               ),
                                             ),
                                           ],
@@ -1085,11 +927,17 @@ class _ActiveuserState extends State<Activeuser> {
                                           vertical: 3.h,
                                         ),
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(30.r),
+                                          borderRadius: BorderRadius.circular(
+                                            30.r,
+                                          ),
                                           gradient: LinearGradient(
                                             colors: [
-                                              Colors.black.withValues(alpha: 0.55),
-                                              Colors.black.withValues(alpha: 0.55),
+                                              Colors.black.withValues(
+                                                alpha: 0.55,
+                                              ),
+                                              Colors.black.withValues(
+                                                alpha: 0.55,
+                                              ),
                                             ],
                                           ),
                                           border: Border.all(
@@ -1098,7 +946,9 @@ class _ActiveuserState extends State<Activeuser> {
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: const Color(0xFF2D7DFF).withValues(alpha: 0.35),
+                                              color: const Color(
+                                                0xFF2D7DFF,
+                                              ).withValues(alpha: 0.35),
                                               blurRadius: 8,
                                               spreadRadius: 1,
                                             ),
@@ -1107,7 +957,6 @@ class _ActiveuserState extends State<Activeuser> {
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-
                                             // Icon(
                                             //   Icons.people_outline,
                                             //   color: Colors.white,
@@ -1115,15 +964,14 @@ class _ActiveuserState extends State<Activeuser> {
                                             // ),
 
                                             //SizedBox(width: 2.w),
-
                                             Text(
                                               index % 2 == 0
                                                   ? "Friendship"
                                                   : "Casual",
                                               style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 9.sp,
-                                                  fontWeight: FontWeight.w900
+                                                color: Colors.white,
+                                                fontSize: 9.sp,
+                                                fontWeight: FontWeight.w900,
                                               ),
                                             ),
                                           ],

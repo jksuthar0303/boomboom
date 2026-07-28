@@ -8,16 +8,16 @@ import 'package:google_fonts/google_fonts.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppColors {
-  static const bg         = Color(0xFF070709);
-  static const cardBg     = Color(0xFF0F1017);
+  static const bg = Color(0xFF070709);
+  static const cardBg = Color(0xFF0F1017);
   static const cardBorder = Color(0xFF1C1D2A);
-  static const textPrimary   = Color(0xFFFFFFFF);
+  static const textPrimary = Color(0xFFFFFFFF);
   static const textSecondary = Color(0xFFB0B0B0);
-  static const grey       = Color(0xFF55576E);
-  static const purple     = Color(0xFF7B3FE4);
+  static const grey = Color(0xFF55576E);
+  static const purple = Color(0xFF7B3FE4);
   static const purpleDark = Color(0xFF1A1030);
-  static const white      = Colors.white;
-  static const black      = Colors.black;
+  static const white = Colors.white;
+  static const black = Colors.black;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,17 +55,16 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
   }
 
   void _onTakeSelfie() {
-    // TODO: open camera / image picker
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Camera launching…')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Camera launching…')));
   }
 
   @override
   Widget build(BuildContext context) {
     final bool isTablet = MediaQuery.of(context).size.shortestSide >= 600;
-    final double hPad   = isTablet ? 56.w : 20.w;
-    final double maxW   = isTablet ? 640.0 : double.infinity;
+    final double hPad = isTablet ? 56.w : 20.w;
+    final double maxW = isTablet ? 640.0 : double.infinity;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -163,10 +162,7 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
       centerTitle: true,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(
-          height: 1,
-          color: AppColors.cardBorder,
-        ),
+        child: Container(height: 1, color: AppColors.cardBorder),
       ),
       leading: GestureDetector(
         onTap: () => Navigator.maybePop(context),
@@ -232,9 +228,21 @@ class _QuickTipsCard extends StatelessWidget {
   const _QuickTipsCard({required this.isTablet});
 
   static const List<_TipData> _tips = [
-    _TipData(icon: Icons.wb_sunny_rounded,    title: 'Good Lighting',    sub: 'Natural light works best'),
-    _TipData(icon: Icons.face_retouching_natural, title: 'Face Visible', sub: 'Center your face clearly'),
-    _TipData(icon: Icons.remove_red_eye_rounded, title: 'Look at Camera', sub: 'Make eye contact'),
+    _TipData(
+      icon: Icons.wb_sunny_rounded,
+      title: 'Good Lighting',
+      sub: 'Natural light works best',
+    ),
+    _TipData(
+      icon: Icons.face_retouching_natural,
+      title: 'Face Visible',
+      sub: 'Center your face clearly',
+    ),
+    _TipData(
+      icon: Icons.remove_red_eye_rounded,
+      title: 'Look at Camera',
+      sub: 'Make eye contact',
+    ),
   ];
 
   @override
@@ -342,17 +350,15 @@ class _CameraButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double btnSize  = isTablet ? 150.w : 120.w;
+    final double btnSize = isTablet ? 150.w : 120.w;
     final double ringSize = isTablet ? 180.w : 148.w;
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedBuilder(
         animation: pulseAnim,
-        builder: (_, child) => Transform.scale(
-          scale: pulseAnim.value,
-          child: child,
-        ),
+        builder: (_, child) =>
+            Transform.scale(scale: pulseAnim.value, child: child),
         child: SizedBox(
           width: ringSize,
           height: ringSize,
@@ -410,7 +416,7 @@ class _DashedCirclePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width / 2) - strokeWidth;
     final dashAngle = (2 * pi) / dashCount;
-    final gapAngle  = dashAngle * 0.45;
+    final gapAngle = dashAngle * 0.45;
     final sweepAngle = dashAngle - gapAngle;
 
     for (int i = 0; i < dashCount; i++) {
