@@ -1,0 +1,469 @@
+import 'package:dio/dio.dart';
+import 'xml_api_client.dart';
+import '../constant/appconstants.dart';
+
+class RegisterService {
+  final XmlApiClient _client;
+
+  RegisterService({XmlApiClient? client})
+      : _client = client ?? XmlApiClient(baseUrl: AppConstants.baseUrl);
+
+  static const String namespace = AppConstants.tempuriNamespace;
+
+  /// SOAP RegisterInsert request
+  Future<XmlResponse> registerInsert({
+    required String email,
+    required String fullName,
+    required String dob,
+    required String password,
+    required String bio,
+    required String gender,
+    required String lookingFor,
+    required String orientation,
+    required String occupation,
+    required String lat,
+    required String lon,
+    required String height,
+    required String bodyType,
+    required String drinkingHabits,
+    required String workout,
+  }) async {
+    const String method = 'RegisterInsert';
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <RegisterInsert xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <FullName>$fullName</FullName>
+      <Dob>$dob</Dob>
+      <AppPassword>$password</AppPassword>
+      <Gender>$gender</Gender>
+      <Lookingfor>$lookingFor</Lookingfor>
+      <Orientation>$orientation</Orientation>
+      <BIO>$bio</BIO>
+      <Occupation>$occupation</Occupation>
+      <Lat>$lat</Lat>
+      <Lon>$lon</Lon>
+      <Height>$height</Height>
+      <BodyType>$bodyType</BodyType>
+      <DrinkingHabits>$drinkingHabits</DrinkingHabits>
+      <Workout>$workout</Workout>
+      <FCMToken></FCMToken>
+    </RegisterInsert>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP MediaInsert request
+  Future<XmlResponse> mediaInsert({
+    required String email,
+    required String mediaBase64,
+    required String type,
+    ProgressCallback? onSendProgress,
+  }) async {
+    const String method = 'MediaInsert';
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <MediaInsert xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Media>$mediaBase64</Media>
+      <Email>$email</Email>
+      <Type>$type</Type>
+    </MediaInsert>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      onSendProgress: onSendProgress,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP Login request
+  Future<XmlResponse> login({
+    required String email,
+    required String password,
+    String fcmToken = "",
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <Login xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <AppPassword>$password</AppPassword>
+      <FCMToken>$fcmToken</FCMToken>
+    </Login>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP ShowProfile request
+  Future<XmlResponse> showProfile({
+    required String email,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ShowProfile xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+    </ShowProfile>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP ForgotPassword request
+  Future<XmlResponse> forgotPassword({
+    required String email,
+    required String newPassword,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ForgotPassword xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <NewPassword>$newPassword</NewPassword>
+    </ForgotPassword>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP DeleteAccount request
+  Future<XmlResponse> deleteAccount({
+    required String email,
+    required String password,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <DeleteAccount xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <AppPassword>$password</AppPassword>
+    </DeleteAccount>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP InterestInsert request
+  Future<XmlResponse> interestInsert({
+    required String email,
+    required String interest,
+  }) async {
+    final String cleanInterest = interest.replaceAll(RegExp(r'[^\x00-\x7F]'), '').trim();
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <InterestInsert xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Interest>$cleanInterest</Interest>
+      <Email>$email</Email>
+    </InterestInsert>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP LifestyleInsert request
+  Future<XmlResponse> lifestyleInsert({
+    required String email,
+    required String lifestyle,
+  }) async {
+    final String cleanLifestyle = lifestyle.replaceAll(RegExp(r'[^\x00-\x7F]'), '').trim();
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <LifestyleInsert xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <LifeStyle>$cleanLifestyle</LifeStyle>
+      <Email>$email</Email>
+    </LifestyleInsert>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP ShowInterestByEmail request
+  Future<XmlResponse> showInterestByEmail({
+    required String email,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ShowInterestByEmail xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Email>$email</Email>
+    </ShowInterestByEmail>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP ShowLifestyleByEmail request
+  Future<XmlResponse> showLifestyleByEmail({
+    required String email,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ShowLifestyleByEmail xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Email>$email</Email>
+    </ShowLifestyleByEmail>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP ShowMediaByEmail request
+  Future<XmlResponse> showMediaByEmail({
+    required String email,
+    required String type,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ShowMediaByEmail xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Email>$email</Email>
+      <Type>$type</Type>
+    </ShowMediaByEmail>
+  </soap12:Body>
+</soap12:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+      },
+    );
+  }
+
+  /// SOAP UpdateLatLon request
+  Future<XmlResponse> updateLatLon({
+    required String email,
+    required String lat,
+    required String lon,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <UpdateLatLon xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <Lat>$lat</Lat>
+      <Lon>$lon</Lon>
+    </UpdateLatLon>
+  </soap:Body>
+</soap:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/UpdateLatLon"',
+      },
+    );
+  }
+
+  /// SOAP UpdateProfile request
+  Future<XmlResponse> updateProfile({
+    required String email,
+    required String fullName,
+    required String dob,
+    required String gender,
+    required String lookingFor,
+    required String orientation,
+    required String bio,
+    required String occupation,
+    required String height,
+    required String bodyType,
+    required String drinkingHabits,
+    required String workout,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <UpdateProfile xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <FullName>$fullName</FullName>
+      <Dob>$dob</Dob>
+      <Gender>$gender</Gender>
+      <Lookingfor>$lookingFor</Lookingfor>
+      <Orientation>$orientation</Orientation>
+      <BIO>$bio</BIO>
+      <Occupation>$occupation</Occupation>
+      <Height>$height</Height>
+      <BodyType>$bodyType</BodyType>
+      <DrinkingHabits>$drinkingHabits</DrinkingHabits>
+      <Workout>$workout</Workout>
+    </UpdateProfile>
+  </soap:Body>
+</soap:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/UpdateProfile"',
+      },
+    );
+  }
+
+  /// SOAP InterestDelete request
+  Future<XmlResponse> interestDelete({
+    required int id,
+    required String email,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <InterestDelete xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Id>$id</Id>
+      <Email>$email</Email>
+    </InterestDelete>
+  </soap:Body>
+</soap:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/InterestDelete"',
+      },
+    );
+  }
+
+  /// SOAP ShowCompleteProfile request
+  Future<XmlResponse> showCompleteProfile({
+    required String email,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ShowCompleteProfile xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+    </ShowCompleteProfile>
+  </soap:Body>
+</soap:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/ShowCompleteProfile"',
+      },
+    );
+  }
+
+  /// SOAP MediaDelete request
+  Future<XmlResponse> mediaDelete({
+    required int id,
+    required String email,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <MediaDelete xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Id>$id</Id>
+      <Email>$email</Email>
+    </MediaDelete>
+  </soap:Body>
+</soap:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/MediaDelete"',
+      },
+    );
+  }
+}
+
