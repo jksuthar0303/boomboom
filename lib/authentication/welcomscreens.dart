@@ -1,6 +1,7 @@
 import 'package:boomboom/authentication/registerscreen/login.dart';
 import 'package:boomboom/authentication/registerscreen/otpscreen.dart';
 import 'package:boomboom/authentication/registerscreen/registerfirst.dart';
+import 'package:boomboom/backend/permission_service.dart';
 import 'package:boomboom/backend/secure_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,23 +13,60 @@ import '../constant/colors.dart';
 import '../screens/bottombar.dart';
 import '../widget/bouncelogo.dart';
 
-class WelcomeScreen extends StatelessWidget {
-  WelcomeScreen({super.key});
+class WelcomeScreen extends StatefulWidget {
+  const WelcomeScreen({super.key});
 
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
   final TextEditingController emailController = TextEditingController();
+  bool _locationPermissionAsked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _askLocationPermissionIfNeeded();
+    });
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _askLocationPermissionIfNeeded() async {
+    if (_locationPermissionAsked || !mounted) return;
+    _locationPermissionAsked = true;
+
+    try {
+      final alreadyGranted = await PermissionService.isLocationGranted();
+      if (!alreadyGranted && mounted) {
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) {
+          await PermissionService.requestLocationPermission();
+        }
+      }
+    } catch (e) {
+      debugPrint("[WelcomeScreen] Location permission error: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(                          // ✅ SafeArea added — screen niche aayegi
+      body: SafeArea(
+        // ✅ SafeArea added — screen niche aayegi
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: AppSize.w(24)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              SizedBox(height: AppSize.h(20)),  // ✅ thoda top space
-
+              SizedBox(height: AppSize.h(20)), // ✅ thoda top space
               /// 🔙 Back Button
               Row(
                 children: [
@@ -55,10 +93,7 @@ class WelcomeScreen extends StatelessWidget {
               SizedBox(height: AppSize.h(14)),
 
               /// 🔤 Logo
-              BounceLogo(
-                imagePath: "assets/logos.png",
-                size: 100,
-              ),
+              BounceLogo(imagePath: "assets/logos.png", size: 100),
 
               SizedBox(height: AppSize.h(14)),
 
@@ -83,7 +118,7 @@ class WelcomeScreen extends StatelessWidget {
                 showGradientBorder: true,
                 onTap: () {
                   Get.to(
-                        () => LoginScreen(),
+                    () => LoginScreen(),
                     transition: Transition.cupertino,
                     duration: const Duration(milliseconds: 800),
                   );
@@ -115,10 +150,7 @@ class WelcomeScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(AppSize.w(14)),
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF9B59B6),
-                      Color(0xFF3498DB),
-                    ],
+                    colors: [Color(0xFF9B59B6), Color(0xFF3498DB)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -126,14 +158,10 @@ class WelcomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(1.5),
                 child: Container(
                   height: AppSize.h(52),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppSize.w(16),
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
                   decoration: BoxDecoration(
                     color: AppColors.cardBg,
-                    borderRadius: BorderRadius.circular(
-                      AppSize.w(13),
-                    ),
+                    borderRadius: BorderRadius.circular(AppSize.w(13)),
                   ),
                   child: Row(
                     children: [
@@ -177,7 +205,9 @@ class WelcomeScreen extends StatelessWidget {
                     );
                     return;
                   }
-                  await SecureStorage().saveUserEmail(emailController.text.trim());
+                  await SecureStorage().saveUserEmail(
+                    emailController.text.trim(),
+                  );
                   Get.to(
                     () => EmailOtpScreen(email: emailController.text.trim()),
                     transition: Transition.rightToLeft,
@@ -235,8 +265,14 @@ class WelcomeScreen extends StatelessWidget {
                   SizedBox(width: AppSize.w(16)),
                   _socialCircleButton(
                     onTap: () async {
-                      await SecureStorage().saveUserEmail("google_user@gmail.com");
-                      Get.to(() => const CompleteProfileScreen(email: "google_user@gmail.com"));
+                      await SecureStorage().saveUserEmail(
+                        "google_user@gmail.com",
+                      );
+                      Get.to(
+                        () => const CompleteProfileScreen(
+                          email: "google_user@gmail.com",
+                        ),
+                      );
                     },
                     child: Image.network(
                       "https://cdn-icons-png.flaticon.com/512/300/300221.png",
@@ -269,7 +305,10 @@ class WelcomeScreen extends StatelessWidget {
                     size: AppSize.sp(12),
                   ),
                   SizedBox(width: AppSize.w(5)),
-                  Text("Your data is safe and secure", style: AppTextStyles.small),
+                  Text(
+                    "Your data is safe and secure",
+                    style: AppTextStyles.small,
+                  ),
                 ],
               ),
 
@@ -292,7 +331,9 @@ class WelcomeScreen extends StatelessWidget {
                             builder: (context) => AlertDialog(
                               backgroundColor: AppColors.cardBg,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppSize.w(16)),
+                                borderRadius: BorderRadius.circular(
+                                  AppSize.w(16),
+                                ),
                                 side: BorderSide(color: AppColors.cardBorder),
                               ),
                               title: Text(
@@ -393,17 +434,13 @@ class WelcomeScreen extends StatelessWidget {
             height: AppSize.h(42),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.surface,                    // dark fill
+              color: AppColors.surface, // dark fill
               border: Border.all(
-                color: AppColors.cardBorder,              // subtle border ring
+                color: AppColors.cardBorder, // subtle border ring
                 width: 1.2,
               ),
             ),
-            child: Icon(
-              icon,
-              color: AppColors.white,
-              size: AppSize.sp(20),
-            ),
+            child: Icon(icon, color: AppColors.white, size: AppSize.sp(20)),
           ),
 
           SizedBox(width: AppSize.w(14)),
@@ -423,29 +460,28 @@ class WelcomeScreen extends StatelessWidget {
                 SizedBox(height: AppSize.h(2)),
                 Text(
                   subtitle,
-                  style: AppTextStyles.small.copyWith(
-                    fontSize: 10.sp,
-                  ),
+                  style: AppTextStyles.small.copyWith(fontSize: 10.sp),
                 ),
               ],
             ),
           ),
 
           if (showArrow)
-            Icon(Icons.chevron_right, color: AppColors.grey, size: AppSize.sp(22)),
+            Icon(
+              Icons.chevron_right,
+              color: AppColors.grey,
+              size: AppSize.sp(22),
+            ),
 
           if (showRightIcon)
-          /// ✅ Right person icon also with circle
+            /// ✅ Right person icon also with circle
             Container(
               width: AppSize.w(36),
               height: AppSize.h(36),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.surface,
-                border: Border.all(
-                  color: AppColors.cardBorder,
-                  width: 1.2,
-                ),
+                border: Border.all(color: AppColors.cardBorder, width: 1.2),
               ),
               child: Icon(
                 Icons.person_outline,

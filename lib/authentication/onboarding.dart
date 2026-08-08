@@ -1,5 +1,5 @@
 import 'package:boomboom/authentication/welcomscreens.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:boomboom/backend/permission_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -16,37 +16,35 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen>
     with SingleTickerProviderStateMixin {
-
   late AnimationController _controller;
   late Animation<double> fadeAnim;
   late Animation<double> scaleAnim;
   late Animation<double> textAnim;
-
-  Future<void> _requestNotificationPermission() async {
-    await Permission.notification.request();
-  }
+  bool _isNavigating = false;
 
   @override
   void initState() {
     super.initState();
-    _requestNotificationPermission();
 
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
 
-    scaleAnim = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    scaleAnim = Tween<double>(
+      begin: 1.0,
+      end: 1.08,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
-    fadeAnim = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    fadeAnim = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
-    textAnim = Tween<double>(begin: 40, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    textAnim = Tween<double>(
+      begin: 40,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
   }
@@ -55,6 +53,29 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleGetStarted() async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+
+    try {
+      await PermissionService.requestNotificationPermission();
+    } catch (e) {
+      debugPrint("[Onboarding] Notification permission error: $e");
+    }
+
+    if (!mounted) {
+      _isNavigating = false;
+      return;
+    }
+
+    Get.to(
+      () => WelcomeScreen(),
+      transition: Transition.rightToLeft,
+      duration: const Duration(milliseconds: 500),
+    );
+    _isNavigating = false;
   }
 
   @override
@@ -67,19 +88,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-
           // ── 1. FULLSCREEN BACKGROUND IMAGE (letsimage = complete composite image) ──
-          AnimatedBuilder
-            (
+          AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
               return Transform.scale(
                 scale: scaleAnim.value,
                 alignment: Alignment.center,
-                child: Opacity(
-                  opacity: fadeAnim.value,
-                  child: child,
-                ),
+                child: Opacity(opacity: fadeAnim.value, child: child),
               );
             },
 
@@ -87,8 +103,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             // alignment center karo taaki dono sides dikhe
             child: Image.asset(
               "assets/letsimage.png",
-              fit: BoxFit.contain,              // cover full screen
-              width: size.width,                // ✅ 0.94 nahi, FULL width
+              fit: BoxFit.contain, // cover full screen
+              width: size.width, // ✅ 0.94 nahi, FULL width
               height: size.height,
               // ✅ (-0.90, 1) nahi, center
             ),
@@ -103,10 +119,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Color(0xBB000000),
-                  ],
+                  colors: [Colors.transparent, Color(0xBB000000)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -126,10 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 builder: (context, child) {
                   return Transform.translate(
                     offset: Offset(0, textAnim.value),
-                    child: Opacity(
-                      opacity: fadeAnim.value,
-                      child: child,
-                    ),
+                    child: Opacity(opacity: fadeAnim.value, child: child),
                   );
                 },
                 child: Padding(
@@ -140,15 +150,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     24.h,
                   ),
                   child: GestureDetector(
-                    onTap: () {
-                      Get.to(
-                            () => WelcomeScreen(),
-                        transition: Transition.rightToLeft,
-                        duration: const Duration(milliseconds: 500),
-                      );
-                    },
+                    onTap: _handleGetStarted,
                     child: Container(
-                      height: 55.h,  // ← height badhaao
+                      height: 55.h, // ← height badhaao
                       width: 80.w,
                       decoration: BoxDecoration(
                         color: AppColors.accent,
@@ -192,7 +196,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
           ),
-
         ],
       ),
     );

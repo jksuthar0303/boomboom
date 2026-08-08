@@ -441,9 +441,9 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
         orientation: widget.orientation!,
         occupation: selectedwork ?? "Not specified",
         height: "${_heightCm.toInt()} cm",
-        bodyType: selectedBodyType ?? "Average",
-        drinkingHabits: selectedDrinking ?? "Social",
-        workout: selectedWorkout ?? "Sometimes",
+        bodyType: AppConstants.cleanEmoji(selectedBodyType ?? "Average"),
+        drinkingHabits: AppConstants.cleanEmoji(selectedDrinking ?? "Social"),
+        workout: AppConstants.cleanEmoji(selectedWorkout ?? "Sometimes"),
         interests: selectedInterests,
         photos: widget.photos ?? [],
         videos: widget.videos ?? [],
@@ -531,23 +531,23 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
         // 2. Save selected lifestyles
         final List<String> lifestyleItems = [];
         if (selectedDrinking != null) {
-          lifestyleItems.add("Drinking: $selectedDrinking");
+          lifestyleItems.add("Drinking: ${AppConstants.cleanEmoji(selectedDrinking!)}");
         }
         if (selectedWorkout != null) {
-          lifestyleItems.add("Workout: $selectedWorkout");
+          lifestyleItems.add("Workout: ${AppConstants.cleanEmoji(selectedWorkout!)}");
         }
         if (selectedBodyType != null) {
-          lifestyleItems.add("BodyType: $selectedBodyType");
+          lifestyleItems.add("BodyType: ${AppConstants.cleanEmoji(selectedBodyType!)}");
         }
         lifestyleItems.add("Height: ${_heightCm.toInt()} cm");
         if (selectedEthnicity != null) {
-          lifestyleItems.add("PersonalityType: $selectedEthnicity");
+          lifestyleItems.add("PersonalityType: ${AppConstants.cleanEmoji(selectedEthnicity!)}");
         }
         if (selectedEyeColor != null) {
-          lifestyleItems.add("LanguageSpoken: $selectedEyeColor");
+          lifestyleItems.add("LanguageSpoken: ${AppConstants.cleanEmoji(selectedEyeColor!)}");
         }
         if (selectedSmoking != null) {
-          lifestyleItems.add("Smoking: $selectedSmoking");
+          lifestyleItems.add("Smoking: ${AppConstants.cleanEmoji(selectedSmoking!)}");
         }
 
         for (var lifestyle in lifestyleItems) {

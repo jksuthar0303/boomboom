@@ -49,6 +49,18 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need access to your location to show nearby people and events on BoomBoom.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need access to your location to show nearby matches and events even when app is in background.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need location access to find nearby matches for you.</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>Allow notifications to receive new match alerts, messages and event updates.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need photo library access to select your profile pictures.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access to take selfies for your profile verification.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

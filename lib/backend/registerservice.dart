@@ -28,6 +28,10 @@ class RegisterService {
     required String drinkingHabits,
     required String workout,
   }) async {
+    final String cleanBodyType = AppConstants.cleanEmoji(bodyType);
+    final String cleanDrinkingHabits = AppConstants.cleanEmoji(drinkingHabits);
+    final String cleanWorkout = AppConstants.cleanEmoji(workout);
+    final String cleanOccupation = AppConstants.cleanEmoji(occupation);
     final String xmlBody =
         '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
@@ -42,13 +46,13 @@ class RegisterService {
       <Lookingfor>$lookingFor</Lookingfor>
       <Orientation>$orientation</Orientation>
       <BIO>$bio</BIO>
-      <Occupation>$occupation</Occupation>
+      <Occupation>$cleanOccupation</Occupation>
       <Lat>$lat</Lat>
       <Lon>$lon</Lon>
       <Height>$height</Height>
-      <BodyType>$bodyType</BodyType>
-      <DrinkingHabits>$drinkingHabits</DrinkingHabits>
-      <Workout>$workout</Workout>
+      <BodyType>$cleanBodyType</BodyType>
+      <DrinkingHabits>$cleanDrinkingHabits</DrinkingHabits>
+      <Workout>$cleanWorkout</Workout>
       <FCMToken></FCMToken>
     </RegisterInsert>
   </soap12:Body>
@@ -222,9 +226,7 @@ class RegisterService {
     required String email,
     required String lifestyle,
   }) async {
-    final String cleanLifestyle = lifestyle
-        .replaceAll(RegExp(r'[^\x00-\x7F]'), '')
-        .trim();
+    final String cleanLifestyle = AppConstants.cleanEmoji(lifestyle);
     final String xmlBody =
         '''<?xml version="1.0" encoding="utf-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
@@ -357,6 +359,10 @@ class RegisterService {
     required String drinkingHabits,
     required String workout,
   }) async {
+    final String cleanBodyType = AppConstants.cleanEmoji(bodyType);
+    final String cleanDrinkingHabits = AppConstants.cleanEmoji(drinkingHabits);
+    final String cleanWorkout = AppConstants.cleanEmoji(workout);
+    final String cleanOccupation = AppConstants.cleanEmoji(occupation);
     final String xmlBody =
         '''<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -370,11 +376,11 @@ class RegisterService {
       <Lookingfor>$lookingFor</Lookingfor>
       <Orientation>$orientation</Orientation>
       <BIO>$bio</BIO>
-      <Occupation>$occupation</Occupation>
+      <Occupation>$cleanOccupation</Occupation>
       <Height>$height</Height>
-      <BodyType>$bodyType</BodyType>
-      <DrinkingHabits>$drinkingHabits</DrinkingHabits>
-      <Workout>$workout</Workout>
+      <BodyType>$cleanBodyType</BodyType>
+      <DrinkingHabits>$cleanDrinkingHabits</DrinkingHabits>
+      <Workout>$cleanWorkout</Workout>
     </UpdateProfile>
   </soap:Body>
 </soap:Envelope>'''

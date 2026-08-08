@@ -31,7 +31,7 @@ class AuthController extends GetxController {
 
           if (status == 1 && profileJson["ResultSets"] is List) {
             final List resultSets = profileJson["ResultSets"];
-            if (resultSets.length >= 5) {
+            if (resultSets.length >= 2) {
               // ResultSet 1: Profile details
               final List profileList = resultSets[1];
               if (profileList.isNotEmpty) {
@@ -40,57 +40,63 @@ class AuthController extends GetxController {
                 );
 
                 // ResultSet 2: Media
-                final List mediaList = resultSets[2];
-                final List<Map<String, dynamic>> mediaItems = [];
-                for (var item in mediaList) {
-                  final url = item["Media"] ?? item["MediaName"];
-                  final type = item["Type"] ?? "image";
-                  if (url != null && url.toString().isNotEmpty) {
-                    mediaItems.add({
-                      "Url": url.toString(),
-                      "Type": type.toString(),
-                    });
+                if (resultSets.length > 2 && resultSets[2] is List) {
+                  final List mediaList = resultSets[2];
+                  final List<Map<String, dynamic>> mediaItems = [];
+                  for (var item in mediaList) {
+                    final url = item["Media"] ?? item["MediaName"];
+                    final type = item["Type"] ?? "image";
+                    if (url != null && url.toString().isNotEmpty) {
+                      mediaItems.add({
+                        "Url": url.toString(),
+                        "Type": type.toString(),
+                      });
+                    }
                   }
-                }
-                if (mediaItems.isNotEmpty) {
-                  data["Media"] = mediaItems;
+                  if (mediaItems.isNotEmpty) {
+                    data["Media"] = mediaItems;
+                  }
                 }
 
                 // ResultSet 3: Interests
-                final List interestsList = resultSets[3];
-                final List<String> interests = [];
-                final Map<String, int> interestMap = {};
-                for (var item in interestsList) {
-                  final String rawName = (item["Interest"] ?? "")
-                      .toString()
-                      .trim();
-                  final String matchedName =
-                      AppConstants.findMatchingInterest(rawName) ?? rawName;
-                  final int? id = int.tryParse(
-                    item["id"]?.toString() ?? item["Id"]?.toString() ?? "",
-                  );
-                  if (matchedName.isNotEmpty) {
-                    interests.add(matchedName);
-                    if (id != null) {
-                      interestMap[matchedName] = id;
+                if (resultSets.length > 3 && resultSets[3] is List) {
+                  final List interestsList = resultSets[3];
+                  final List<String> interests = [];
+                  final Map<String, int> interestMap = {};
+                  for (var item in interestsList) {
+                    final String rawName = (item["Interest"] ?? "")
+                        .toString()
+                        .trim();
+                    final String matchedName =
+                        AppConstants.findMatchingInterest(rawName) ?? rawName;
+                    final int? id = int.tryParse(
+                      item["id"]?.toString() ?? item["Id"]?.toString() ?? "",
+                    );
+                    if (matchedName.isNotEmpty) {
+                      interests.add(matchedName);
+                      if (id != null) {
+                        interestMap[matchedName] = id;
+                      }
                     }
                   }
+                  data["Interests"] = interests;
+                  await SecureStorage().saveInterestMap(jsonEncode(interestMap));
                 }
-                data["Interests"] = interests;
-                await SecureStorage().saveInterestMap(jsonEncode(interestMap));
 
                 // ResultSet 4: Lifestyle
-                final List lifestyleList = resultSets[4];
-                final List<String> lifestyle = [];
-                for (var item in lifestyleList) {
-                  final String val = (item["LifeStyle"] ?? "")
-                      .toString()
-                      .trim();
-                  if (val.isNotEmpty) {
-                    lifestyle.add(val);
+                if (resultSets.length > 4 && resultSets[4] is List) {
+                  final List lifestyleList = resultSets[4];
+                  final List<String> lifestyle = [];
+                  for (var item in lifestyleList) {
+                    final String val = (item["LifeStyle"] ?? "")
+                        .toString()
+                        .trim();
+                    if (val.isNotEmpty) {
+                      lifestyle.add(val);
+                    }
                   }
+                  data["Lifestyle"] = lifestyle;
                 }
-                data["Lifestyle"] = lifestyle;
 
                 // Save the merged data JSON back to SecureStorage
                 final Map<String, dynamic> combinedMap = {
@@ -273,9 +279,9 @@ class AuthController extends GetxController {
 
               // 2. Call LifestyleInsert API for each selected lifestyle item
               final List<String> lifestyleItems = [
-                "Drinking: $drinkingHabits",
-                "Workout: $workout",
-                "BodyType: $bodyType",
+                "Drinking: ${AppConstants.cleanEmoji(drinkingHabits)}",
+                "Workout: ${AppConstants.cleanEmoji(workout)}",
+                "BodyType: ${AppConstants.cleanEmoji(bodyType)}",
                 "Height: $height",
               ];
               for (var lifestyle in lifestyleItems) {

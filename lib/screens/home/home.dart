@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
-import 'package:boomboom/screens/home/homescreenitems/exploreuserhome.dart';
 import 'package:boomboom/screens/home/homescreenitems/verifyiuser.dart';
 import 'package:boomboom/screens/home/travell/travell.dart';
 import 'package:boomboom/screens/profile/profile.dart';
@@ -396,17 +395,39 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
-    // 1. Load cached details immediately for instant rendering
-    await _loadCachedProfileInfo();
+    final authController = Get.isRegistered<AuthController>()
+        ? Get.find<AuthController>()
+        : Get.put(AuthController());
 
-    // 2. Fetch fresh details from API in the background
-    try {
-      await AuthController().fetchAndStoreFullProfile(email: storedEmail);
-      debugPrint("[Home] User Profile refreshed from server.");
-      // 3. Reload cache with updated server values
+    // Shared storage mein check karein ki profile data saved hai ya nahi
+    final cachedJsonStr = await SecureStorage().getProfileJson();
+
+    if (cachedJsonStr == null || cachedJsonStr.trim().isEmpty) {
+      // User ka data shared storage mein save nahi hai -> Bina delay ke home screen par hi fetch karke save karayein
+      debugPrint(
+        "[Home] User profile data not found in shared storage. Calling ShowCompleteProfile immediately...",
+      );
+      try {
+        await authController.fetchAndStoreFullProfile(email: storedEmail);
+        debugPrint(
+          "[Home] Full user profile fetched and saved in shared storage.",
+        );
+      } catch (e) {
+        debugPrint("[Home] Error fetching full profile on home screen: $e");
+      }
       await _loadCachedProfileInfo();
-    } catch (e) {
-      debugPrint("[Home] Background profile pre-fetch error: $e");
+    } else {
+      // Shared storage mein data pehle se hai -> Fast load UI
+      await _loadCachedProfileInfo();
+
+      // Background mein fresh profile sync karke shared storage update karein
+      try {
+        await authController.fetchAndStoreFullProfile(email: storedEmail);
+        debugPrint("[Home] Background profile refreshed from server.");
+        await _loadCachedProfileInfo();
+      } catch (e) {
+        debugPrint("[Home] Background profile refresh error: $e");
+      }
     }
   }
 
@@ -682,8 +703,6 @@ class _HomeScreenState extends State<HomeScreen>
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 8.w),
               child: Container(
-                width: 150
-                    .w, // 👈 yahan apne hisaab se 220.w, 240.w, 260.w kar sakte ho
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.04),
@@ -701,72 +720,35 @@ class _HomeScreenState extends State<HomeScreen>
                   ],
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 40.w,
-                          height: 40.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.cyanAccent,
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.cyanAccent.withValues(alpha: 0.5),
-                                blurRadius: 15,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.local_fire_department,
-                            color: Colors.orangeAccent,
-                            size: 18.sp,
-                          ),
-                        ),
-                        SizedBox(width: 8.w),
-                        Text(
-                          "NEW",
-                          style: AppTextStyles.subHeading.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ExploreUsersScreen(),
-                        ),
-                      ),
-                      child: Container(
-                        width: 30.w,
-                        height: 30.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.cyanAccent,
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.cyanAccent.withValues(alpha: 0.4),
-                              blurRadius: 10,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.arrow_forward,
+                    Container(
+                      width: 40.w,
+                      height: 40.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
                           color: Colors.cyanAccent,
-                          size: 15.sp,
+                          width: 1.5,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.cyanAccent.withValues(alpha: 0.5),
+                            blurRadius: 15,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.local_fire_department,
+                        color: Colors.orangeAccent,
+                        size: 18.sp,
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    Text(
+                      "NEW",
+                      style: AppTextStyles.subHeading.copyWith(
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -1070,7 +1052,7 @@ class _HomeScreenState extends State<HomeScreen>
               );
             }),
 
-            SizedBox(height: 16.h),
+            SizedBox(height: 100.h),
           ],
         ),
       ),
