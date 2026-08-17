@@ -12,7 +12,6 @@ import '../constant/appsize.dart';
 import '../constant/apptextstyle.dart';
 import '../constant/colors.dart';
 import '../model/messagescreen.dart';
-import '../screens/home/homescreenitems/verifyiuser.dart';
 import 'boomboom.dart';
 import 'messagedetail.dart';
 
@@ -311,8 +310,8 @@ class MessagePageState extends State<MessagePage> {
       );
     }
 
-    // Always show available online users + See More button at the end
-    final int count = _onlineUsers.length + 1;
+    // Show every online user returned by the API.
+    final int count = _onlineUsers.length;
 
     return SizedBox(
       height: AppSize.h(90),
@@ -321,56 +320,8 @@ class MessagePageState extends State<MessagePage> {
         padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
         itemCount: count,
         itemBuilder: (_, i) {
-          if (i == _onlineUsers.length) {
-            return _seeMoreButton();
-          }
           return _userOnlineAvatar(_onlineUsers[i]);
         },
-      ),
-    );
-  }
-
-  Widget _seeMoreButton() {
-    return Padding(
-      padding: EdgeInsets.only(right: AppSize.w(16)),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: () {
-              Get.to(() => const Activeuser(initialTab: 0));
-            },
-            child: Container(
-              width: AppSize.w(60),
-              height: AppSize.h(60),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFFF6B6B).withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: Colors.white,
-                size: 22.sp,
-              ),
-            ),
-          ),
-          SizedBox(height: AppSize.h(6)),
-          Text(
-            'See More',
-            style: GoogleFonts.poppins(
-              fontSize: 11.sp,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
       ),
     );
   }

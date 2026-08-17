@@ -38,6 +38,60 @@ class HomeService {
     );
   }
 
+  /// Returns favourite/like/view rows for the logged-in user.
+  Future<XmlResponse> favoriteLikeViewShowByMyEmail({
+    required String myEmail,
+    required String action,
+    String? token,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <FavoriteLikeView_ShowByMyEmail xmlns="$namespace">
+      <token>${token ?? AppConstants.dummyToken}</token>
+      <myEmail>$myEmail</myEmail>
+      <action>$action</action>
+    </FavoriteLikeView_ShowByMyEmail>
+  </soap:Body>
+</soap:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"${namespace}FavoriteLikeView_ShowByMyEmail"',
+      },
+    );
+  }
+
+  /// Returns users who performed an action on the supplied email.
+  Future<XmlResponse> favoriteLikeViewShowByActionEmail({
+    required String actionEmail,
+    required String action,
+    String? token,
+  }) async {
+    final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <FavoriteLikeView_ShowByActionEmail xmlns="$namespace">
+      <token>${token ?? AppConstants.dummyToken}</token>
+      <actionEmail>$actionEmail</actionEmail>
+      <action>$action</action>
+    </FavoriteLikeView_ShowByActionEmail>
+  </soap:Body>
+</soap:Envelope>'''.trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"${namespace}FavoriteLikeView_ShowByActionEmail"',
+      },
+    );
+  }
+
   /// SOAP ShowAllExceptMe request (Everyone & New Matches)
   Future<XmlResponse> showAllExceptMe({required String myEmail}) async {
     final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>

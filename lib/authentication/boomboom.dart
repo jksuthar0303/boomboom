@@ -521,8 +521,10 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   ProfileModel? ownProfile;
   ProfileModel? otherProfile;
   List<ProfileModel> _liveProfiles = [];
+  List<String?> _liveProfileEmails = [];
   bool _isLoadingOtherProfile = false;
   bool _isLoadingLiveFeed = true;
+  bool _profileNotFound = false;
 
   ProfileModel get _profile {
     if (widget.isOwnProfile && ownProfile != null) {
@@ -579,12 +581,18 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
             final List rawList = jsonResult["Data"];
             final List<ProfileModel> parsedList = [];
+            final List<String?> profileEmails = [];
 
             for (var item in rawList) {
               if (item is Map) {
                 final p = _buildProfileFromMap(Map<String, dynamic>.from(item));
                 if (p != null) {
                   parsedList.add(p);
+                  profileEmails.add(
+                    (item["EmailAddress"] ?? item["email"] ??
+                            item["ActionEmail"])
+                        ?.toString(),
+                  );
                 }
               }
             }
@@ -592,6 +600,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
             if (mounted && parsedList.isNotEmpty) {
               setState(() {
                 _liveProfiles = parsedList;
+                _liveProfileEmails = profileEmails;
               });
             }
           }
@@ -608,6 +617,10 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
   Future<void> _loadOtherUserProfile(String email) async {
     if (email.isEmpty) return;
+    _profileNotFound = false;
+    if (!widget.isOwnProfile) {
+      _recordProfileView(email);
+    }
     setState(() => _isLoadingOtherProfile = true);
 
     try {
@@ -621,6 +634,16 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           final Map<String, dynamic> jsonResult = jsonDecode(
             res.first.innerText,
           );
+          if (jsonResult["Status"] != 1) {
+            if (mounted) {
+              setState(() {
+                _profileNotFound = true;
+                _isLoadingOtherProfile = false;
+                otherProfile = null;
+              });
+            }
+            return;
+          }
           if (jsonResult["Status"] == 1) {
             Map<String, dynamic>? profileData;
             List<dynamic>? rawInterests;
@@ -674,11 +697,27 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       debugPrint("[BoomProfileScreen] Error fetching ShowCompleteProfile: $e");
     } finally {
       if (mounted) {
-        if (otherProfile == null && widget.initialUserData != null) {
+        if (!_profileNotFound &&
+            otherProfile == null &&
+            widget.initialUserData != null) {
           _parseAndSetOtherProfile(widget.initialUserData!, null, null, null);
         }
         setState(() => _isLoadingOtherProfile = false);
       }
+    }
+  }
+
+  Future<void> _recordProfileView(String actionEmail) async {
+    try {
+      final myEmail = await SecureStorage().getUserEmail() ?? '';
+      if (myEmail.trim().isEmpty || actionEmail.trim().isEmpty) return;
+      await HomeService().favoriteLikeViewInsert(
+        myEmail: myEmail.trim(),
+        actionEmail: actionEmail.trim(),
+        action: 'view',
+      );
+    } catch (e) {
+      debugPrint('[BoomProfileScreen] Error recording profile view: $e');
     }
   }
 
@@ -1117,6 +1156,28 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
   Future<void> _swipeOut({required bool toLike}) async {
     if (_isSwiping) return;
+    final int profileCount = _liveProfiles.isNotEmpty
+        ? _liveProfiles.length
+        : sampleProfiles.length;
+    final int currentProfileIndex = _currentIndex % profileCount;
+    final String? actionEmail = _liveProfiles.isNotEmpty &&
+            currentProfileIndex < _liveProfileEmails.length
+        ? _liveProfileEmails[currentProfileIndex]
+        : null;
+
+    if (toLike && actionEmail != null && actionEmail.trim().isNotEmpty) {
+      try {
+        final myEmail = await SecureStorage().getUserEmail() ?? '';
+        await HomeService().favoriteLikeViewInsert(
+          myEmail: myEmail.trim(),
+          actionEmail: actionEmail.trim(),
+          action: 'like',
+        );
+      } catch (e) {
+        debugPrint('[BoomProfileScreen] Error saving swipe like: $e');
+      }
+    }
+
     setState(() => _isSwiping = true);
     final sw = MediaQuery.of(context).size.width;
     setState(() {
@@ -1163,6 +1224,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   double get _nopeOp => (-_dragX / 100).clamp(0.0, 1.0);
 
   // ── Toggle favourite ──
+  // ignore: unused_element
   void _toggleFavourite() {
     final idx = _currentIndex % sampleProfiles.length;
     setState(() {
@@ -1216,9 +1278,22 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    final bool isSwipeFeed = !widget.isOwnProfile &&
+    final bool isSwipeFeed =
+        !widget.isOwnProfile &&
         widget.userEmail == null &&
         widget.initialUserData == null;
+
+    if (_profileNotFound) {
+      return const Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Center(
+          child: Text(
+            'No data found',
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+        ),
+      );
+    }
 
     if ((widget.isOwnProfile && ownProfile == null) ||
         _isLoadingOtherProfile ||
@@ -1562,9 +1637,13 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      GestureDetector(
-                        onTap: () async {
-                          final idx = _currentIndex % sampleProfiles.length;
+                      if (!widget.isOwnProfile)
+                        GestureDetector(
+                          onTap: () async {
+                          final profileCount = _liveProfiles.isNotEmpty
+                              ? _liveProfiles.length
+                              : sampleProfiles.length;
+                          final idx = _currentIndex % profileCount;
                           final bool nextLiked = !_favourites.contains(idx);
                           setState(() {
                             if (!nextLiked) {
@@ -1576,10 +1655,13 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                             }
                           });
 
-                          final actionEmail = widget.userEmail ??
-                              widget.initialUserData?['EmailAddress']?.toString() ??
+                          final actionEmail =
+                              widget.userEmail ??
+                              widget.initialUserData?['EmailAddress']
+                                  ?.toString() ??
                               widget.initialUserData?['email']?.toString();
-                          if (actionEmail == null || actionEmail.trim().isEmpty) {
+                          if (actionEmail == null ||
+                              actionEmail.trim().isEmpty) {
                             return;
                           }
                           try {
@@ -1610,8 +1692,8 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                               );
                             }
                           }
-                        },
-                        child: AnimatedContainer(
+                          },
+                          child: AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           width: isTablet ? AppSize.w(48) : AppSize.w(44),
                           height: isTablet ? AppSize.h(48) : AppSize.h(44),
@@ -1651,8 +1733,8 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                               size: isTablet ? 24.sp : 20.sp,
                             ),
                           ),
+                          ),
                         ),
-                      ),
 
                       SizedBox(height: AppSize.h(8)),
 

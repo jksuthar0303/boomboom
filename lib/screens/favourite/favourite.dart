@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:xml/xml.dart' as xml;
+import '../../backend/home_service.dart';
+import '../../backend/secure_storage.dart';
 import '../../authentication/boomboom.dart';
 import '../../constant/apptextstyle.dart';
 import '../../constant/colors.dart';
@@ -13,26 +17,24 @@ class LikesScreen extends StatefulWidget {
 }
 
 class _LikesScreenState extends State<LikesScreen> {
-  int myLikesCount = 12;
-  int whoLikedCount = 45;
-  int whoViewedCount = 128;
+  int myLikesCount = 0;
+  int whoLikedCount = 0;
+  int whoViewedCount = 0;
   // int whoSortedCount = 18;
   // int mySortedCount = 7;
 
-  late final List<int> counts = [
-    myLikesCount,
-    whoLikedCount,
-    whoViewedCount,
-    // whoSortedCount,
-    // mySortedCount,
-  ];
+  List<int> get counts => [myLikesCount, whoLikedCount, whoViewedCount];
 
   int selectedTab = 0;
+  bool _isLoading = true;
+  String? _errorMessage;
+  String? _emptyMessage;
+  List<Map<String, dynamic>> _apiUsers = [];
 
   final tabs = [
     "My Likes",
     "Who Liked",
-    "Who Viewed",
+    "Recently Viewed",
     // "Who Favourite Me",
     // "My Favourite",
   ];
@@ -105,6 +107,83 @@ class _LikesScreenState extends State<LikesScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadUsersForTab(0);
+  }
+
+  String _actionForTab(int index) {
+    switch (index) {
+      case 1:
+        return 'liked';
+      case 2:
+        return 'view';
+      default:
+        return 'like';
+    }
+  }
+
+  Future<void> _loadUsersForTab(int tabIndex) async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+        _emptyMessage = null;
+      });
+    }
+    try {
+      final email = await SecureStorage().getUserEmail() ?? '';
+      final response = tabIndex == 1
+          ? await HomeService().favoriteLikeViewShowByActionEmail(
+              actionEmail: email.trim(),
+              action: 'like',
+            )
+          : await HomeService().favoriteLikeViewShowByMyEmail(
+              myEmail: email.trim(),
+              action: _actionForTab(tabIndex),
+            );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+
+      final result = XmlResponseParser.parse(response.body);
+      if (result['Status'].toString() != '1') {
+        if (!mounted) return;
+        setState(() {
+          _apiUsers = [];
+          _isLoading = false;
+          _emptyMessage = 'No data found';
+        });
+        return;
+      }
+      final data = result is Map && result['Data'] is List
+          ? (result['Data'] as List)
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList()
+          : <Map<String, dynamic>>[];
+
+      if (!mounted) return;
+      setState(() {
+        _apiUsers = data;
+        _emptyMessage = data.isEmpty ? 'No data found' : null;
+        if (tabIndex == 0) myLikesCount = data.length;
+        if (tabIndex == 1) whoLikedCount = data.length;
+        if (tabIndex == 2) whoViewedCount = data.length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _apiUsers = [];
+        _isLoading = false;
+        _emptyMessage = null;
+        _errorMessage = 'Data load nahi ho saka. Retry karein.';
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
@@ -140,7 +219,10 @@ class _LikesScreenState extends State<LikesScreen> {
                     final color = tabColors[index];
 
                     return GestureDetector(
-                      onTap: () => setState(() => selectedTab = index),
+                      onTap: () {
+                        setState(() => selectedTab = index);
+                        _loadUsersForTab(index);
+                      },
                       child: Container(
                         margin: EdgeInsets.only(right: 10.w),
                         padding: EdgeInsets.symmetric(
@@ -180,10 +262,11 @@ class _LikesScreenState extends State<LikesScreen> {
                                   ),
                                 ),
                                 // Red count badge
-                                Positioned(
-                                  top: -6,
-                                  right: -3,
-                                  child: Container(
+                                if (counts[index] > 0)
+                                  Positioned(
+                                    top: -6,
+                                    right: -3,
+                                    child: Container(
                                     padding: EdgeInsets.symmetric(
                                       horizontal: counts[index] > 9 ? 4.w : 5.w,
                                       vertical: 1.5.h,
@@ -206,8 +289,8 @@ class _LikesScreenState extends State<LikesScreen> {
                                         fontWeight: FontWeight.w900,
                                       ),
                                     ),
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
 
@@ -235,21 +318,45 @@ class _LikesScreenState extends State<LikesScreen> {
 
               // ── GRID ──
               Expanded(
-                child: GridView.builder(
-                  itemCount: users.length,
-                  physics: const BouncingScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12.h,
-                    crossAxisSpacing: 12.w,
-                    childAspectRatio: 0.68,
-                  ),
-                  itemBuilder: (_, i) => _card(i),
-                ),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _errorMessage != null
+                    ? _buildMessage(_errorMessage!, true)
+                    : _apiUsers.isEmpty
+                    ? _buildMessage(_emptyMessage ?? 'No data found', false)
+                    : GridView.builder(
+                        itemCount: _apiUsers.length,
+                        physics: const BouncingScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12.h,
+                          crossAxisSpacing: 12.w,
+                          childAspectRatio: 0.68,
+                        ),
+                        itemBuilder: (_, i) => _card(i),
+                      ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMessage(String message, bool retry) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message, style: const TextStyle(color: Colors.white60)),
+          if (retry) ...[
+            SizedBox(height: 10.h),
+            OutlinedButton(
+              onPressed: () => _loadUsersForTab(selectedTab),
+              child: const Text('Retry'),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -272,11 +379,19 @@ class _LikesScreenState extends State<LikesScreen> {
 
   // ── CARD ──
   Widget _card(int index) {
-    final user = users[index % users.length];
+    final apiUser = _apiUsers[index];
+    final user = _mapApiUser(apiUser);
 
     return GestureDetector(
       onTap: () {
-        Get.to(BoomProfileScreen());
+        Get.to(
+          BoomProfileScreen(
+            userEmail:
+                apiUser['EmailAddress']?.toString() ??
+                apiUser['ActionEmail']?.toString(),
+            initialUserData: apiUser,
+          ),
+        );
       },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20.r),
@@ -289,8 +404,8 @@ class _LikesScreenState extends State<LikesScreen> {
               width: double.infinity,
               height: double.infinity,
               errorBuilder: (_, _, _) => Container(
-                color: Colors.grey.shade900,
-                child: Icon(Icons.person, color: Colors.white24, size: 40.sp),
+                color: Colors.transparent,
+                child: const SizedBox.shrink(),
               ),
             ),
 
@@ -310,9 +425,8 @@ class _LikesScreenState extends State<LikesScreen> {
 
             // ── X BUTTON (top-left) — BLUE filled circle ──
             // ── X BUTTON (top-left) ──
-            Positioned(
-              top: 10,
-              left: 10,
+            Positioned(top: 10.h, left: 10.w, child: const SizedBox.shrink()),
+            /*
               child: Container(
                 width: 32.w,
                 height: 32.w,
@@ -330,19 +444,25 @@ class _LikesScreenState extends State<LikesScreen> {
                 ),
                 child: Icon(Icons.close, color: Colors.white, size: 16.sp),
               ),
-            ),
+            ),*/
 
             // ── HEART ICON — same as Explore screen ──
-            Positioned(
-              top: 10.h,
-              right: 10.w,
-              child: Icon(
-                Icons.favorite_border_rounded,
-                color: Colors.white,
-                size: 26.sp,
-                shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+            if (selectedTab == 0)
+              Positioned(
+                top: 10.h,
+                right: 10.w,
+                child: GestureDetector(
+                  onTap: () => _unlikeUser(index),
+                  child: Icon(
+                    Icons.favorite_rounded,
+                    color: Colors.redAccent,
+                    size: 26.sp,
+                    shadows: const [
+                      Shadow(color: Colors.black54, blurRadius: 6),
+                    ],
+                  ),
+                ),
               ),
-            ),
 
             // ── BOTTOM INFO ──
             Positioned(
@@ -368,11 +488,12 @@ class _LikesScreenState extends State<LikesScreen> {
                         ),
                       ),
                       SizedBox(width: 3.w),
-                      Icon(
-                        Icons.verified_rounded,
-                        color: Colors.blueAccent,
-                        size: 14.sp,
-                      ),
+                      if (user["isVerified"] == true)
+                        Icon(
+                          Icons.verified_rounded,
+                          color: Colors.blueAccent,
+                          size: 14.sp,
+                        ),
                     ],
                   ),
 
@@ -385,21 +506,24 @@ class _LikesScreenState extends State<LikesScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          user["flag"],
+                          user["gender"],
                           style: TextStyle(
+                            color: Colors.white,
                             fontSize: 9.sp,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        SizedBox(width: 3.w),
-                        Text(
-                          user["city"],
-                          style: AppTextStyles.small.copyWith(
-                            color: Colors.white70,
-                            fontSize: 8.sp,
-                            fontWeight: FontWeight.w900,
+                        if (user["occupation"].toString().isNotEmpty) ...[
+                          SizedBox(width: 3.w),
+                          Text(
+                            user["occupation"],
+                            style: AppTextStyles.small.copyWith(
+                              color: Colors.white70,
+                              fontSize: 8.sp,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -407,29 +531,6 @@ class _LikesScreenState extends State<LikesScreen> {
                   SizedBox(height: 3.h),
 
                   // ── DISTANCE BADGE ──
-                  _darkPill(
-                    borderColor: Colors.white12,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          color: Colors.white60,
-                          size: 11.sp,
-                        ),
-                        SizedBox(width: 2.w),
-                        Text(
-                          user["distance"],
-                          style: AppTextStyles.small.copyWith(
-                            color: Colors.white60,
-                            fontSize: 8.sp,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
                   SizedBox(height: 3.h),
 
                   // ── ACTIVE NOW + FRIENDSHIP ROW ──
@@ -452,7 +553,7 @@ class _LikesScreenState extends State<LikesScreen> {
                             ),
                             SizedBox(width: 1.w),
                             Text(
-                              "Active now",
+                              user["isOnline"] ? "Online" : "Offline",
                               style: AppTextStyles.small.copyWith(
                                 color: Colors.white70,
                                 fontSize: 8.sp,
@@ -503,7 +604,7 @@ class _LikesScreenState extends State<LikesScreen> {
                               ),
                               SizedBox(width: 4.w),
                               Text(
-                                "Friendship",
+                                user["lookingFor"],
                                 style: AppTextStyles.small.copyWith(
                                   color: Colors.white,
                                   fontSize: 8.sp,
@@ -523,5 +624,108 @@ class _LikesScreenState extends State<LikesScreen> {
         ),
       ),
     );
+  }
+
+  Map<String, dynamic> _mapApiUser(Map<String, dynamic> item) {
+    final dob = item['Dob']?.toString() ?? '';
+    String age = '';
+    try {
+      final date = DateTime.parse(dob);
+      final now = DateTime.now();
+      var value = now.year - date.year;
+      if (now.month < date.month ||
+          (now.month == date.month && now.day < date.day))
+        value--;
+      age = value.toString();
+    } catch (_) {}
+    final image =
+        item['ProfileImage'] ??
+        item['Image'] ??
+        item['Media'] ??
+        item['Photo'] ??
+        '';
+    return {
+      'image': image.toString(),
+      'name': item['FullName'] ?? item['Name'] ?? 'Unknown',
+      'age': age,
+      'gender': item['Gender'] ?? 'Not specified',
+      'occupation': item['Occupation'] == null ||
+              item['Occupation'].toString().trim().toLowerCase() ==
+                  'not specified'
+          ? ''
+          : item['Occupation'].toString(),
+      'distance': '${item['Lat'] ?? ''}, ${item['Lon'] ?? ''}',
+      'isOnline': item['IsOnline'].toString().toLowerCase() == 'true',
+      'isVerified': item['IsVerified'].toString().toLowerCase() == 'true',
+      'lookingFor': item['Lookingfor'] ?? 'Not specified',
+    };
+  }
+
+  Future<void> _unlikeUser(int index) async {
+    if (index < 0 || index >= _apiUsers.length) return;
+    final target = _apiUsers[index];
+    final actionEmail = (target['ActionEmail'] ?? target['EmailAddress'])
+        ?.toString()
+        .trim();
+    if (actionEmail == null || actionEmail.isEmpty) return;
+
+    final email = await SecureStorage().getUserEmail() ?? '';
+    final removed = _apiUsers.removeAt(index);
+    if (mounted) {
+      setState(() {
+        if (selectedTab == 0) myLikesCount = _apiUsers.length;
+      });
+    }
+    try {
+      final response = await HomeService().favoriteLikeViewInsert(
+        myEmail: email.trim(),
+        actionEmail: actionEmail,
+        action: 'unlike',
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+      if (mounted && selectedTab == 0) {
+        setState(() => myLikesCount = _apiUsers.length);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        final restoreIndex = index > _apiUsers.length
+            ? _apiUsers.length
+            : index;
+        _apiUsers.insert(restoreIndex, removed);
+        if (selectedTab == 0) myLikesCount = _apiUsers.length;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unlike save nahi ho saka.')),
+      );
+    }
+  }
+}
+
+class XmlResponseParser {
+  static Map<String, dynamic> parse(String body) {
+    try {
+      final document = xml.XmlDocument.parse(body);
+      final nodes = document.findAllElements(
+        'FavoriteLikeView_ShowByMyEmailResult',
+      );
+      final actionNodes = document.findAllElements(
+        'FavoriteLikeView_ShowByActionEmailResult',
+      );
+      final resultNodes = nodes.isNotEmpty ? nodes : actionNodes;
+      if (resultNodes.isEmpty) return const {};
+      return Map<String, dynamic>.from(
+        jsonDecode(resultNodes.first.innerText) as Map,
+      );
+    } catch (_) {
+      final start = body.indexOf('{');
+      final end = body.lastIndexOf('}');
+      if (start < 0 || end < start) return const {};
+      return Map<String, dynamic>.from(
+        jsonDecode(body.substring(start, end + 1)) as Map,
+      );
+    }
   }
 }

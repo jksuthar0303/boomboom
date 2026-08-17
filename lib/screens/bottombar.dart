@@ -92,12 +92,7 @@ class _MainScreenState extends State<MainScreen> {
           nav(Icons.home, 0, AppColors.navHome),
           nav(Icons.location_on, 1, AppColors.navLocation),
           navImage("assets/logos.png", 2, AppColors.navBoomBoom),
-          navWithBadge(
-            Icons.favorite,
-            3,
-            5,
-            AppColors.navFavourite,
-          ),
+          nav(Icons.favorite, 3, AppColors.navFavourite),
           navWithBadge(
             Icons.forum_rounded,
             4,
