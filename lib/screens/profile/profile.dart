@@ -150,7 +150,6 @@ class _PhoneLayout extends StatelessWidget {
           SizedBox(height: 20.h),
           _SpotlightCard(),
           SizedBox(height: 20.h),
-          _SectionLabel('BoomBoom Mode'),
           _TileGroupWidget(tiles: _allTiles(context)[0]),
           SizedBox(height: 18.h),
           _SectionLabel('Account'),
@@ -187,7 +186,6 @@ class _TabletLayout extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _SectionLabel('BoomBoom Mode'),
                       _TileGroupWidget(
                         tiles: _allTiles(context)[0],
                         noMargin: true,

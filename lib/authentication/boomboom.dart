@@ -85,6 +85,7 @@ class ProfileModel {
   final List<String> interests, lifestyle;
   final List<MediaItem> media;
   final int completionPercent;
+  final bool isVerified;
   final String? telegramUsername;
 
   const ProfileModel({
@@ -102,6 +103,7 @@ class ProfileModel {
     required this.lifestyle,
     required this.media,
     this.completionPercent = 72,
+    this.isVerified = false,
     this.seenAgo = '5 min ago',
     this.telegramUsername,
   });
@@ -610,7 +612,12 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       debugPrint("[BoomProfileScreen] Error fetching ShowAllExceptMe: $e");
     } finally {
       if (mounted) {
-        setState(() => _isLoadingLiveFeed = false);
+        setState(() {
+          _isLoadingLiveFeed = false;
+          if (_liveProfiles.isEmpty) {
+            _profileNotFound = true;
+          }
+        });
       }
     }
   }
@@ -690,6 +697,13 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
               );
               return;
             }
+
+            if (mounted) {
+              setState(() {
+                _profileNotFound = true;
+                _isLoadingOtherProfile = false;
+              });
+            }
           }
         }
       }
@@ -701,6 +715,8 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
             otherProfile == null &&
             widget.initialUserData != null) {
           _parseAndSetOtherProfile(widget.initialUserData!, null, null, null);
+        } else if (!_profileNotFound && otherProfile == null) {
+          _profileNotFound = true;
         }
         setState(() => _isLoadingOtherProfile = false);
       }
@@ -728,7 +744,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     List<dynamic>? rawLifestyle,
   ]) {
     try {
-      final String name = (data["FullName"] ?? data["name"] ?? "User")
+      final String name = (data["FullName"] ?? data["name"] ?? "")
           .toString();
       final String dob = (data["Dob"] ?? data["dob"] ?? "").toString();
       final String calculatedAge = dob.isNotEmpty
@@ -738,20 +754,24 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           .toString()
           .trim();
       final String job =
-          (data["Occupation"] ?? data["occupation"] ?? "Not specified")
+          (data["Occupation"] ?? data["occupation"] ?? "")
               .toString();
-      final String height = (data["Height"] ?? data["height"] ?? "165 cm")
+      final String height = (data["Height"] ?? data["height"] ?? "")
           .toString();
       final String lookingFor =
-          (data["Lookingfor"] ?? data["lookingFor"] ?? "Serious Love")
+          (data["Lookingfor"] ?? data["lookingFor"] ?? "")
               .toString();
       final String gender = (data["Gender"] ?? data["gender"] ?? "").toString();
       final String orientation =
           (data["Orientation"] ?? data["orientation"] ?? "").toString();
+      final bool isVerified = data["IsVerified"] == true ||
+          data["IsVerified"]?.toString().toLowerCase() == "true" ||
+          data["isVerified"] == true ||
+          data["isVerified"]?.toString().toLowerCase() == "true";
       final String city =
-          (data["City"] ?? data["city"] ?? data["Country"] ?? "India")
+          (data["City"] ?? data["city"] ?? data["Country"] ?? "")
               .toString();
-      final String distance = (data["Distance"] ?? data["distance"] ?? "1.2 km")
+      final String distance = (data["Distance"] ?? data["distance"] ?? "")
           .toString();
 
       final List<MediaItem> mediaItems = [];
@@ -899,6 +919,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         interests: interestsList,
         lifestyle: lifestyleList,
         media: mediaItems,
+        isVerified: isVerified,
       );
     } catch (e) {
       debugPrint("[BoomProfileScreen] Error building profile model: $e");
@@ -1400,8 +1421,6 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                     SizedBox(height: AppSize.h(12)),
                     _lifestyle(p, isTablet),
                     SizedBox(height: AppSize.h(22)),
-                    _bottomActionRow(p, isTablet),
-                    SizedBox(height: AppSize.h(20)),
                   ]),
                 ),
               ),
@@ -1594,11 +1613,12 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                               ),
                             ),
                             SizedBox(width: AppSize.w(6)),
-                            Icon(
-                              Icons.verified_rounded,
-                              color: Colors.blue,
-                              size: isTablet ? AppSize.sp(22) : AppSize.sp(18),
-                            ),
+                            if (p.isVerified)
+                              Icon(
+                                Icons.verified_rounded,
+                                color: Colors.blue,
+                                size: isTablet ? AppSize.sp(22) : AppSize.sp(18),
+                              ),
                           ],
                         ),
 
@@ -1794,11 +1814,12 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       '🎯 ${p.lookingFor}',
       '📏 ${p.height}',
     ];
+    final visibleBadges = badges.skip(2).toList();
     return SizedBox(
       height: AppSize.h(32), // ✅ 35 → 32, thoda zyada room
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: badges.length,
+        itemCount: visibleBadges.length,
         separatorBuilder: (_, _) => SizedBox(width: AppSize.w(6)),
         itemBuilder: (_, i) => Container(
           padding: EdgeInsets.symmetric(
@@ -1814,7 +1835,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           alignment: Alignment.center,
           // ✅ yeh add karo — text vertically center rahega
           child: Text(
-            badges[i],
+            visibleBadges[i],
             style: TextStyle(
               color: Colors.white,
               fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),

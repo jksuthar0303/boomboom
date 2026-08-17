@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:boomboom/backend/secure_storage.dart';
 import 'package:boomboom/backend/registerservice.dart';
 import 'package:boomboom/controller/auth_controller.dart';
+import 'package:boomboom/controller/user_controller.dart';
 import 'package:boomboom/widget/snakbar.dart';
 import 'package:boomboom/constant/appconstants.dart';
 
@@ -666,7 +667,14 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
                             "Plus Size ✨",
                           ],
                           selectedBodyType,
-                          (v) => selectedBodyType = v,
+                          (v) {
+                            selectedBodyType = v;
+                            if (!widget.isRegister &&
+                                Get.isRegistered<UserController>()) {
+                              Get.find<UserController>().bodyType.value =
+                                  AppConstants.cleanEmoji(v);
+                            }
+                          },
                         ),
                         _divider(),
 
@@ -690,7 +698,14 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
                               "Marketing",
                             ],
                             selectedwork,
-                            (v) => selectedwork = v,
+                            (v) {
+                              selectedwork = v;
+                              if (!widget.isRegister &&
+                                  Get.isRegistered<UserController>()) {
+                                Get.find<UserController>().occupation.value =
+                                    AppConstants.cleanEmoji(v);
+                              }
+                            },
                           ),
                           _divider(),
                         ],
@@ -937,10 +952,11 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
                           color: allFilled ? accent : const Color(0xFF555555),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      GestureDetector(
-                        onTap: allFilled ? _handleSubmit : null,
-                        child: AnimatedContainer(
+                      if (widget.isRegister) ...[
+                        const SizedBox(height: 10),
+                        GestureDetector(
+                          onTap: allFilled ? _handleSubmit : null,
+                          child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           width: double.infinity,
                           height: 50,
@@ -991,8 +1007,9 @@ class _LifestyleScreenState extends State<LifestyleScreen> {
                               ),
                             ),
                           ),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
