@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:boomboom/controller/auth_controller.dart';
+import 'package:boomboom/screens/profile/updateprofile/privacyscreen.dart';
+import 'package:boomboom/screens/profile/updateprofile/termsscreen.dart';
 import '../../constant/appsize.dart';
 import '../../constant/apptextstyle.dart';
 import '../../constant/colors.dart';
@@ -23,7 +25,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool isPasswordHidden = true;
   bool isConfirmPasswordHidden = true;
-
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +210,70 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
 
-            SizedBox(height: AppSize.h(10)),
+            SizedBox(height: AppSize.h(14)),
+
+            /// 📝 Terms of Use - Privacy Policy (Above Login Button)
+            Center(
+              child: RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: AppTextStyles.small.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: AppSize.sp(11),
+                  ),
+                  children: [
+                    const TextSpan(text: "By logging in, you agree to our "),
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: GestureDetector(
+                        onTap: () {
+                          Get.to(
+                            () => const TermsOfUseScreen(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 350),
+                          );
+                        },
+                        child: Text(
+                          "Terms of Use",
+                          style: AppTextStyles.small.copyWith(
+                            color: const Color(0xFF9B59B6),
+                            fontWeight: FontWeight.w600,
+                            fontSize: AppSize.sp(11),
+                            decoration: TextDecoration.underline,
+                            decorationColor: const Color(0xFF9B59B6),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const TextSpan(text: " and "),
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: GestureDetector(
+                        onTap: () {
+                          Get.to(
+                            () => const PrivacyPolicyScreen(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 350),
+                          );
+                        },
+                        child: Text(
+                          "Privacy Policy",
+                          style: AppTextStyles.small.copyWith(
+                            color: const Color(0xFF9B59B6),
+                            fontWeight: FontWeight.w600,
+                            fontSize: AppSize.sp(11),
+                            decoration: TextDecoration.underline,
+                            decorationColor: const Color(0xFF9B59B6),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            SizedBox(height: AppSize.h(14)),
 
             /// LOGIN BUTTON
             Obx(
@@ -227,6 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
             ),
+            SizedBox(height: AppSize.h(10)),
           ],
         ),
       ),

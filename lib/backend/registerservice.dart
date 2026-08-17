@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'xml_api_client.dart';
 import '../constant/appconstants.dart';
 
@@ -91,7 +92,10 @@ class RegisterService {
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
       onSendProgress: onSendProgress,
-      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
+      headers: {
+        'Content-Type': 'application/soap+xml; charset=utf-8',
+        'SOAPAction': '"${namespace}MediaInsert"',
+      },
     );
   }
 
@@ -119,6 +123,37 @@ class RegisterService {
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
       headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
+    );
+  }
+
+  /// SOAP UpdateFCMToken request
+  Future<XmlResponse> updateFCMToken({
+    required String email,
+    required String fcmToken,
+  }) async {
+    debugPrint("🔥 [UpdateFCMToken Request] Email: $email");
+    debugPrint("🔥 [UpdateFCMToken Request] Token: $fcmToken");
+
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <UpdateFCMToken xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <FCMToken>$fcmToken</FCMToken>
+    </UpdateFCMToken>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"${namespace}UpdateFCMToken"',
+      },
     );
   }
 

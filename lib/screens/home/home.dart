@@ -2,23 +2,22 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
+import 'package:xml/xml.dart' as xml;
 import 'package:boomboom/screens/home/homescreenitems/verifyiuser.dart';
 import 'package:boomboom/screens/home/travell/travell.dart';
 import 'package:boomboom/screens/profile/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-
+import '../../backend/home_service.dart';
 import '../../backend/registerservice.dart';
 import '../../backend/secure_storage.dart';
 import '../../controller/auth_controller.dart';
 import '../../authentication/welcomscreens.dart';
-
 import '../../authentication/boomboom.dart';
 import '../../constant/appsize.dart';
 import '../../constant/apptextstyle.dart';
 import '../../constant/colors.dart';
-import '../../controller/appsetting.dart';
 import '../../widget/lotteewidgets.dart';
 import '../../widget/topcards.dart';
 import '../../widget/videobackground.dart';
@@ -26,6 +25,7 @@ import 'homescreenitems/FullCardScreen.dart';
 import 'homescreenitems/eventscreens/eventscreens.dart';
 import 'homescreenitems/homefilterscreen.dart';
 import 'homescreenitems/newmatches.dart';
+import 'homescreenitems/notificationscreen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,18 +41,135 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  final PageController _pageController = PageController();
+  late final AuthController authController = Get.isRegistered<AuthController>()
+      ? Get.find<AuthController>()
+      : Get.put(AuthController(), permanent: true);
+
   String _profileImageUrl =
       "https://images.unsplash.com/photo-1502685104226-ee32379fefbe";
   String _currentCityName = "Pattaya City";
 
-  final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _autoSlideTimer;
 
-  final _settings = AppSettingsController.to;
   late TabController _tabController;
+
+  bool _isEveryoneLoading = true;
+  List<Map<String, dynamic>> _everyoneUsers = [];
+
+  bool _isOnlineLoading = true;
+  bool _isVerifiedLoading = true;
+  List<Map<String, dynamic>> _onlineUsers = [];
+  List<Map<String, dynamic>> _verifiedUsers = [];
+
+  Future<void> _fetchEveryoneUsers() async {
+    try {
+      final String myEmail = await SecureStorage().getUserEmail() ?? "";
+      final response = await HomeService().showAllExceptMe(
+        myEmail: myEmail.trim(),
+      );
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowAllExceptMeResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            final List rawList = jsonResult["Data"];
+            if (mounted) {
+              setState(() {
+                _everyoneUsers = List<Map<String, dynamic>>.from(rawList);
+                _isEveryoneLoading = false;
+              });
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[Home] Error fetching everyone users: $e");
+    }
+    if (mounted) {
+      setState(() {
+        _isEveryoneLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchOnlineUsers() async {
+    try {
+      final String myEmail = await SecureStorage().getUserEmail() ?? "";
+      final response = await HomeService().showOnlineUsers(
+        myEmail: myEmail.trim(),
+      );
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowOnlineUsersResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            if (mounted) {
+              setState(() {
+                _onlineUsers = List<Map<String, dynamic>>.from(
+                  jsonResult["Data"],
+                );
+                _isOnlineLoading = false;
+              });
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[Home] Error fetching online users: $e");
+    }
+    if (mounted) {
+      setState(() {
+        _isOnlineLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchVerifiedUsers() async {
+    try {
+      final String myEmail = await SecureStorage().getUserEmail() ?? "";
+      final response = await HomeService().showVerifiedUsers(
+        myEmail: myEmail.trim(),
+      );
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowVerifiedUsersResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            if (mounted) {
+              setState(() {
+                _verifiedUsers = List<Map<String, dynamic>>.from(
+                  jsonResult["Data"],
+                );
+                _isVerifiedLoading = false;
+              });
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[Home] Error fetching verified users: $e");
+    }
+    if (mounted) {
+      setState(() {
+        _isVerifiedLoading = false;
+      });
+    }
+  }
 
   final List<Map<String, dynamic>> activeUsers = [
     {
@@ -368,6 +485,9 @@ class _HomeScreenState extends State<HomeScreen>
     HomeScreen.state = this;
     _checkLoginAndLoadProfile();
     _checkAndRequestLocation();
+    _fetchEveryoneUsers();
+    _fetchOnlineUsers();
+    _fetchVerifiedUsers();
     _tabController = TabController(length: 2, vsync: this);
     // ✅ Free Tonight ke liye 5 sec timer — Travel Alert pe skip
     _autoSlideTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -586,7 +706,7 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             // ── TOP BAR ──────────────────────────────────
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10.w),
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -616,11 +736,10 @@ class _HomeScreenState extends State<HomeScreen>
                       // ✅ Circle grey (pehle jaisa) — sirf icon YELLOW
                       GestureDetector(
                         onTap: () {
-                          // Get.to(() => const NotificationScreen());
+                          Get.to(() => const NotificationSettingsScreen());
                         },
                         child: CustomLottieee(
                           asset: "assets/Notification bell.json",
-
                           height: 28.h,
                           width: 28.w,
                         ),
@@ -650,7 +769,7 @@ class _HomeScreenState extends State<HomeScreen>
 
             // ── CAROUSEL ─────────────────────────────────
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10.w),
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
               child: SizedBox(
                 height: 200.h,
                 child: Stack(
@@ -701,9 +820,9 @@ class _HomeScreenState extends State<HomeScreen>
 
             // ── NEW MATCHES LABEL ─────────────────────────
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.w),
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.04),
                   borderRadius: BorderRadius.circular(22.r),
@@ -763,19 +882,19 @@ class _HomeScreenState extends State<HomeScreen>
             SizedBox(height: 24.h),
 
             // ── ACTIVE / VERIFIED TABS ────────────────────
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    _tabController.animateTo(0);
-                    setState(() {});
-                  },
-                  child: Padding(
-                    padding: EdgeInsets.only(left: 10.0.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      _tabController.animateTo(0);
+                      setState(() {});
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 250),
                       padding: EdgeInsets.symmetric(
-                        horizontal: 10.w,
+                        horizontal: 12.w,
                         vertical: 6.h,
                       ),
                       decoration: BoxDecoration(
@@ -814,71 +933,89 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                   ),
-                ),
-                SizedBox(width: 6.w),
-                GestureDetector(
-                  onTap: () {
-                    _tabController.animateTo(1);
-                    setState(() {});
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 10.w,
-                      vertical: 6.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _tabController.index == 1
-                          ? Colors.cyanAccent.withValues(alpha: 0.15)
-                          : Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(12.r),
-                      border: Border.all(
+                  SizedBox(width: 8.w),
+                  GestureDetector(
+                    onTap: () {
+                      _tabController.animateTo(1);
+                      setState(() {});
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12.w,
+                        vertical: 6.h,
+                      ),
+                      decoration: BoxDecoration(
                         color: _tabController.index == 1
-                            ? Colors.cyanAccent.withValues(alpha: 0.4)
-                            : Colors.white.withValues(alpha: 0.08),
+                            ? Colors.cyanAccent.withValues(alpha: 0.15)
+                            : Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(
+                          color: _tabController.index == 1
+                              ? Colors.cyanAccent.withValues(alpha: 0.4)
+                              : Colors.white.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.verified_rounded,
+                            color: Colors.cyanAccent,
+                            size: 11.sp,
+                          ),
+                          SizedBox(width: 6.w),
+                          Text(
+                            "Verified",
+                            style: AppTextStyles.subHeading.copyWith(
+                              fontSize: 12.sp,
+                              color: _tabController.index == 1
+                                  ? Colors.white
+                                  : Colors.white54,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.verified_rounded,
-                          color: Colors.cyanAccent,
-                          size: 11.sp,
-                        ),
-                        SizedBox(width: 6.w),
-                        Text(
-                          "Verified",
-                          style: AppTextStyles.subHeading.copyWith(
-                            fontSize: 12.sp,
-                            color: _tabController.index == 1
-                                ? Colors.white
-                                : Colors.white54,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
-            SizedBox(height: 16.h),
+            SizedBox(height: 18.h),
 
-            Obx(() {
-              final isActive = _tabController.index == 0;
-              final rawList = isActive ? activeUsers : verifiedUsers;
-              final users = _settings.hideChatUsers.value
-                  ? rawList.where((u) => u["hasChatted"] == false).toList()
-                  : rawList;
-              return _userRow(users);
-            }),
+            Builder(
+              builder: (_) {
+                final isActive = _tabController.index == 0;
+                final isLoading = isActive
+                    ? _isOnlineLoading
+                    : _isVerifiedLoading;
+                final rawList = isActive ? _onlineUsers : _verifiedUsers;
 
-            SizedBox(height: 20.h),
+                if (isLoading) {
+                  return SizedBox(
+                    height: 220.h,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF9B59B6),
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  );
+                }
+
+                // Show only 5 users on HomeScreen
+                final displayUsers = rawList.take(5).toList();
+
+                return _activeVerifiedUserRow(displayUsers, isActive);
+              },
+            ),
+
+            SizedBox(height: 28.h),
 
             // ── EVERYONE ROW ──────────────────────────────
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.w),
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
                 decoration: BoxDecoration(
@@ -987,70 +1124,96 @@ class _HomeScreenState extends State<HomeScreen>
             SizedBox(height: 12.h),
 
             // ── EVERYONE GRID ─────────────────────────────
-            Obx(() {
-              final allUsers = [...activeUsers, ...verifiedUsers];
-              final visibleUsers = _settings.hideChatUsers.value
-                  ? allUsers.where((u) => u["hasChatted"] == false).toList()
-                  : allUsers;
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: visibleUsers.length + 1,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 3.w,
-                  mainAxisSpacing: 3.h,
-                  childAspectRatio: 0.58,
-                ),
-                itemBuilder: (_, index) {
-                  if (index == visibleUsers.length) {
-                    return GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const MatchesScreen(),
-                        ),
+            Builder(
+              builder: (_) {
+                if (_isEveryoneLoading) {
+                  return SizedBox(
+                    height: 180.h,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF9B59B6),
+                        strokeWidth: 2.5,
                       ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14.r),
-                          gradient: const LinearGradient(
-                            colors: [Colors.cyanAccent, Colors.blueAccent],
+                    ),
+                  );
+                }
+
+                if (_everyoneUsers.isEmpty) {
+                  return Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.h),
+                    child: const Center(
+                      child: Text(
+                        "No users found",
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    ),
+                  );
+                }
+
+                // First 11 users from API, 12th is "See All"
+                final displayUsers = _everyoneUsers.take(11).toList();
+
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: displayUsers.length + 1,
+                  padding: EdgeInsets.symmetric(horizontal: 14.w),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8.w,
+                    mainAxisSpacing: 8.h,
+                    childAspectRatio: 0.64,
+                  ),
+                  itemBuilder: (_, index) {
+                    if (index == displayUsers.length) {
+                      return GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MatchesScreen(),
                           ),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(10.w),
-                              decoration: const BoxDecoration(
-                                color: Colors.black,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.arrow_forward,
-                                color: Colors.white,
-                                size: 22.sp,
-                              ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14.r),
+                            gradient: const LinearGradient(
+                              colors: [Colors.cyanAccent, Colors.blueAccent],
                             ),
-                            SizedBox(height: 10.h),
-                            Text(
-                              "See All",
-                              style: AppTextStyles.small.copyWith(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12.sp,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(10.w),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.arrow_forward,
+                                  color: Colors.white,
+                                  size: 22.sp,
+                                ),
                               ),
-                            ),
-                          ],
+                              SizedBox(height: 10.h),
+                              Text(
+                                "See All",
+                                style: AppTextStyles.small.copyWith(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12.sp,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  }
-                  return _gridCard(visibleUsers[index]);
-                },
-              );
-            }),
+                      );
+                    }
+                    return _everyoneGridCard(displayUsers[index]);
+                  },
+                );
+              },
+            ),
 
             SizedBox(height: 100.h),
           ],
@@ -1059,20 +1222,37 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _userRow(List<Map<String, dynamic>> users) {
+  Widget _activeVerifiedUserRow(
+    List<Map<String, dynamic>> users,
+    bool isActive,
+  ) {
+    if (users.isEmpty) {
+      return SizedBox(
+        height: 100.h,
+        child: Center(
+          child: Text(
+            isActive ? "No active users online" : "No verified users found",
+            style: const TextStyle(color: Colors.white54),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 220.h,
       width: double.infinity,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: users.length + 1,
-        padding: EdgeInsets.symmetric(horizontal: 10.w),
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
         itemBuilder: (_, index) {
           if (index == users.length) {
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => Activeuser()),
+                MaterialPageRoute(
+                  builder: (_) => Activeuser(initialTab: isActive ? 0 : 1),
+                ),
               ),
               child: Container(
                 width: 130.w,
@@ -1114,10 +1294,34 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             );
           }
+
           final user = users[index];
+          final String fullName = (user["FullName"] ?? "User").toString();
+          final int age = _calculateUserAge(user["Dob"]?.toString());
+          final bool isOnline =
+              user["IsOnline"]?.toString().toLowerCase() == "true" || isActive;
+          final bool isVerified =
+              user["IsVerified"]?.toString().toLowerCase() == "true" ||
+              !isActive;
+          final String? media = user["Media"]?.toString();
+          final bool hasValidImg =
+              media != null &&
+              media.isNotEmpty &&
+              media.toLowerCase() != "null" &&
+              (media.startsWith("http") || media.startsWith("https"));
+
+          final String initial = fullName.trim().isNotEmpty
+              ? fullName.trim()[0].toUpperCase()
+              : "U";
+
           return GestureDetector(
             onTap: () => Get.to(
-              () => BoomProfileScreen(),
+              () => BoomProfileScreen(
+                userEmail:
+                    user["EmailAddress"]?.toString() ??
+                    user["email"]?.toString(),
+                initialUserData: user,
+              ),
               transition: Transition.rightToLeft,
             ),
             child: Container(
@@ -1128,18 +1332,16 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.network(
-                      user["image"].toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        color: Colors.grey.shade900,
-                        child: Icon(
-                          Icons.person,
-                          color: Colors.white38,
-                          size: 30.sp,
-                        ),
-                      ),
-                    ),
+                    if (hasValidImg)
+                      Image.network(
+                        media,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _buildUserRowInitialBg(initial),
+                      )
+                    else
+                      _buildUserRowInitialBg(initial),
+
                     Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -1159,7 +1361,9 @@ class _HomeScreenState extends State<HomeScreen>
                         width: 8.w,
                         height: 8.w,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2ECC71),
+                          color: isOnline
+                              ? const Color(0xFF2ECC71)
+                              : Colors.grey,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                           boxShadow: [
@@ -1174,7 +1378,7 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                     ),
-                    if (_tabController.index == 1)
+                    if (isVerified)
                       Positioned(
                         top: 6,
                         right: 6,
@@ -1192,7 +1396,7 @@ class _HomeScreenState extends State<HomeScreen>
                         children: [
                           Flexible(
                             child: Text(
-                              "${user["name"]}, ${user["age"] ?? ""}",
+                              "$fullName, $age",
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppTextStyles.small.copyWith(
@@ -1202,12 +1406,14 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                             ),
                           ),
-                          SizedBox(width: 3.w),
-                          Icon(
-                            Icons.verified_rounded,
-                            color: Colors.cyanAccent,
-                            size: 10.sp,
-                          ),
+                          if (isVerified) ...[
+                            SizedBox(width: 3.w),
+                            Icon(
+                              Icons.verified_rounded,
+                              color: Colors.cyanAccent,
+                              size: 10.sp,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1221,25 +1427,164 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _gridCard(Map<String, dynamic> user) {
+  Widget _buildUserRowInitialBg(String initial) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF28133E), Color(0xFF1B1B2F), Color(0xFF110E1D)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Center(
+        child: Container(
+          width: 44.w,
+          height: 44.w,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF9B59B6), Color(0xFF3498DB)],
+            ),
+          ),
+          child: Center(
+            child: Text(
+              initial,
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  int _calculateUserAge(String? dobStr) {
+    if (dobStr == null || dobStr.isEmpty) return 24;
+    try {
+      final dob = DateTime.parse(dobStr);
+      final today = DateTime.now();
+      int age = today.year - dob.year;
+      if (today.month < dob.month ||
+          (today.month == dob.month && today.day < dob.day)) {
+        age--;
+      }
+      return age > 0 ? age : 24;
+    } catch (_) {
+      return 24;
+    }
+  }
+
+  Widget _everyoneGridCard(Map<String, dynamic> user) {
+    final String fullName = (user["FullName"] ?? "User").toString();
+    final int age = _calculateUserAge(user["Dob"]?.toString());
+    final bool isOnline = user["IsOnline"]?.toString().toLowerCase() == "true";
+    final bool isVerified =
+        user["IsVerified"]?.toString().toLowerCase() == "true";
+    final String? media = user["Media"]?.toString();
+    final bool hasValidImg =
+        media != null &&
+        media.isNotEmpty &&
+        media.toLowerCase() != "null" &&
+        (media.startsWith("http") || media.startsWith("https"));
+
+    final String initial = fullName.trim().isNotEmpty
+        ? fullName.trim()[0].toUpperCase()
+        : "U";
+
     return GestureDetector(
-      onTap: () =>
-          Get.to(() => BoomProfileScreen(), transition: Transition.rightToLeft),
+      onTap: () => Get.to(
+        () => BoomProfileScreen(
+          userEmail:
+              user["EmailAddress"]?.toString() ?? user["email"]?.toString(),
+          initialUserData: user,
+        ),
+        transition: Transition.rightToLeft,
+      ),
       child: Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(14.r)),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14.r),
+          color: const Color(0xFF151515),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 1,
+          ),
+        ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14.r),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.network(
-                user["image"].toString(),
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: Colors.grey.shade900,
-                  child: Icon(Icons.person, color: Colors.white24, size: 40.sp),
+              if (hasValidImg)
+                Image.network(
+                  media,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF28133E), Color(0xFF110E1D)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        initial,
+                        style: TextStyle(
+                          fontSize: 26.sp,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(0xFF28133E),
+                        Color(0xFF1B1B2F),
+                        Color(0xFF110E1D),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 44.w,
+                      height: 44.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF9B59B6), Color(0xFF3498DB)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF9B59B6,
+                            ).withValues(alpha: 0.35),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          initial,
+                          style: TextStyle(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -1259,43 +1604,48 @@ class _HomeScreenState extends State<HomeScreen>
                   width: 8.w,
                   height: 8.w,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2ECC71),
+                    color: isOnline ? const Color(0xFF2ECC71) : Colors.grey,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF2ECC71).withValues(alpha: 0.6),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
+                    border: Border.all(color: Colors.white, width: 1.5),
+                    boxShadow: isOnline
+                        ? [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF2ECC71,
+                              ).withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ]
+                        : null,
                   ),
                 ),
               ),
               Positioned(
-                bottom: 4,
-                left: 8,
-                right: 8,
+                bottom: 6,
+                left: 6,
+                right: 6,
                 child: Row(
                   children: [
                     Flexible(
                       child: Text(
-                        "${user["name"]}, ${user["age"] ?? ""}",
+                        "$fullName, $age",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.small.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 11.sp,
+                          fontSize: 10.5.sp,
                         ),
                       ),
                     ),
-                    SizedBox(width: 2.w),
-                    Icon(
-                      Icons.verified_rounded,
-                      color: Colors.cyanAccent,
-                      size: 10.sp,
-                    ),
+                    if (isVerified) ...[
+                      SizedBox(width: 2.w),
+                      Icon(
+                        Icons.verified_rounded,
+                        color: Colors.cyanAccent,
+                        size: 11.sp,
+                      ),
+                    ],
                   ],
                 ),
               ),

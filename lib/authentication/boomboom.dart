@@ -1,16 +1,18 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:boomboom/backend/registerservice.dart';
+import 'package:boomboom/backend/home_service.dart';
 import 'package:boomboom/backend/secure_storage.dart';
-import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import 'package:xml/xml.dart' as xml;
 import '../constant/appsize.dart';
 import '../constant/apptextstyle.dart';
 import '../constant/colors.dart';
-import '../controller/auth_controller.dart';
 import 'messagedetail.dart';
 
 // ────────────────────────────────────────
@@ -55,10 +57,17 @@ class MediaItem {
   final MediaType type;
   final String url;
   final File? localFile;
+  final Uint8List? bytes;
 
-  const MediaItem({required this.type, this.url = '', this.localFile});
+  const MediaItem({
+    required this.type,
+    this.url = '',
+    this.localFile,
+    this.bytes,
+  });
 
   bool get isLocal => localFile != null;
+  bool get isBytes => bytes != null;
 }
 
 class ProfileModel {
@@ -101,14 +110,14 @@ class ProfileModel {
 final List<ProfileModel> sampleProfiles = [
   ProfileModel(
     name: 'Taniya Agarwal',
-    age: '32',
-    job: 'Marketer at Vedica 2024',
+    age: '24',
+    job: 'Fashion Designer',
     city: 'New Delhi, India',
-    distance: '12 km',
+    distance: '3.2 km',
     height: '1.67 m',
     lookingFor: 'Long Term',
     gender: 'Female',
-    nature: 'Introvert · Extrovert',
+    nature: 'Extrovert',
     seenAgo: '5 min ago',
     telegramUsername: 'taniya_boom',
     about:
@@ -121,60 +130,24 @@ final List<ProfileModel> sampleProfiles = [
       '📚 Reading',
       '📸 Photography',
       '💪 Fitness',
-      '🐾 Dogs',
     ],
     lifestyle: ['🍸 Social Drinker', '🚭 Non Smoker', '🏋️ Gym Freak'],
     completionPercent: 85,
-    // media: [
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600'),
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?w=400'),
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400'),
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400'),
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400'),
-    // ],
-    // media: [
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600'),
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?w=400'),
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400'),
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400'),
-    //   MediaItem(type: MediaType.image, url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400'),
-    //   // ✅ Network video (~6 sec) — apna real video URL yahan daal sakte ho
-    //   MediaItem(
-    //     type: MediaType.video,
-    //     url: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
-    //   ),
-    // ],
     media: [
-      // ✅ Video ab pehle number par
       MediaItem(
-        type: MediaType.video,
+        type: MediaType.image,
         url:
-            'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
       ),
       MediaItem(
         type: MediaType.image,
         url:
-            'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600',
+            'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800',
       ),
       MediaItem(
         type: MediaType.image,
         url:
-            'https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?w=400',
-      ),
-      MediaItem(
-        type: MediaType.image,
-        url:
-            'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400',
-      ),
-      MediaItem(
-        type: MediaType.image,
-        url:
-            'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400',
-      ),
-      MediaItem(
-        type: MediaType.image,
-        url:
-            'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400',
+            'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800',
       ),
     ],
   ),
@@ -182,7 +155,7 @@ final List<ProfileModel> sampleProfiles = [
     name: 'Kiara Sharma',
     age: '22',
     job: 'UX Designer at Zomato',
-    city: 'Mumbai',
+    city: 'Mumbai, India',
     distance: '2.4 km',
     height: '1.63 m',
     lookingFor: 'Coffee Date',
@@ -192,7 +165,7 @@ final List<ProfileModel> sampleProfiles = [
     telegramUsername: 'kiara_zomato',
     about:
         'Coffee lover & travel addict. Always looking for the next adventure. '
-        'Big fan of indie music and rooftop views.',
+        'Big fan of indie music and rooftop sunsets.',
     interests: [
       '☕ Coffee',
       '✈️ Travel',
@@ -201,22 +174,22 @@ final List<ProfileModel> sampleProfiles = [
       '📸 Photography',
     ],
     lifestyle: ['🚭 Non Smoker', '🌅 Morning Person', '🧘 Yoga'],
-    completionPercent: 60,
+    completionPercent: 90,
     media: [
       MediaItem(
         type: MediaType.image,
         url:
-            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600',
+            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800',
       ),
       MediaItem(
         type: MediaType.image,
         url:
-            'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400',
+            'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=800',
       ),
       MediaItem(
         type: MediaType.image,
         url:
-            'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400',
+            'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800',
       ),
     ],
   ),
@@ -343,22 +316,24 @@ class _FullscreenGalleryState extends State<FullscreenGallery> {
                   clipBehavior: Clip.none,
                   onInteractionUpdate: (_) => setState(() {}),
                   child: Center(
-                    child: m.isLocal
-                        ? Image.file(m.localFile!, fit: BoxFit.contain)
-                        : CachedNetworkImage(
-                            imageUrl: m.url,
-                            fit: BoxFit.contain,
-                            placeholder: (_, _) => const Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                              ),
-                            ),
-                            errorWidget: (_, _, _) => const Icon(
-                              Icons.broken_image,
-                              color: Colors.white54,
-                              size: 60,
-                            ),
-                          ),
+                    child: m.isBytes
+                        ? Image.memory(m.bytes!, fit: BoxFit.contain)
+                        : (m.isLocal
+                              ? Image.file(m.localFile!, fit: BoxFit.contain)
+                              : CachedNetworkImage(
+                                  imageUrl: m.url,
+                                  fit: BoxFit.contain,
+                                  placeholder: (_, _) => const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  errorWidget: (_, _, _) => const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.white54,
+                                    size: 60,
+                                  ),
+                                )),
                   ),
                 ),
               );
@@ -509,6 +484,8 @@ class BoomProfileScreen extends StatefulWidget {
   final bool showMore;
   final bool showTelegram;
   final bool isOwnProfile;
+  final String? userEmail;
+  final Map<String, dynamic>? initialUserData;
 
   const BoomProfileScreen({
     super.key,
@@ -516,6 +493,8 @@ class BoomProfileScreen extends StatefulWidget {
     this.showMore = true,
     this.showTelegram = true,
     this.isOwnProfile = false,
+    this.userEmail,
+    this.initialUserData,
   });
 
   @override
@@ -531,7 +510,6 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   late bool showStar;
   late bool showMore;
   late bool showTelegram;
-  // ✅ v5: Track favourite state per profile index
   final Set<int> _favourites = {};
 
   late AnimationController _snapCtrl;
@@ -541,16 +519,30 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   final ScrollController _scrollCtrl = ScrollController();
 
   ProfileModel? ownProfile;
+  ProfileModel? otherProfile;
+  List<ProfileModel> _liveProfiles = [];
+  bool _isLoadingOtherProfile = false;
+  bool _isLoadingLiveFeed = true;
 
   ProfileModel get _profile {
     if (widget.isOwnProfile && ownProfile != null) {
       return ownProfile!;
     }
+    if (otherProfile != null) {
+      return otherProfile!;
+    }
+    if (_liveProfiles.isNotEmpty) {
+      return _liveProfiles[_currentIndex % _liveProfiles.length];
+    }
     return sampleProfiles[_currentIndex % sampleProfiles.length];
   }
 
-  bool get _isFavourited =>
-      _favourites.contains(_currentIndex % sampleProfiles.length);
+  bool get _isFavourited {
+    final int len = _liveProfiles.isNotEmpty
+        ? _liveProfiles.length
+        : sampleProfiles.length;
+    return _favourites.contains(_currentIndex % len);
+  }
 
   int _calculateAge(String dobStr) {
     try {
@@ -567,42 +559,351 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     }
   }
 
-  Future<void> _loadOwnProfile({bool forceRefresh = true}) async {
+  Future<void> _loadLiveFeedProfiles() async {
+    if (!mounted) return;
+    setState(() => _isLoadingLiveFeed = true);
+
+    try {
+      final String myEmail = await SecureStorage().getUserEmail() ?? "";
+      final response = await HomeService().showAllExceptMe(
+        myEmail: myEmail.trim(),
+      );
+
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowAllExceptMeResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            final List rawList = jsonResult["Data"];
+            final List<ProfileModel> parsedList = [];
+
+            for (var item in rawList) {
+              if (item is Map) {
+                final p = _buildProfileFromMap(Map<String, dynamic>.from(item));
+                if (p != null) {
+                  parsedList.add(p);
+                }
+              }
+            }
+
+            if (mounted && parsedList.isNotEmpty) {
+              setState(() {
+                _liveProfiles = parsedList;
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[BoomProfileScreen] Error fetching ShowAllExceptMe: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingLiveFeed = false);
+      }
+    }
+  }
+
+  Future<void> _loadOtherUserProfile(String email) async {
+    if (email.isEmpty) return;
+    setState(() => _isLoadingOtherProfile = true);
+
+    try {
+      final response = await RegisterService().showCompleteProfile(
+        email: email.trim(),
+      );
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowCompleteProfileResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1) {
+            Map<String, dynamic>? profileData;
+            List<dynamic>? rawInterests;
+            List<dynamic>? rawMedia;
+            List<dynamic>? rawLifestyle;
+
+            if (jsonResult["ResultSets"] is List &&
+                (jsonResult["ResultSets"] as List).isNotEmpty) {
+              final resultSets = jsonResult["ResultSets"] as List;
+              for (var rs in resultSets) {
+                if (rs is List && rs.isNotEmpty) {
+                  final firstItem = rs.first;
+                  if (firstItem is Map) {
+                    if (firstItem.containsKey("FullName") ||
+                        firstItem.containsKey("Dob") ||
+                        firstItem.containsKey("BIO")) {
+                      profileData = Map<String, dynamic>.from(firstItem);
+                    } else if (firstItem.containsKey("Interest") ||
+                        firstItem.containsKey("InterestName")) {
+                      rawInterests = rs;
+                    } else if (firstItem.containsKey("Media") ||
+                        firstItem.containsKey("Type")) {
+                      rawMedia = rs;
+                    } else if (firstItem.containsKey("LifeStyle") ||
+                        firstItem.containsKey("Lifestyle")) {
+                      rawLifestyle = rs;
+                    }
+                  }
+                }
+              }
+            } else if (jsonResult["Data"] is List &&
+                (jsonResult["Data"] as List).isNotEmpty) {
+              profileData = Map<String, dynamic>.from(jsonResult["Data"].first);
+            }
+
+            profileData ??= widget.initialUserData;
+
+            if (profileData != null) {
+              _parseAndSetOtherProfile(
+                profileData,
+                rawInterests,
+                rawMedia,
+                rawLifestyle,
+              );
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[BoomProfileScreen] Error fetching ShowCompleteProfile: $e");
+    } finally {
+      if (mounted) {
+        if (otherProfile == null && widget.initialUserData != null) {
+          _parseAndSetOtherProfile(widget.initialUserData!, null, null, null);
+        }
+        setState(() => _isLoadingOtherProfile = false);
+      }
+    }
+  }
+
+  ProfileModel? _buildProfileFromMap(
+    Map<String, dynamic> data, [
+    List<dynamic>? rawInterests,
+    List<dynamic>? rawMedia,
+    List<dynamic>? rawLifestyle,
+  ]) {
+    try {
+      final String name = (data["FullName"] ?? data["name"] ?? "User")
+          .toString();
+      final String dob = (data["Dob"] ?? data["dob"] ?? "").toString();
+      final String calculatedAge = dob.isNotEmpty
+          ? _calculateAge(dob).toString()
+          : (data["age"] ?? "24").toString();
+      final String bio = (data["BIO"] ?? data["bio"] ?? data["Bio"] ?? "")
+          .toString()
+          .trim();
+      final String job =
+          (data["Occupation"] ?? data["occupation"] ?? "Not specified")
+              .toString();
+      final String height = (data["Height"] ?? data["height"] ?? "165 cm")
+          .toString();
+      final String lookingFor =
+          (data["Lookingfor"] ?? data["lookingFor"] ?? "Serious Love")
+              .toString();
+      final String gender = (data["Gender"] ?? data["gender"] ?? "").toString();
+      final String orientation =
+          (data["Orientation"] ?? data["orientation"] ?? "").toString();
+      final String city =
+          (data["City"] ?? data["city"] ?? data["Country"] ?? "India")
+              .toString();
+      final String distance = (data["Distance"] ?? data["distance"] ?? "1.2 km")
+          .toString();
+
+      final List<MediaItem> mediaItems = [];
+      void addMediaItem(dynamic val) {
+        if (val == null) return;
+        final String str = val.toString().trim();
+        if (str.isEmpty ||
+            str.toLowerCase() == "null" ||
+            str.toLowerCase() == "image" ||
+            str.toLowerCase() == "video") {
+          return;
+        }
+
+        if (str.startsWith("http://") || str.startsWith("https://")) {
+          mediaItems.add(MediaItem(type: MediaType.image, url: str));
+        } else if (str.startsWith("/") &&
+            !str.startsWith("/9j/") &&
+            str.length < 200) {
+          mediaItems.add(
+            MediaItem(
+              type: MediaType.image,
+              url: "https://boomboomdate.com$str",
+            ),
+          );
+        } else if (str.length > 50) {
+          try {
+            final String cleanB64 = str.contains(",")
+                ? str.split(",").last.trim()
+                : str.trim();
+            final bytes = base64Decode(cleanB64);
+            mediaItems.add(MediaItem(type: MediaType.image, bytes: bytes));
+          } catch (_) {}
+        }
+      }
+
+      dynamic mediaSource =
+          rawMedia ??
+          data["Media"] ??
+          data["Photos"] ??
+          data["Photo"] ??
+          data["img"];
+      if (mediaSource != null) {
+        if (mediaSource is List) {
+          for (var m in mediaSource) {
+            if (m is String) {
+              addMediaItem(m);
+            } else if (m is Map) {
+              final val = m["Media"] ?? m["Url"] ?? m["url"] ?? m["media"];
+              addMediaItem(val);
+            }
+          }
+        } else if (mediaSource is String) {
+          addMediaItem(mediaSource);
+        }
+      }
+
+      // ── DEDUPLICATE & SANITIZE LIFESTYLE ──
+      String cleanTag(String input) {
+        return input.replaceAll(RegExp(r'\?+'), '').trim();
+      }
+
+      final Map<String, String> lifestyleMap = {};
+      if (rawLifestyle != null) {
+        for (var l in rawLifestyle) {
+          String str = "";
+          if (l is Map) {
+            str = (l["LifeStyle"] ?? l["Lifestyle"] ?? "").toString().trim();
+          } else if (l is String) {
+            str = l.trim();
+          }
+          if (str.isNotEmpty) {
+            str = cleanTag(str);
+            if (str.isNotEmpty) {
+              final key = str.contains(":")
+                  ? str.split(":").first.trim().toLowerCase()
+                  : str.toLowerCase();
+              lifestyleMap[key] = str;
+            }
+          }
+        }
+      }
+
+      if (data["Height"] != null &&
+          data["Height"].toString().trim().isNotEmpty) {
+        lifestyleMap["height"] =
+            "Height: ${cleanTag(data["Height"].toString())}";
+      }
+      if (data["BodyType"] != null &&
+          data["BodyType"].toString().trim().isNotEmpty) {
+        lifestyleMap["bodytype"] =
+            "BodyType: ${cleanTag(data["BodyType"].toString())}";
+      }
+      if (data["Workout"] != null &&
+          data["Workout"].toString().trim().isNotEmpty) {
+        lifestyleMap["workout"] =
+            "Workout: ${cleanTag(data["Workout"].toString())}";
+      }
+      if (data["DrinkingHabits"] != null &&
+          data["DrinkingHabits"].toString().trim().isNotEmpty) {
+        lifestyleMap["drinking"] =
+            "Drinking: ${cleanTag(data["DrinkingHabits"].toString())}";
+      }
+
+      final List<String> lifestyleList = lifestyleMap.values
+          .map((s) => cleanTag(s))
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      // ── DEDUPLICATE & SANITIZE INTERESTS ──
+      final Set<String> interestsSet = {};
+      if (rawInterests != null) {
+        for (var i in rawInterests) {
+          if (i is Map) {
+            final iname = i["Interest"] ?? i["InterestName"] ?? i["Name"];
+            if (iname != null && iname.toString().trim().isNotEmpty) {
+              final c = cleanTag(iname.toString());
+              if (c.isNotEmpty) interestsSet.add(c);
+            }
+          } else if (i is String && i.trim().isNotEmpty) {
+            final c = cleanTag(i);
+            if (c.isNotEmpty) interestsSet.add(c);
+          }
+        }
+      } else if (data["Interests"] is List) {
+        for (var i in data["Interests"]) {
+          if (i != null && i.toString().trim().isNotEmpty) {
+            final c = cleanTag(i.toString());
+            if (c.isNotEmpty) interestsSet.add(c);
+          }
+        }
+      }
+      final List<String> interestsList = interestsSet.toList();
+
+      return ProfileModel(
+        name: name,
+        age: calculatedAge,
+        job: job,
+        city: city,
+        distance: distance,
+        height: height,
+        lookingFor: lookingFor,
+        gender: gender,
+        nature: orientation,
+        about: bio.isNotEmpty ? bio : "No bio added yet.",
+        interests: interestsList,
+        lifestyle: lifestyleList,
+        media: mediaItems,
+      );
+    } catch (e) {
+      debugPrint("[BoomProfileScreen] Error building profile model: $e");
+      return null;
+    }
+  }
+
+  void _parseAndSetOtherProfile(
+    Map<String, dynamic> data, [
+    List<dynamic>? rawInterests,
+    List<dynamic>? rawMedia,
+    List<dynamic>? rawLifestyle,
+  ]) {
+    final p = _buildProfileFromMap(data, rawInterests, rawMedia, rawLifestyle);
+    if (p != null && mounted) {
+      setState(() {
+        otherProfile = p;
+        if (widget.isOwnProfile) {
+          ownProfile = p;
+        }
+      });
+    }
+  }
+
+  Future<void> _loadOwnProfile() async {
     if (!mounted) return;
 
-    // 1. Read from SecureStorage cache first
+    try {
+      final email = await SecureStorage().getUserEmail();
+      if (email != null && email.isNotEmpty) {
+        await _loadOtherUserProfile(email);
+        return;
+      }
+    } catch (e) {
+      debugPrint("Error loading own profile via ShowCompleteProfile: $e");
+    }
+
     try {
       final jsonStr = await SecureStorage().getProfileJson();
       if (jsonStr != null && jsonStr.isNotEmpty) {
         _parseProfileJson(jsonStr);
-      } else {
-        if (mounted) {}
       }
     } catch (e) {
       debugPrint("Error loading profile cache: $e");
-    }
-
-    // 2. Fetch fresh updates from the server in the background
-    if (forceRefresh) {
-      try {
-        final email = await SecureStorage().getUserEmail();
-        if (email != null && email.isNotEmpty) {
-          final authController = Get.put(AuthController());
-          await authController.fetchAndStoreFullProfile(email: email);
-
-          // Re-load cache to show updated data
-          final updatedJsonStr = await SecureStorage().getProfileJson();
-          if (updatedJsonStr != null && updatedJsonStr.isNotEmpty) {
-            _parseProfileJson(updatedJsonStr);
-          }
-        }
-      } catch (e) {
-        debugPrint("Error in background profile refresh: $e");
-      } finally {
-        if (mounted) {}
-      }
-    } else {
-      if (mounted) {}
     }
   }
 
@@ -670,27 +971,6 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
             data["BodyType"].toString().trim().isNotEmpty) {
           lifestyleList.add("Body Type: ${data["BodyType"]}");
         }
-        if (data["Lifestyle"] is List) {
-          for (var item in data["Lifestyle"]) {
-            final str = item.toString().trim();
-            if (str.startsWith("PersonalityType:") ||
-                str.startsWith("LanguageSpoken:") ||
-                str.startsWith("Smoking:")) {
-              final parts = str.split(":");
-              if (parts.length >= 2) {
-                final key = parts[0].trim();
-                final val = parts.sublist(1).join(":").trim();
-                if (key == "PersonalityType") {
-                  lifestyleList.add("Personality: $val");
-                }
-                if (key == "LanguageSpoken") {
-                  lifestyleList.add("Language: $val");
-                }
-                if (key == "Smoking") lifestyleList.add("Smoking: $val");
-              }
-            }
-          }
-        }
 
         if (mounted) {
           setState(() {
@@ -730,6 +1010,28 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       duration: const Duration(milliseconds: 300),
     );
     if (widget.isOwnProfile) {
+      _loadOwnProfile();
+    } else if (widget.userEmail != null || widget.initialUserData != null) {
+      final email =
+          widget.userEmail ??
+          widget.initialUserData?["EmailAddress"]?.toString() ??
+          widget.initialUserData?["email"]?.toString() ??
+          "";
+      if (email.isNotEmpty) {
+        _loadOtherUserProfile(email);
+      } else if (widget.initialUserData != null) {
+        _parseAndSetOtherProfile(widget.initialUserData!);
+      }
+    } else {
+      // ── Load live profiles from ShowAllExceptMe for swipe feed ──
+      _loadLiveFeedProfiles();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant BoomProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isOwnProfile && ownProfile == null) {
       _loadOwnProfile();
     }
   }
@@ -914,10 +1216,21 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (widget.isOwnProfile && ownProfile == null) {
+    final bool isSwipeFeed = !widget.isOwnProfile &&
+        widget.userEmail == null &&
+        widget.initialUserData == null;
+
+    if ((widget.isOwnProfile && ownProfile == null) ||
+        _isLoadingOtherProfile ||
+        (isSwipeFeed && _isLoadingLiveFeed && _liveProfiles.isEmpty)) {
       return const Scaffold(
         backgroundColor: AppColors.bg,
-        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF9B59B6),
+            strokeWidth: 2.5,
+          ),
+        ),
       );
     }
 
@@ -931,14 +1244,25 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       backgroundColor: AppColors.bg,
       body: GestureDetector(
         onPanUpdate: (d) {
-          if (_isSwiping || !showStar) return;
+          if (_isSwiping ||
+              !showStar ||
+              widget.userEmail != null ||
+              widget.initialUserData != null ||
+              widget.isOwnProfile) {
+            return;
+          }
           setState(() {
             _dragX += d.delta.dx;
             _dragY += d.delta.dy;
           });
         },
         onPanEnd: (_) async {
-          if (_isSwiping) return;
+          if (_isSwiping ||
+              widget.userEmail != null ||
+              widget.initialUserData != null ||
+              widget.isOwnProfile) {
+            return;
+          }
           if (!showStar) {
             _snapBack(); // ❌ swipe disabled
             return;
@@ -1013,6 +1337,55 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     );
   }
 
+  Widget _buildNoHeroImage(String name, bool isTablet) {
+    final String initial = name.trim().isNotEmpty
+        ? name.trim()[0].toUpperCase()
+        : "U";
+
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF28133E), Color(0xFF1B1B2F), Color(0xFF110E1D)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Center(
+        child: Container(
+          width: isTablet ? 120.w : 90.w,
+          height: isTablet ? 120.w : 90.w,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF9B59B6), Color(0xFF3498DB)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF9B59B6).withValues(alpha: 0.4),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              initial,
+              style: TextStyle(
+                fontSize: isTablet ? 48.sp : 36.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ════════════════════════════════════════
   //  HERO IMAGE
   //  ✅ v7: Star bubble border -> yellow | Telegram circle color matched to reference (shape unchanged)
@@ -1032,45 +1405,25 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // ── HERO IMAGE OR PLACEHOLDER ──
+              // ── HERO IMAGE OR INITIAL AVATAR ──
               heroMedia == null
-                  ? Container(
-                      color: AppColors.cardBg,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.person_rounded,
-                              color: AppColors.textSecondary.withValues(
-                                alpha: 0.4,
-                              ),
-                              size: isTablet ? 120.sp : 100.sp,
-                            ),
-                            SizedBox(height: AppSize.h(10)),
-                            Text(
-                              "No Photos Uploaded",
-                              style: AppTextStyles.body.copyWith(
-                                color: AppColors.textSecondary,
-                                fontSize: isTablet
-                                    ? AppSize.sp(14)
-                                    : AppSize.sp(12),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
+                  ? _buildNoHeroImage(p.name, isTablet)
                   : (heroMedia.type == MediaType.image
-                        ? CachedNetworkImage(
-                            imageUrl: heroMedia.url,
-                            fit: BoxFit.cover,
-                            placeholder: (_, _) =>
-                                Container(color: AppColors.cardBg),
-                            errorWidget: (_, _, _) =>
-                                Container(color: AppColors.cardBg),
-                          )
+                        ? (heroMedia.isBytes
+                              ? Image.memory(
+                                  heroMedia.bytes!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) =>
+                                      _buildNoHeroImage(p.name, isTablet),
+                                )
+                              : CachedNetworkImage(
+                                  imageUrl: heroMedia.url,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, _) =>
+                                      _buildNoHeroImage(p.name, isTablet),
+                                  errorWidget: (_, _, _) =>
+                                      _buildNoHeroImage(p.name, isTablet),
+                                ))
                         : Container(
                             color: AppColors.cardBg,
                             child: const Center(
@@ -1101,6 +1454,18 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
             ],
           ),
         ),
+
+        // ── BACK BUTTON (only on detail view, not on main bottom tab) ──
+        if (widget.userEmail != null || widget.initialUserData != null)
+          Positioned(
+            top: isTablet ? AppSize.h(32) : AppSize.h(28),
+            left: isTablet ? AppSize.w(22) : AppSize.w(16),
+            child: _circleBtn(
+              Icons.arrow_back_ios_new_rounded,
+              isTablet,
+              onTap: () => Navigator.maybePop(context),
+            ),
+          ),
 
         // ── MORE BUTTON ──
         if (showMore)
@@ -1193,36 +1558,103 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
                   SizedBox(width: AppSize.w(10)),
 
-                  // ── STAR + TELEGRAM ──
+                  // ── ACTIONS (HEART LIKE + TELEGRAM) ──
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (showStar)
-                        GestureDetector(
-                          onTap: _toggleFavourite,
-                          child: Container(
-                            width: isTablet ? AppSize.w(48) : AppSize.w(44),
-                            height: isTablet ? AppSize.h(48) : AppSize.h(44),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.42),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFFFFD700),
-                                width: 1.4,
-                              ),
+                      GestureDetector(
+                        onTap: () async {
+                          final idx = _currentIndex % sampleProfiles.length;
+                          final bool nextLiked = !_favourites.contains(idx);
+                          setState(() {
+                            if (!nextLiked) {
+                              _favourites.remove(idx);
+                              _showSnack('Unliked 🤍', AppColors.grey);
+                            } else {
+                              _favourites.add(idx);
+                              _showSnack('Liked ❤️', const Color(0xFFFF5E62));
+                            }
+                          });
+
+                          final actionEmail = widget.userEmail ??
+                              widget.initialUserData?['EmailAddress']?.toString() ??
+                              widget.initialUserData?['email']?.toString();
+                          if (actionEmail == null || actionEmail.trim().isEmpty) {
+                            return;
+                          }
+                          try {
+                            final myEmail =
+                                await SecureStorage().getUserEmail() ?? '';
+                            final response = await HomeService()
+                                .favoriteLikeViewInsert(
+                                  myEmail: myEmail.trim(),
+                                  actionEmail: actionEmail.trim(),
+                                  action: nextLiked ? 'like' : 'unlike',
+                                );
+                            if (response.statusCode < 200 ||
+                                response.statusCode >= 300) {
+                              throw Exception('HTTP ${response.statusCode}');
+                            }
+                          } catch (_) {
+                            if (mounted) {
+                              setState(() {
+                                if (nextLiked) {
+                                  _favourites.remove(idx);
+                                } else {
+                                  _favourites.add(idx);
+                                }
+                              });
+                              _showSnack(
+                                'Like save nahi ho saka.',
+                                AppColors.error,
+                              );
+                            }
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          width: isTablet ? AppSize.w(48) : AppSize.w(44),
+                          height: isTablet ? AppSize.h(48) : AppSize.h(44),
+                          decoration: BoxDecoration(
+                            color: _isFavourited
+                                ? const Color(
+                                    0xFFFF5E62,
+                                  ).withValues(alpha: 0.35)
+                                : Colors.black.withValues(alpha: 0.42),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _isFavourited
+                                  ? const Color(0xFFFF5E62)
+                                  : Colors.white70,
+                              width: 1.5,
                             ),
+                            boxShadow: _isFavourited
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFFFF5E62,
+                                      ).withValues(alpha: 0.50),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Center(
                             child: Icon(
                               _isFavourited
-                                  ? Icons.star_rounded
-                                  : Icons.star_border_rounded,
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
                               color: _isFavourited
-                                  ? const Color(0xFFFFD700)
+                                  ? const Color(0xFFFF5E62)
                                   : Colors.white,
+                              size: isTablet ? 24.sp : 20.sp,
                             ),
                           ),
                         ),
+                      ),
 
-                      SizedBox(height: AppSize.h(6)),
+                      SizedBox(height: AppSize.h(8)),
 
                       if (showTelegram)
                         GestureDetector(
@@ -1342,8 +1774,8 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     return Container(
       color: AppColors.cardBg,
       padding: EdgeInsets.symmetric(
-        horizontal: isTablet ? AppSize.w(16) : AppSize.w(12),
-        vertical: AppSize.h(8),
+        horizontal: isTablet ? AppSize.w(18) : AppSize.w(14),
+        vertical: AppSize.h(10),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1352,8 +1784,8 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
             height: thumbH,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: p.media.length, // ✅ +1 hata diya
-              separatorBuilder: (_, _) => SizedBox(width: AppSize.w(3)),
+              itemCount: p.media.length,
+              separatorBuilder: (_, _) => SizedBox(width: AppSize.w(12)),
               itemBuilder: (_, i) {
                 // ✅ Video button wala if block bilkul hata diya
                 final m = p.media[i];
@@ -1388,10 +1820,17 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                       child: m.type == MediaType.image
                           ? (m.isLocal
                                 ? Image.file(m.localFile!, fit: BoxFit.cover)
+                                : m.isBytes
+                                ? Image.memory(
+                                    m.bytes!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => _thumbShimmer(),
+                                  )
                                 : CachedNetworkImage(
                                     imageUrl: m.url,
                                     fit: BoxFit.cover,
                                     placeholder: (_, _) => _thumbShimmer(),
+                                    errorWidget: (_, _, _) => _thumbShimmer(),
                                   ))
                           : _VideoThumbPreview(
                               media: m,

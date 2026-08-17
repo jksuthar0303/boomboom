@@ -1,16 +1,20 @@
-import 'package:boomboom/screens/home/homescreenitems/exploreuserhome.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:xml/xml.dart' as xml;
 
+import '../backend/home_service.dart';
+import '../backend/secure_storage.dart';
 import '../constant/appsize.dart';
 import '../constant/apptextstyle.dart';
 import '../constant/colors.dart';
 import '../model/messagescreen.dart';
+import '../screens/home/homescreenitems/verifyiuser.dart';
+import 'boomboom.dart';
 import 'messagedetail.dart';
-
-
 
 class MessagePage extends StatefulWidget {
   const MessagePage({super.key});
@@ -23,65 +27,52 @@ class MessagePageState extends State<MessagePage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // ── Sample Activities ──
-  final List<ActivityModel> _activities = const [
+  List<Map<String, dynamic>> _onlineUsers = [];
+  bool _isOnlineLoading = true;
 
-    ActivityModel(
-      name: 'Jessica',
-      imageUrl:
-      'https://randomuser.me/api/portraits/women/90.jpg',
-    ),
+  @override
+  void initState() {
+    super.initState();
+    _fetchOnlineUsers();
+  }
 
-    ActivityModel(
-      name: 'Lucas',
-      imageUrl:
-      'https://randomuser.me/api/portraits/men/91.jpg',
-    ),
+  Future<void> _fetchOnlineUsers() async {
+    try {
+      final email = await SecureStorage().getUserEmail() ?? "";
+      final response = await HomeService().showOnlineUsers(myEmail: email);
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowOnlineUsersResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            final List list = jsonResult["Data"];
+            if (mounted) {
+              setState(() {
+                _onlineUsers = list
+                    .map((e) => Map<String, dynamic>.from(e))
+                    .toList();
+                _isOnlineLoading = false;
+              });
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[MessagePage] Error fetching online users: $e");
+    }
+    if (mounted) {
+      setState(() => _isOnlineLoading = false);
+    }
+  }
 
-    ActivityModel(
-      name: 'Emily',
-      imageUrl:
-      'https://randomuser.me/api/portraits/women/92.jpg',
-    ),
-
-    ActivityModel(
-      name: 'David',
-      imageUrl:
-      'https://randomuser.me/api/portraits/men/93.jpg',
-    ),
-
-    ActivityModel(
-      name: 'Sophia',
-      imageUrl:
-      'https://randomuser.me/api/portraits/women/94.jpg',
-    ),
-
-    ActivityModel(
-      name: 'James',
-      imageUrl:
-      'https://randomuser.me/api/portraits/men/95.jpg',
-    ),
-
-    ActivityModel(
-      name: 'Olivia',
-      imageUrl:
-      'https://randomuser.me/api/portraits/women/96.jpg',
-    ),
-
-    ActivityModel(
-      name: 'Ethan',
-      imageUrl:
-      'https://randomuser.me/api/portraits/men/97.jpg',
-    ),
-    ActivityModel(
-      name: 'See More',
-      imageUrl: '',
-    ),
-  ];
+  // ── Sample Messages ──
 
   // ── Sample Messages ──
   static final List<MessageModel> messageList = [
-
     MessageModel(
       name: 'Rahul verma',
       message: 'Heyyy',
@@ -109,9 +100,11 @@ class MessagePageState extends State<MessagePage> {
   final List<MessageModel> _messages = messageList;
 
   List<MessageModel> get _filteredMessages => _messages
-      .where((m) =>
-  m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-      m.message.toLowerCase().contains(_searchQuery.toLowerCase()))
+      .where(
+        (m) =>
+            m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            m.message.toLowerCase().contains(_searchQuery.toLowerCase()),
+      )
       .toList();
 
   @override
@@ -127,9 +120,7 @@ class MessagePageState extends State<MessagePage> {
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
-        child: isTablet
-            ? _buildTabletLayout()
-            : _buildPhoneLayout(),
+        child: isTablet ? _buildTabletLayout() : _buildPhoneLayout(),
       ),
     );
   }
@@ -268,8 +259,7 @@ class MessagePageState extends State<MessagePage> {
               size: 20.sp,
             ),
             border: InputBorder.none,
-            contentPadding:
-            EdgeInsets.symmetric(vertical: AppSize.h(12)),
+            contentPadding: EdgeInsets.symmetric(vertical: AppSize.h(12)),
           ),
         ),
       ),
@@ -286,125 +276,187 @@ class MessagePageState extends State<MessagePage> {
 
   // ─── Activities Row ──────────────────────
   Widget _buildActivitiesRow() {
+    if (_isOnlineLoading) {
+      return SizedBox(
+        height: AppSize.h(90),
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
+          itemCount: 4,
+          itemBuilder: (_, _) => Padding(
+            padding: EdgeInsets.only(right: AppSize.w(16)),
+            child: Column(
+              children: [
+                Container(
+                  width: AppSize.w(60),
+                  height: AppSize.h(60),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                SizedBox(height: AppSize.h(6)),
+                Container(
+                  width: AppSize.w(40),
+                  height: AppSize.h(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(4.r),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Always show available online users + See More button at the end
+    final int count = _onlineUsers.length + 1;
+
     return SizedBox(
       height: AppSize.h(90),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
-        itemCount: _activities.length,
-        itemBuilder: (_, i) => _activityAvatar(_activities[i]),
+        itemCount: count,
+        itemBuilder: (_, i) {
+          if (i == _onlineUsers.length) {
+            return _seeMoreButton();
+          }
+          return _userOnlineAvatar(_onlineUsers[i]);
+        },
       ),
     );
   }
 
-  Widget _activityAvatar(ActivityModel item) {
+  Widget _seeMoreButton() {
+    return Padding(
+      padding: EdgeInsets.only(right: AppSize.w(16)),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () {
+              Get.to(() => const Activeuser(initialTab: 0));
+            },
+            child: Container(
+              width: AppSize.w(60),
+              height: AppSize.h(60),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF6B6B).withValues(alpha: 0.35),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.white,
+                size: 22.sp,
+              ),
+            ),
+          ),
+          SizedBox(height: AppSize.h(6)),
+          Text(
+            'See More',
+            style: GoogleFonts.poppins(
+              fontSize: 11.sp,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    final bool isSeeMore =
-        item.name == "See More";
+  Widget _userOnlineAvatar(Map<String, dynamic> user) {
+    final String fullName = (user["FullName"] ?? user["name"] ?? "User")
+        .toString();
+    final String? media = user["Media"]?.toString();
+
+    Uint8List? imageBytes;
+    bool hasHttp = false;
+
+    if (media != null && media.isNotEmpty && media.toLowerCase() != "null") {
+      final m = media.trim();
+      if (m.startsWith("http://") || m.startsWith("https://")) {
+        hasHttp = true;
+      } else if (m.length > 50) {
+        try {
+          final cleanB64 = m.contains(",") ? m.split(",").last.trim() : m;
+          imageBytes = base64Decode(cleanB64);
+        } catch (_) {}
+      }
+    }
 
     return Padding(
       padding: EdgeInsets.only(right: AppSize.w(16)),
-
-      child: Column(
-        children: [
-
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-
-              /// 🔥 SEE MORE BUTTON
-              if (isSeeMore)
-                GestureDetector(
-
-                  onTap: () {
-
-                    Get.to(ExploreUsersScreen());
-
-                  },
-
-                  child: Container(
-                    width: AppSize.w(60),
-                    height: AppSize.h(60),
-
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFFFF6B6B),
-                          Color(0xFFFF8E53),
-                        ],
-                      ),
-
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFF6B6B)
-                              .withValues(alpha: 0.35),
-                          blurRadius: 12,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-
-                    child: Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      color: Colors.white,
-                      size: 22.sp,
-                    ),
-                  ),
-                )
-
-              else
-
-              /// 🔥 PROFILE IMAGE
+      child: GestureDetector(
+        onTap: () {
+          Get.to(
+            () => BoomProfileScreen(
+              userEmail:
+                  user["EmailAddress"]?.toString() ?? user["email"]?.toString(),
+              initialUserData: user,
+            ),
+            transition: Transition.rightToLeft,
+          );
+        },
+        child: Column(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                /// 🔥 PROFILE IMAGE / INITIAL AVATAR
                 Container(
                   width: AppSize.w(60),
                   height: AppSize.h(60),
-
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-
                     border: Border.all(
-                      color: AppColors.accent
-                          .withValues(alpha: 0.6),
+                      color: AppColors.accent.withValues(alpha: 0.6),
                       width: 2,
                     ),
                   ),
-
                   child: ClipOval(
-                    child: Image.network(
-                      item.imageUrl,
-                      fit: BoxFit.cover,
-
-                      errorBuilder: (_, _, _) =>
-                          _avatarFallback(item.name),
-                    ),
+                    child: imageBytes != null
+                        ? Image.memory(
+                            imageBytes,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                _avatarFallback(fullName),
+                          )
+                        : hasHttp
+                        ? Image.network(
+                            media!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                _avatarFallback(fullName),
+                          )
+                        : _avatarFallback(fullName),
                   ),
                 ),
 
-              /// 🔥 ONLINE DOT
-              if (!isSeeMore)
+                /// 🔥 ONLINE GREEN GLOWING DOT
                 Positioned(
                   bottom: 2,
                   right: 2,
-
                   child: Container(
                     width: 16.w,
                     height: 16.w,
-
                     decoration: BoxDecoration(
                       color: const Color(0xFF00E676),
                       shape: BoxShape.circle,
-
-                      border: Border.all(
-                        color: AppColors.primary,
-                        width: 2,
-                      ),
-
+                      border: Border.all(color: AppColors.primary, width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00E676)
-                              .withValues(alpha: 0.6),
+                          color: const Color(0xFF00E676).withValues(alpha: 0.6),
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),
@@ -412,20 +464,25 @@ class MessagePageState extends State<MessagePage> {
                     ),
                   ),
                 ),
-            ],
-          ),
-
-          SizedBox(height: AppSize.h(6)),
-
-          Text(
-            item.name,
-
-            style: GoogleFonts.poppins(
-              fontSize: 11.sp,
-              color: AppColors.textSecondary,
+              ],
             ),
-          ),
-        ],
+            SizedBox(height: AppSize.h(6)),
+            SizedBox(
+              width: AppSize.w(60),
+              child: Text(
+                fullName.split(" ").first,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 11.sp,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -443,11 +500,8 @@ class MessagePageState extends State<MessagePage> {
     return ListView.separated(
       padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
       itemCount: list.length,
-      separatorBuilder: (_, _) => Divider(
-        color: const Color(0xFF2A2A2A),
-        height: 1,
-        thickness: 1,
-      ),
+      separatorBuilder: (_, _) =>
+          Divider(color: const Color(0xFF2A2A2A), height: 1, thickness: 1),
       itemBuilder: (context, index) {
         final msg = list[index];
         return _messageTile(context, msg, index);
@@ -461,10 +515,8 @@ class MessagePageState extends State<MessagePage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => MessageDetailPage(
-              index: index,
-              messageData: msg.toMap(),
-            ),
+            builder: (_) =>
+                MessageDetailPage(index: index, messageData: msg.toMap()),
           ),
         );
       },
@@ -491,12 +543,9 @@ class MessagePageState extends State<MessagePage> {
             // Name + last message
             Expanded(
               child: Column(
-
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
 
                 children: [
-
                   /// 🔥 NAME
                   Text(
                     msg.name,
@@ -525,6 +574,7 @@ class MessagePageState extends State<MessagePage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   SizedBox(height: AppSize.h(2)),
+
                   /// 🔥 LAST SEEN
                   Text(
                     "Last seen 2 min ago",
@@ -535,7 +585,6 @@ class MessagePageState extends State<MessagePage> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-
                 ],
               ),
             ),
@@ -583,15 +632,25 @@ class MessagePageState extends State<MessagePage> {
 
   // ─── Avatar Fallback ─────────────────────
   Widget _avatarFallback(String name) {
+    final String initial = name.trim().isNotEmpty
+        ? name.trim()[0].toUpperCase()
+        : 'U';
     return Container(
-      color: AppColors.secondary,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          center: Alignment(0.0, -0.2),
+          radius: 0.85,
+          colors: [Color(0xFF8E44AD), Color(0xFF2C3E50), Color(0xFF14142B)],
+        ),
+      ),
       child: Center(
         child: Text(
-          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          initial,
           style: GoogleFonts.poppins(
             fontSize: 20.sp,
             fontWeight: FontWeight.bold,
-            color: AppColors.accent,
+            color: Colors.white,
           ),
         ),
       ),

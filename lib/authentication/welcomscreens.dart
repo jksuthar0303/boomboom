@@ -7,10 +7,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
+import 'dart:convert';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:xml/xml.dart' as xml;
+import '../backend/registerservice.dart';
+import '../controller/auth_controller.dart';
 import '../constant/appsize.dart';
 import '../constant/apptextstyle.dart';
 import '../constant/colors.dart';
 import '../screens/bottombar.dart';
+import '../screens/profile/updateprofile/privacyscreen.dart';
+import '../screens/profile/updateprofile/termsscreen.dart';
 import '../widget/bouncelogo.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -23,6 +30,7 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   final TextEditingController emailController = TextEditingController();
   bool _locationPermissionAsked = false;
+  bool _isGoogleLoading = false;
 
   @override
   void initState() {
@@ -52,6 +60,84 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       }
     } catch (e) {
       debugPrint("[WelcomeScreen] Location permission error: $e");
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    if (_isGoogleLoading) return;
+    setState(() {
+      _isGoogleLoading = true;
+    });
+
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email']);
+      
+      // Clear previous cached session so account selection dialog always appears
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
+
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
+      if (account == null) {
+        // User cancelled sign in dialog
+        if (mounted) setState(() => _isGoogleLoading = false);
+        return;
+      }
+
+      final String googleEmail = account.email.trim();
+
+      // Check if user exists with profile in backend
+      final response =
+          await RegisterService().showCompleteProfile(email: googleEmail);
+
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowCompleteProfileResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> profileJson =
+              jsonDecode(res.first.innerText);
+          final int status = profileJson["Status"] ?? 0;
+          if (status == 1 && profileJson["ResultSets"] is List) {
+            final List resultSets = profileJson["ResultSets"];
+            if (resultSets.length >= 2 &&
+                (resultSets[1] as List).isNotEmpty) {
+              // Existing registered user -> Save & Go to MainScreen
+              await SecureStorage().saveUserEmail(googleEmail);
+              final AuthController authController = Get.put(AuthController());
+              await authController.fetchAndStoreFullProfile(
+                email: googleEmail,
+              );
+              await authController.updateFCMTokenIfAvailable(
+                email: googleEmail,
+              );
+
+              if (mounted) setState(() => _isGoogleLoading = false);
+              Get.offAll(
+                () => const MainScreen(),
+                transition: Transition.rightToLeftWithFade,
+                duration: const Duration(milliseconds: 600),
+              );
+              return;
+            }
+          }
+        }
+      }
+
+      // New User or Incomplete Profile -> Save email & Go to CompleteProfileScreen
+      await SecureStorage().saveUserEmail(googleEmail);
+      if (mounted) setState(() => _isGoogleLoading = false);
+      Get.to(
+        () => CompleteProfileScreen(email: googleEmail),
+      );
+    } catch (e) {
+      if (mounted) setState(() => _isGoogleLoading = false);
+      debugPrint("[Google Sign In Error]: $e");
+      Get.snackbar(
+        "Google Sign-In",
+        "Sign in failed. Please try again.",
+        backgroundColor: AppColors.error,
+        colorText: AppColors.white,
+      );
     }
   }
 
@@ -193,6 +279,69 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
               SizedBox(height: AppSize.h(14)),
 
+              /// 📝 Terms of Use - Privacy Policy (Above Send Email OTP Button)
+              Center(
+                child: RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    style: AppTextStyles.small.copyWith(
+                      color: AppColors.grey,
+                      fontSize: AppSize.sp(11),
+                    ),
+                    children: [
+                      const TextSpan(text: "By continuing, you agree to our "),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: GestureDetector(
+                          onTap: () {
+                            Get.to(
+                              () => const TermsOfUseScreen(),
+                              transition: Transition.cupertino,
+                              duration: const Duration(milliseconds: 350),
+                            );
+                          },
+                          child: Text(
+                            "Terms of Use",
+                            style: AppTextStyles.small.copyWith(
+                              color: const Color(0xFF9B59B6),
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppSize.sp(11),
+                              decoration: TextDecoration.underline,
+                              decorationColor: const Color(0xFF9B59B6),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const TextSpan(text: " and "),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: GestureDetector(
+                          onTap: () {
+                            Get.to(
+                              () => const PrivacyPolicyScreen(),
+                              transition: Transition.cupertino,
+                              duration: const Duration(milliseconds: 350),
+                            );
+                          },
+                          child: Text(
+                            "Privacy Policy",
+                            style: AppTextStyles.small.copyWith(
+                              color: const Color(0xFF9B59B6),
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppSize.sp(11),
+                              decoration: TextDecoration.underline,
+                              decorationColor: const Color(0xFF9B59B6),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              SizedBox(height: AppSize.h(14)),
+
               /// 🚀 Send Email OTP Button (Gradient)
               GestureDetector(
                 onTap: () async {
@@ -247,7 +396,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
               SizedBox(height: AppSize.h(18)),
 
-              /// 🌐 Social Buttons: Facebook + Google + Apple
+              /// 🌐 Social Buttons: Facebook + Google
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -262,33 +411,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       ),
                     ),
                   ),
-                  SizedBox(width: AppSize.w(16)),
+                  SizedBox(width: AppSize.w(20)),
                   _socialCircleButton(
-                    onTap: () async {
-                      await SecureStorage().saveUserEmail(
-                        "google_user@gmail.com",
-                      );
-                      Get.to(
-                        () => const CompleteProfileScreen(
-                          email: "google_user@gmail.com",
-                        ),
-                      );
-                    },
-                    child: Image.network(
-                      "https://cdn-icons-png.flaticon.com/512/300/300221.png",
-                      height: AppSize.w(26),
-                    ),
-                  ),
-                  SizedBox(width: AppSize.w(16)),
-                  _socialCircleButton(
-                    onTap: () {
-                      Get.to(MainScreen());
-                    },
-                    child: Icon(
-                      Icons.apple,
-                      color: AppColors.black,
-                      size: AppSize.sp(35),
-                    ),
+                    onTap: _isGoogleLoading ? () {} : _handleGoogleSignIn,
+                    child: _isGoogleLoading
+                        ? SizedBox(
+                            width: AppSize.w(24),
+                            height: AppSize.w(24),
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF9B59B6),
+                              ),
+                            ),
+                          )
+                        : Image.network(
+                            "https://cdn-icons-png.flaticon.com/512/300/300221.png",
+                            height: AppSize.w(26),
+                          ),
                   ),
                 ],
               ),
@@ -312,77 +452,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ],
               ),
 
-              SizedBox(height: AppSize.h(10)),
-
-              /// 📝 Terms of Use - Privacy Policy
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  style: AppTextStyles.small.copyWith(color: AppColors.grey),
-                  children: [
-                    TextSpan(text: "Terms of Use"),
-                    TextSpan(text: "  •  "),
-                    WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: GestureDetector(
-                        onTap: () {
-                          showDialog(
-                            context: Get.context!,
-                            builder: (context) => AlertDialog(
-                              backgroundColor: AppColors.cardBg,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AppSize.w(16),
-                                ),
-                                side: BorderSide(color: AppColors.cardBorder),
-                              ),
-                              title: Text(
-                                "Privacy Policy",
-                                style: AppTextStyles.body.copyWith(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              content: SingleChildScrollView(
-                                child: Text(
-                                  "We value your privacy. Your personal data is collected only to provide and improve our services. We do not sell or share your information with third parties without your consent.\n\nData collected includes your email and usage information. You may request deletion of your data at any time by contacting our support team.",
-                                  style: AppTextStyles.small.copyWith(
-                                    color: AppColors.grey,
-                                    height: 1.6,
-                                  ),
-                                ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Get.back(),
-                                  child: Text(
-                                    "Got it",
-                                    style: AppTextStyles.body.copyWith(
-                                      color: const Color(0xFF9B59B6),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        child: Text(
-                          "Privacy Policy",
-                          style: AppTextStyles.small.copyWith(
-                            color: const Color(0xFF9B59B6),
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
-                            decorationColor: const Color(0xFF9B59B6),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: AppSize.h(12)),
+              SizedBox(height: AppSize.h(16)),
             ],
           ),
         ),

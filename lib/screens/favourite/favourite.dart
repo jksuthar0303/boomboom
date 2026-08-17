@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import '../../authentication/boomboom.dart';
-import '../../constant/appsize.dart';
 import '../../constant/apptextstyle.dart';
 import '../../constant/colors.dart';
 
@@ -14,30 +13,95 @@ class LikesScreen extends StatefulWidget {
 }
 
 class _LikesScreenState extends State<LikesScreen> {
-
   int myLikesCount = 12;
   int whoLikedCount = 45;
   int whoViewedCount = 128;
-  int whoSortedCount = 18;
-  int mySortedCount = 7;
+  // int whoSortedCount = 18;
+  // int mySortedCount = 7;
 
   late final List<int> counts = [
-    myLikesCount, whoLikedCount, whoViewedCount, whoSortedCount, mySortedCount,
+    myLikesCount,
+    whoLikedCount,
+    whoViewedCount,
+    // whoSortedCount,
+    // mySortedCount,
   ];
 
   int selectedTab = 0;
 
-  final tabs = ["My Likes", "Who Liked", "Who Viewed", "Who Favourite Me", "My Favourite"];
+  final tabs = [
+    "My Likes",
+    "Who Liked",
+    "Who Viewed",
+    // "Who Favourite Me",
+    // "My Favourite",
+  ];
 
   final List<Map<String, dynamic>> users = [
-    {"image": "https://randomuser.me/api/portraits/women/1.jpg", "name": "Jyunko", "age": 26, "flag": "🇹🇭", "city": "Thailand", "distance": "50km away"},
-    {"image": "https://randomuser.me/api/portraits/women/2.jpg", "name": "Pin107", "age": 25, "flag": "🇹🇭", "city": "Chiang Mai", "distance": "2475km away"},
-    {"image": "https://randomuser.me/api/portraits/women/3.jpg", "name": "Namkang16TH", "age": 57, "flag": "🇹🇭", "city": "Bangkok", "distance": "29km away"},
-    {"image": "https://randomuser.me/api/portraits/women/4.jpg", "name": "Ploy15987", "age": 22, "flag": "🇮🇳", "city": "India", "distance": "8757km away"},
-    {"image": "https://randomuser.me/api/portraits/women/5.jpg", "name": "Sara", "age": 28, "flag": "🇹🇭", "city": "Phuket", "distance": "120km away"},
-    {"image": "https://randomuser.me/api/portraits/women/6.jpg", "name": "Mila", "age": 24, "flag": "🇮🇳", "city": "Mumbai", "distance": "300km away"},
-    {"image": "https://randomuser.me/api/portraits/women/7.jpg", "name": "Lena", "age": 30, "flag": "🇹🇭", "city": "Pattaya", "distance": "5km away"},
-    {"image": "https://randomuser.me/api/portraits/women/8.jpg", "name": "Nong", "age": 27, "flag": "🇹🇭", "city": "Chonburi", "distance": "18km away"},
+    {
+      "image": "https://randomuser.me/api/portraits/women/1.jpg",
+      "name": "Jyunko",
+      "age": 26,
+      "flag": "🇹🇭",
+      "city": "Thailand",
+      "distance": "50km away",
+    },
+    {
+      "image": "https://randomuser.me/api/portraits/women/2.jpg",
+      "name": "Pin107",
+      "age": 25,
+      "flag": "🇹🇭",
+      "city": "Chiang Mai",
+      "distance": "2475km away",
+    },
+    {
+      "image": "https://randomuser.me/api/portraits/women/3.jpg",
+      "name": "Namkang16TH",
+      "age": 57,
+      "flag": "🇹🇭",
+      "city": "Bangkok",
+      "distance": "29km away",
+    },
+    {
+      "image": "https://randomuser.me/api/portraits/women/4.jpg",
+      "name": "Ploy15987",
+      "age": 22,
+      "flag": "🇮🇳",
+      "city": "India",
+      "distance": "8757km away",
+    },
+    {
+      "image": "https://randomuser.me/api/portraits/women/5.jpg",
+      "name": "Sara",
+      "age": 28,
+      "flag": "🇹🇭",
+      "city": "Phuket",
+      "distance": "120km away",
+    },
+    {
+      "image": "https://randomuser.me/api/portraits/women/6.jpg",
+      "name": "Mila",
+      "age": 24,
+      "flag": "🇮🇳",
+      "city": "Mumbai",
+      "distance": "300km away",
+    },
+    {
+      "image": "https://randomuser.me/api/portraits/women/7.jpg",
+      "name": "Lena",
+      "age": 30,
+      "flag": "🇹🇭",
+      "city": "Pattaya",
+      "distance": "5km away",
+    },
+    {
+      "image": "https://randomuser.me/api/portraits/women/8.jpg",
+      "name": "Nong",
+      "age": 27,
+      "flag": "🇹🇭",
+      "city": "Chonburi",
+      "distance": "18km away",
+    },
   ];
 
   @override
@@ -46,37 +110,12 @@ class _LikesScreenState extends State<LikesScreen> {
       backgroundColor: AppColors.primary,
       body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(AppSize.w(2)),
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
           child: Column(
             children: [
-
-              // // ── SEARCH BAR ──
-              // Container(
-              //   height: 48.h,
-              //   padding: EdgeInsets.symmetric(horizontal: 16.w),
-              //   decoration: BoxDecoration(
-              //     color: Colors.white.withOpacity(0.07),
-              //     borderRadius: BorderRadius.circular(30.r),
-              //     border: Border.all(color: Colors.white.withOpacity(0.15)),
-              //   ),
-              //   child: Row(
-              //     children: [
-              //       Ic(Icons.search, color: Colors.white54, size: 20.sp),
-              //       SizedBox(width: 10.w),
-              //       Text(
-              //         "Search by  country, name, age, district",
-              //         style: AppTextStyles.body.copyWith(color: Colors.white38, fontSize: 13.sp),
-              //       ),
-              //     ],
-              //   ),
-              // ),
-
-             // SizedBox(height: 14.h),
-
-              // ── TABS ──
               // ── TABS ──
               SizedBox(
-                height: 40.h,
+                height: 42.h,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: tabs.length,
@@ -85,16 +124,16 @@ class _LikesScreenState extends State<LikesScreen> {
                       Icons.favorite_rounded,
                       Icons.people_alt_rounded,
                       Icons.remove_red_eye_rounded,
-                      Icons.bookmark_rounded,
-                      Icons.sort_rounded,
+                      // Icons.bookmark_rounded,
+                      // Icons.sort_rounded,
                     ];
 
                     final tabColors = [
                       Colors.red,
                       Colors.purple,
                       Colors.blue,
-                      Colors.green,
-                      Colors.amber,
+                      // Colors.green,
+                      // Colors.amber,
                     ];
 
                     final isSelected = selectedTab == index;
@@ -104,12 +143,15 @@ class _LikesScreenState extends State<LikesScreen> {
                       onTap: () => setState(() => selectedTab = index),
                       child: Container(
                         margin: EdgeInsets.only(right: 10.w),
-                        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14.w,
+                          vertical: 8.h,
+                        ),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? color.withValues(alpha: 0.18)
                               : const Color(0xFF1A1A1A),
-                          borderRadius: BorderRadius.circular(10.r),
+                          borderRadius: BorderRadius.circular(12.r),
                           border: Border.all(
                             color: isSelected ? color : Colors.white12,
                             width: 1.2,
@@ -123,33 +165,41 @@ class _LikesScreenState extends State<LikesScreen> {
                               clipBehavior: Clip.none,
                               children: [
                                 Container(
-                                  width: 34.w,
-                                  height: 34.w,
+                                  width: 32.w,
+                                  height: 32.w,
                                   decoration: BoxDecoration(
-                                    color: color.withValues(alpha: isSelected ? 0.25 : 0.12),
+                                    color: color.withValues(
+                                      alpha: isSelected ? 0.25 : 0.12,
+                                    ),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
                                     tabIcons[index],
                                     color: isSelected ? color : Colors.white60,
-                                    size: 17.sp,
+                                    size: 16.sp,
                                   ),
                                 ),
                                 // Red count badge
                                 Positioned(
-                                  top: -8,
+                                  top: -6,
                                   right: -3,
                                   child: Container(
                                     padding: EdgeInsets.symmetric(
-                                        horizontal: counts[index] > 9 ? 4.w : 5.w,
-                                        vertical: 1.5.h),
+                                      horizontal: counts[index] > 9 ? 4.w : 5.w,
+                                      vertical: 1.5.h,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.red,
                                       borderRadius: BorderRadius.circular(10.r),
-                                      border: Border.all(color: const Color(0xFF111111), width: 1.2),
+                                      border: Border.all(
+                                        color: const Color(0xFF111111),
+                                        width: 1.2,
+                                      ),
                                     ),
                                     child: Text(
-                                      counts[index] > 99 ? '99+' : counts[index].toString(),
+                                      counts[index] > 99
+                                          ? '99+'
+                                          : counts[index].toString(),
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 7.sp,
@@ -167,7 +217,9 @@ class _LikesScreenState extends State<LikesScreen> {
                             Text(
                               tabs[index],
                               style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.white60,
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.white60,
                                 fontSize: 11.sp,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -179,17 +231,18 @@ class _LikesScreenState extends State<LikesScreen> {
                   },
                 ),
               ),
-              SizedBox(height: AppSize.h(16)),
+              SizedBox(height: 12.h),
 
               // ── GRID ──
               Expanded(
                 child: GridView.builder(
                   itemCount: users.length,
+                  physics: const BouncingScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisSpacing: 4.h,
-                    crossAxisSpacing: 2.w,
-                    childAspectRatio: 0.72,
+                    mainAxisSpacing: 12.h,
+                    crossAxisSpacing: 12.w,
+                    childAspectRatio: 0.68,
                   ),
                   itemBuilder: (_, i) => _card(i),
                 ),
@@ -222,14 +275,13 @@ class _LikesScreenState extends State<LikesScreen> {
     final user = users[index % users.length];
 
     return GestureDetector(
-      onTap: (){
+      onTap: () {
         Get.to(BoomProfileScreen());
       },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20.r),
         child: Stack(
           children: [
-
             // ── PHOTO ──
             Image.network(
               user["image"],
@@ -244,10 +296,12 @@ class _LikesScreenState extends State<LikesScreen> {
 
             // ── GRADIENT ──
             Container(
-
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.88)],
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.88),
+                  ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -267,16 +321,14 @@ class _LikesScreenState extends State<LikesScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4), // Shadow bhi black
+                      color: Colors.black.withValues(
+                        alpha: 0.4,
+                      ), // Shadow bhi black
                       blurRadius: 8,
                     ),
                   ],
                 ),
-                child: Icon(
-                  Icons.close,
-                  color: Colors.white,
-                  size: 16.sp,
-                ),
+                child: Icon(Icons.close, color: Colors.white, size: 16.sp),
               ),
             ),
 
@@ -288,22 +340,18 @@ class _LikesScreenState extends State<LikesScreen> {
                 Icons.favorite_border_rounded,
                 color: Colors.white,
                 size: 26.sp,
-                shadows: const [
-                  Shadow(
-                    color: Colors.black54,
-                    blurRadius: 6,
-                  ),
-                ],
+                shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
               ),
             ),
 
             // ── BOTTOM INFO ──
             Positioned(
-              bottom: 0, left: 5.h, right: 8.h,
+              bottom: 8.h,
+              left: 8.w,
+              right: 8.w,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   // Name + Age + Verified
                   Row(
                     children: [
@@ -313,16 +361,22 @@ class _LikesScreenState extends State<LikesScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.body.copyWith(
-                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12.sp,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.sp,
                           ),
                         ),
                       ),
-                      SizedBox(width: 1.w),
-                      Icon(Icons.verified_rounded, color: Colors.blueAccent, size: 14.sp),
+                      SizedBox(width: 3.w),
+                      Icon(
+                        Icons.verified_rounded,
+                        color: Colors.blueAccent,
+                        size: 14.sp,
+                      ),
                     ],
                   ),
 
-                  SizedBox(height: 0.5.h),
+                  SizedBox(height: 3.h),
 
                   // ── COUNTRY BADGE ──
                   _darkPill(
@@ -330,17 +384,27 @@ class _LikesScreenState extends State<LikesScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(user["flag"], style: TextStyle(fontSize: 9.sp,fontWeight: FontWeight.w900)),
-                        SizedBox(width: 1.w),
+                        Text(
+                          user["flag"],
+                          style: TextStyle(
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        SizedBox(width: 3.w),
                         Text(
                           user["city"],
-                          style: AppTextStyles.small.copyWith(color: Colors.white70, fontSize: 8.sp,fontWeight: FontWeight.w900),
+                          style: AppTextStyles.small.copyWith(
+                            color: Colors.white70,
+                            fontSize: 8.sp,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  SizedBox(height: 0.5.h),
+                  SizedBox(height: 3.h),
 
                   // ── DISTANCE BADGE ──
                   _darkPill(
@@ -348,23 +412,30 @@ class _LikesScreenState extends State<LikesScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.location_on_outlined, color: Colors.white60, size: 11.sp),
-                        SizedBox(width: 1.w),
+                        Icon(
+                          Icons.location_on_outlined,
+                          color: Colors.white60,
+                          size: 11.sp,
+                        ),
+                        SizedBox(width: 2.w),
                         Text(
                           user["distance"],
-                          style: AppTextStyles.small.copyWith(color: Colors.white60, fontSize: 8.sp, fontWeight: FontWeight.w900),
+                          style: AppTextStyles.small.copyWith(
+                            color: Colors.white60,
+                            fontSize: 8.sp,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  SizedBox(height: 0.5.h),
+                  SizedBox(height: 3.h),
 
                   // ── ACTIVE NOW + FRIENDSHIP ROW ──
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-
                       // Active now badge
                       _darkPill(
                         borderColor: Colors.white12,
@@ -372,15 +443,21 @@ class _LikesScreenState extends State<LikesScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 6.w, height: 6.w,
+                              width: 6.w,
+                              height: 6.w,
                               decoration: const BoxDecoration(
-                                color: Color(0xFF2ECC71), shape: BoxShape.circle,
+                                color: Color(0xFF2ECC71),
+                                shape: BoxShape.circle,
                               ),
                             ),
                             SizedBox(width: 1.w),
                             Text(
                               "Active now",
-                              style: AppTextStyles.small.copyWith(color: Colors.white70, fontSize: 8.sp,fontWeight: FontWeight.w900),
+                              style: AppTextStyles.small.copyWith(
+                                color: Colors.white70,
+                                fontSize: 8.sp,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ],
                         ),
@@ -399,13 +476,18 @@ class _LikesScreenState extends State<LikesScreen> {
                         ),
                         padding: const EdgeInsets.all(1.2),
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 4.h),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 7.w,
+                            vertical: 4.h,
+                          ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(29.r),
                             color: Colors.black.withValues(alpha: 0.7),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF6C63FF).withValues(alpha: 0.35),
+                                color: const Color(
+                                  0xFF6C63FF,
+                                ).withValues(alpha: 0.35),
                                 blurRadius: 8,
                                 spreadRadius: 1,
                               ),

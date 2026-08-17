@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'privacyscreen.dart';
+import 'termsscreen.dart';
 
 class AppColors {
   static const bg           = Color(0xFF070709);
@@ -293,7 +296,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _link(String t) => GestureDetector(
-    onTap: () {},
+    onTap: () {
+      if (t == "Privacy Policy") {
+        Get.to(() => const PrivacyPolicyScreen());
+      } else if (t == "Terms of Use") {
+        Get.to(() => const TermsOfUseScreen());
+      }
+    },
     child: Text(
       t,
       style: GoogleFonts.poppins(

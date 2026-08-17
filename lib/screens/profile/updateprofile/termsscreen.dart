@@ -4,8 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class PrivacyPolicyScreen extends StatelessWidget {
-  const PrivacyPolicyScreen({super.key});
+class TermsOfUseScreen extends StatelessWidget {
+  const TermsOfUseScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +26,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           },
         ),
         title: Text(
-          'Privacy Policy',
+          'Terms of Use',
           style: GoogleFonts.poppins(
             fontSize: 18.sp,
             fontWeight: FontWeight.w600,
@@ -69,14 +69,14 @@ class PrivacyPolicyScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.shield_outlined,
+                          Icons.description_outlined,
                           color: Colors.white,
                           size: 22.sp,
                         ),
                       ),
                       SizedBox(width: 12.w),
                       Text(
-                        'Privacy Policy',
+                        'Terms of Use',
                         style: GoogleFonts.poppins(
                           fontSize: 20.sp,
                           fontWeight: FontWeight.bold,
@@ -95,7 +95,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 4.h),
                   Text(
-                    'GDPR + Indian Law Compliant',
+                    'Please read these terms carefully before using BoomBoom.',
                     style: GoogleFonts.poppins(
                       fontSize: 12.5.sp,
                       fontWeight: FontWeight.w500,
@@ -107,84 +107,88 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             SizedBox(height: 16.h),
 
-            // Legal Compliance Section (Expandable)
-            const ExpandableSection(
+            // Terms Sections (Expandable)
+            const ExpandableTermsSection(
               icon: Icons.gavel_rounded,
-              title: 'Legal Compliance',
+              title: '1. Acceptance of Terms',
               content:
-                  'BoomBoom is committed to protecting user privacy in compliance with the Information Technology Act, 2000 (India), SPDI Rules, 2011, and GDPR (EU) wherever applicable.',
+                  'By accessing or using the BoomBoom mobile application, website, or services, you agree to be bound by these Terms of Use and our Privacy Policy. If you do not agree to these terms, you must not access or use the application.',
             ),
 
-            const ExpandableSection(
-              icon: Icons.data_usage_rounded,
-              title: '1. Information We Collect',
+            const ExpandableTermsSection(
+              icon: Icons.verified_user_outlined,
+              title: '2. Eligibility & Age Restriction',
               content:
-                  'A. Information you provide directly: Name, phone number, email, gender, date of birth, profile photos, bio, matching preferences and interests.\n\n'
-                  'B. Automatically collected information: IP address, device ID, location data (if permitted), app analytics and crash logs.\n\n'
-                  'C. Third-party information: If you sign in using Google or other providers, limited profile information may be received.',
+                  'You must be at least 18 years of age (or the age of legal majority in your jurisdiction) to create an account and use BoomBoom.\n\n'
+                  'By creating an account, you represent and warrant that:\n'
+                  '• You can form a binding contract with BoomBoom.\n'
+                  '• You have never been convicted of a felony or sexual offense.\n'
+                  '• You are not barred from using our services under applicable law.',
             ),
 
-            const ExpandableSection(
-              icon: Icons.track_changes_rounded,
-              title: '2. Purpose of Data Collection',
+            const ExpandableTermsSection(
+              icon: Icons.account_circle_outlined,
+              title: '3. Account Security & Responsibilities',
               content:
-                  'We use your information to create and manage user profiles, provide relevant matches, enable chatting and communication, prevent fraud, abuse and fake profiles, and improve app performance through analytics.\n\n'
-                  'We do NOT sell user data or share data for marketing without your consent.',
+                  'You are responsible for maintaining the confidentiality of your login credentials. You agree that all information provided during registration is accurate, true, and up to date.\n\n'
+                  'You must not share your account or allow any other individual to access your account. You agree to notify us immediately of any unauthorized use or security breach.',
             ),
 
-            const ExpandableSection(
-              icon: Icons.share_rounded,
-              title: '3. Data Sharing',
+            const ExpandableTermsSection(
+              icon: Icons.rule_rounded,
+              title: '4. Community Guidelines & Conduct',
               content:
-                  'We may share data with cloud storage providers for storing user media and information, analytics providers such as Firebase for app performance monitoring, and payment gateways for subscription processing.\n\n'
-                  'All service providers are bound by confidentiality obligations.',
+                  'BoomBoom is built on mutual respect and safe connections. You agree NOT to:\n'
+                  '• Harass, stalk, intimidate, abuse, or defame any person.\n'
+                  '• Post explicit, defamatory, hate speech, or sexually unlawful content.\n'
+                  '• Solicit money, perpetrate scams, or conduct financial fraud.\n'
+                  '• Impersonate any person or entity or misrepresent your identity.\n'
+                  '• Send spam, commercial promotions, or unauthorized advertisements.',
             ),
 
-            const ExpandableSection(
-              icon: Icons.access_time_rounded,
-              title: '4. Retention of Data',
-              content:
-                  'We retain your information while your account remains active or as required by applicable law. If you delete your account, data is removed except where retention is required for taxation, legal compliance, record-keeping, or abuse investigations.',
-            ),
-
-            const ExpandableSection(
+            const ExpandableTermsSection(
               icon: Icons.security_rounded,
-              title: '5. User Rights',
+              title: '5. Safety & Offline Interaction Disclaimer',
               content:
-                  'Subject to applicable law, you have the right to access your personal data, request corrections, request deletion, and withdraw consent.\n\n'
-                  'Requests can be sent to support@boomboom.com.',
+                  'BoomBoom is an online platform for social interaction. We do not conduct criminal background checks or verify user intentions.\n\n'
+                  'Offline meetings with other users are solely at your own risk. Always prioritize your personal safety: meet in public places, do not share financial details, inform a trusted contact, and report suspicious activities immediately.',
             ),
 
-            const ExpandableSection(
-              icon: Icons.lock_rounded,
-              title: '6. Security',
+            const ExpandableTermsSection(
+              icon: Icons.credit_card_rounded,
+              title: '6. Subscriptions & In-App Purchases',
               content:
-                  'We use encryption, access controls, and secure servers to protect user information. However, no online service can guarantee 100% security.\n\n'
-                  'The Company is not liable for unauthorized access resulting from user negligence, such as sharing devices or using weak passwords.',
+                  'Certain features may require a paid subscription or purchase. Payments are processed through the respective app store (Apple App Store / Google Play Store).\n\n'
+                  'Subscriptions auto-renew unless cancelled at least 24 hours prior to the end of the current billing cycle. All purchases are final and non-refundable unless required by applicable law.',
             ),
 
-            const ExpandableSection(
-              icon: Icons.child_care_rounded,
-              title: '7. Child Safety',
+            const ExpandableTermsSection(
+              icon: Icons.copyright_rounded,
+              title: '7. Intellectual Property & Content Rights',
               content:
-                  'BoomBoom does not knowingly allow anyone under the age of 18 to use the platform. Any account found to belong to a minor may be removed immediately.',
+                  'You retain ownership of the content you upload, but you grant BoomBoom a worldwide, royalty-free, non-exclusive license to host, display, and distribute your content solely for operating and promoting the service.\n\n'
+                  'All BoomBoom trademarks, graphics, and code are owned exclusively by the Company.',
             ),
 
-            const ExpandableSection(
-              icon: Icons.info_outline_rounded,
-              title: '8. Changes to Policy',
+            const ExpandableTermsSection(
+              icon: Icons.block_rounded,
+              title: '8. Suspension & Account Termination',
               content:
-                  'Privacy Policy updates may be made from time to time. Any changes will be posted within the application and on the official website where applicable.',
+                  'We reserve the right to investigate, suspend, or permanently terminate your account without prior notice if you violate these Terms of Use, engage in misconduct, or pose a safety risk to other users.',
             ),
 
-            const ExpandableSection(
+            const ExpandableTermsSection(
               icon: Icons.warning_amber_rounded,
-              title: '9. Disclaimer & No Liability Policy',
+              title: '9. Limitation of Liability',
               content:
-                  'BoomBoom is a platform for connecting people and is not a matchmaking or marriage bureau.\n\n'
-                  'The Company does not verify user identity, intentions, criminal background, or marital status. Offline meetings are conducted entirely at the user’s own risk.\n\n'
-                  'The Company, its directors, employees, and developers shall not be responsible for fraud, scams, abuse, sexual harassment, financial loss, emotional suffering, injury, or death arising from user interactions.\n\n'
-                  'Users are advised to verify identities, meet in public places, avoid sharing financial information, and contact local law enforcement in case of harassment or criminal activity.',
+                  'To the maximum extent permitted by law, BoomBoom, its founders, affiliates, and developers shall not be liable for any indirect, incidental, punitive, or consequential damages, or for any loss of data, bodily injury, emotional distress, or financial harm resulting from user interactions or platform access.',
+            ),
+
+            const ExpandableTermsSection(
+              icon: Icons.headset_mic_rounded,
+              title: '10. Contact & Grievance',
+              content:
+                  'If you have questions regarding these Terms of Use or wish to report a violation, please contact our support team at support@boomboom.com.',
             ),
 
             SizedBox(height: 14.h),
@@ -208,12 +212,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
   }
 }
 
-class ExpandableSection extends StatefulWidget {
+class ExpandableTermsSection extends StatefulWidget {
   final IconData icon;
   final String title;
   final String content;
 
-  const ExpandableSection({
+  const ExpandableTermsSection({
     super.key,
     required this.icon,
     required this.title,
@@ -221,11 +225,10 @@ class ExpandableSection extends StatefulWidget {
   });
 
   @override
-  // ignore: library_private_types_in_public_api
-  _ExpandableSectionState createState() => _ExpandableSectionState();
+  State<ExpandableTermsSection> createState() => _ExpandableTermsSectionState();
 }
 
-class _ExpandableSectionState extends State<ExpandableSection> {
+class _ExpandableTermsSectionState extends State<ExpandableTermsSection> {
   bool _isExpanded = false;
 
   @override
@@ -293,7 +296,10 @@ class _ExpandableSectionState extends State<ExpandableSection> {
               ),
               if (_isExpanded) ...[
                 SizedBox(height: 12.h),
-                Divider(color: AppColors.cardBorder, height: 1),
+                Divider(
+                  color: AppColors.cardBorder,
+                  height: 1,
+                ),
                 Padding(
                   padding: EdgeInsets.only(top: 12.h),
                   child: Text(

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:boomboom/screens/profile/updateprofile/deletescreen.dart';
 import 'package:boomboom/screens/profile/updateprofile/feedbackscreen.dart';
 import 'package:boomboom/screens/profile/updateprofile/privacyscreen.dart';
+import 'package:boomboom/screens/profile/updateprofile/termsscreen.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:boomboom/backend/secure_storage.dart';
 import 'package:boomboom/authentication/welcomscreens.dart';
 import 'package:boomboom/screens/profile/updateprofile/selfieverification.dart';
@@ -316,6 +318,9 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       emoji: Text('📄', style: TextStyle(fontSize: 18.sp)),
       label: 'Terms & Conditions',
       subtitle: "Read Our Terms And Policies",
+      onTap: () {
+        Get.to(() => const TermsOfUseScreen());
+      },
     ),
     _TileData(
       iconBg: _C.surface,
@@ -505,8 +510,14 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
                 TextButton(
                   onPressed: () async {
                     Navigator.pop(context);
+                    try {
+                      final GoogleSignIn googleSignIn = GoogleSignIn();
+                      await googleSignIn.signOut();
+                    } catch (e) {
+                      debugPrint("Google Sign Out Error: $e");
+                    }
                     await SecureStorage().clearAll();
-                    Get.offAll(() => WelcomeScreen());
+                    Get.offAll(() => const WelcomeScreen());
                   },
                   child: Text(
                     "Logout",

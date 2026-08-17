@@ -26,10 +26,14 @@ class _MainScreenState extends State<MainScreen> {
 
   int index = 0;
 
-  final pages = [
+  List<Widget> get pages => [
     const HomeScreen(),
     NearbyMapScreen(),
-    BoomProfileScreen(),
+    const BoomProfileScreen(
+      isOwnProfile: false,
+      showStar: true,
+      showMore: true,
+    ),
     LikesScreen(),
     MessagePage(),
   ];

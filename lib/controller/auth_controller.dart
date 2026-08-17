@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
@@ -105,6 +106,7 @@ class AuthController extends GetxController {
                 };
                 final String combinedJsonStr = jsonEncode(combinedMap);
                 await SecureStorage().saveProfileJson(combinedJsonStr);
+
                 debugPrint(
                   "Persisted combined user profile details from ShowCompleteProfile: $combinedJsonStr",
                 );
@@ -117,6 +119,42 @@ class AuthController extends GetxController {
       debugPrint(
         "Error fetching and storing full profile via ShowCompleteProfile: $e",
       );
+    }
+  }
+
+  /// Update FCM Token on backend server
+  Future<void> updateFCMTokenIfAvailable({required String email}) async {
+    try {
+      String? fcmToken = await SecureStorage().getFcmToken();
+      if (fcmToken == null || fcmToken.isEmpty) {
+        try {
+          fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null && fcmToken.isNotEmpty) {
+            await SecureStorage().saveFcmToken(fcmToken);
+          }
+        } catch (e) {
+          debugPrint("[FirebaseMessaging getToken in AuthController Error]: $e");
+        }
+      }
+
+      if (fcmToken != null && fcmToken.isNotEmpty && email.trim().isNotEmpty) {
+        debugPrint(
+          "🚀 [AuthController] Updating FCM Token for $email -> $fcmToken",
+        );
+        final response = await _registerService.updateFCMToken(
+          email: email.trim(),
+          fcmToken: fcmToken.trim(),
+        );
+        debugPrint(
+          "[UpdateFCMToken Result]: ${response.statusCode} - ${response.body}",
+        );
+      } else {
+        debugPrint(
+          "⚠️ [AuthController] Cannot update FCM token: token or email is empty (token: $fcmToken, email: $email)",
+        );
+      }
+    } catch (e) {
+      debugPrint("[UpdateFCMToken error]: $e");
     }
   }
 
@@ -160,6 +198,9 @@ class AuthController extends GetxController {
 
               // Fetch and store complete profile JSON (with Interests, Lifestyle, Media)
               await fetchAndStoreFullProfile(email: email.trim());
+
+              // Update FCM Token on server
+              await updateFCMTokenIfAvailable(email: email.trim());
 
               NeuSnackbar.success("Login Successfully");
 
@@ -396,6 +437,9 @@ class AuthController extends GetxController {
 
               // Fetch and store complete profile JSON (with Interests, Lifestyle, Media)
               await fetchAndStoreFullProfile(email: email);
+
+              // Update FCM Token on server after registration
+              await updateFCMTokenIfAvailable(email: email);
 
               NeuSnackbar.success(
                 "Profile registration completed successfully!",

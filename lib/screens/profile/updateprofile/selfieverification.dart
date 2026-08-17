@@ -1,11 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:xml/xml.dart' as xml;
 
-// ── Replace with your actual imports ─────────────────────────────────────────
-// import 'package:your_app/core/theme/colors.dart';
-// ─────────────────────────────────────────────────────────────────────────────
+import '../../../backend/registerservice.dart';
+import '../../../backend/secure_storage.dart';
 
 class AppColors {
   static const bg = Color(0xFF070709);
@@ -35,6 +40,12 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnim;
 
+  bool _isLoading = false;
+  bool _isSuccessSubmitted = false;
+  File? _capturedImage;
+  final ImagePicker _picker = ImagePicker();
+  final RegisterService _registerService = RegisterService();
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +57,21 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
     _pulseAnim = Tween<double>(begin: 1.0, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // Retrieve lost data on Android if MainActivity was recreated after Camera intent
+    _checkLostData();
+  }
+
+  Future<void> _checkLostData() async {
+    try {
+      final LostDataResponse response = await _picker.retrieveLostData();
+      if (response.isEmpty) return;
+      if (response.file != null) {
+        await _processAndUploadSelfie(response.file!);
+      }
+    } catch (e) {
+      debugPrint('Error retrieving lost data: $e');
+    }
   }
 
   @override
@@ -54,10 +80,178 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
     super.dispose();
   }
 
-  void _onTakeSelfie() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Camera launching…')));
+  Future<bool> _checkAndRequestCameraPermission() async {
+    final status = await Permission.camera.status;
+    if (status.isGranted) return true;
+
+    final result = await Permission.camera.request();
+    if (result.isGranted) return true;
+
+    if (result.isPermanentlyDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Camera permission is permanently denied. Please enable it in Settings.',
+            ),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => openAppSettings(),
+            ),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Camera permission was denied.')),
+        );
+      }
+    }
+    return false;
+  }
+
+  Future<void> _onTakeSelfie() async {
+    if (_isLoading) return;
+
+    // 1. Check & Request Camera Permission
+    final hasPermission = await _checkAndRequestCameraPermission();
+    if (!hasPermission) return;
+
+    try {
+      // 2. Launch Camera with optimized resolution & quality
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 70,
+      );
+
+      if (photo == null) return; // User cancelled capture
+
+      await _processAndUploadSelfie(photo);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Camera error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _processAndUploadSelfie(XFile photo) async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _capturedImage = File(photo.path);
+    });
+
+    try {
+      // 1. Convert captured image to Base64
+      final bytes = await photo.readAsBytes();
+      final String base64Image = base64Encode(bytes);
+
+      // 2. Retrieve logged-in user email
+      final String? userEmail = await SecureStorage().getUserEmail();
+      if (userEmail == null || userEmail.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('User email not found. Please log in again.'),
+            ),
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 3. Call SOAP MediaInsert API with Base64 image and type 'verify'
+      final response = await _registerService.mediaInsert(
+        email: userEmail.trim(),
+        mediaBase64: base64Image,
+        type: 'verify',
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        bool isSuccess = false;
+        String message = 'Selfie uploaded successfully for verification!';
+
+        try {
+          final doc = xml.XmlDocument.parse(response.body);
+          final resElements = doc.findAllElements('MediaInsertResult');
+          if (resElements.isNotEmpty) {
+            final jsonStr = resElements.first.innerText;
+            final resJson = jsonDecode(jsonStr);
+            if ((resJson['Status'] ?? 0) == 1) {
+              isSuccess = true;
+              message = resJson['Message'] ?? 'Verification submitted successfully!';
+            } else {
+              message = resJson['Message'] ?? 'Failed to submit verification.';
+            }
+          } else {
+            isSuccess = true;
+          }
+        } catch (_) {
+          isSuccess = true;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: isSuccess ? Colors.green : Colors.red,
+          ),
+        );
+
+        if (isSuccess) {
+          setState(() {
+            _isSuccessSubmitted = true;
+          });
+          Future.delayed(const Duration(seconds: 2), () {
+            _safeNavigateBack();
+          });
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Server Error: ${response.statusCode}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _safeNavigateBack() {
+    if (!mounted) return;
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Get.back();
+    }
   }
 
   @override
@@ -118,17 +312,25 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
                   _CameraButton(
                     isTablet: isTablet,
                     pulseAnim: _pulseAnim,
+                    isLoading: _isLoading,
+                    capturedImage: _capturedImage,
                     onTap: _onTakeSelfie,
                   ),
 
                   SizedBox(height: 16.h),
 
                   Text(
-                    'Tap to Take Selfie',
+                    _isLoading
+                        ? 'Uploading Selfie...'
+                        : (_isSuccessSubmitted
+                            ? 'Verification Submitted!'
+                            : (_capturedImage != null
+                                ? 'Tap to Retake Selfie'
+                                : 'Tap to Take Selfie')),
                     style: GoogleFonts.poppins(
                       fontSize: isTablet ? 17.sp : 15.sp,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: _isSuccessSubmitted ? Colors.greenAccent : AppColors.textPrimary,
                     ),
                   ),
 
@@ -165,7 +367,7 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
         child: Container(height: 1, color: AppColors.cardBorder),
       ),
       leading: GestureDetector(
-        onTap: () => Navigator.maybePop(context),
+        onTap: _safeNavigateBack,
         child: Container(
           margin: EdgeInsets.all(10.w),
           decoration: BoxDecoration(
@@ -340,11 +542,15 @@ class _TipRow extends StatelessWidget {
 class _CameraButton extends StatelessWidget {
   final bool isTablet;
   final Animation<double> pulseAnim;
+  final bool isLoading;
+  final File? capturedImage;
   final VoidCallback onTap;
 
   const _CameraButton({
     required this.isTablet,
     required this.pulseAnim,
+    required this.isLoading,
+    required this.capturedImage,
     required this.onTap,
   });
 
@@ -372,15 +578,29 @@ class _CameraButton extends StatelessWidget {
               child: Container(
                 width: btnSize,
                 height: btnSize,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.purple,
                   shape: BoxShape.circle,
+                  image: capturedImage != null
+                      ? DecorationImage(
+                          image: FileImage(capturedImage!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-                child: Icon(
-                  Icons.camera_alt_rounded,
-                  color: AppColors.white,
-                  size: isTablet ? 58.sp : 46.sp,
-                ),
+                child: isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.white,
+                        ),
+                      )
+                    : (capturedImage == null
+                        ? Icon(
+                            Icons.camera_alt_rounded,
+                            color: AppColors.white,
+                            size: isTablet ? 58.sp : 46.sp,
+                          )
+                        : const SizedBox.shrink()),
               ),
             ),
           ),
