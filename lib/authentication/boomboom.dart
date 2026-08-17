@@ -591,7 +591,8 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                 if (p != null) {
                   parsedList.add(p);
                   profileEmails.add(
-                    (item["EmailAddress"] ?? item["email"] ??
+                    (item["EmailAddress"] ??
+                            item["email"] ??
                             item["ActionEmail"])
                         ?.toString(),
                   );
@@ -744,8 +745,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     List<dynamic>? rawLifestyle,
   ]) {
     try {
-      final String name = (data["FullName"] ?? data["name"] ?? "")
-          .toString();
+      final String name = (data["FullName"] ?? data["name"] ?? "").toString();
       final String dob = (data["Dob"] ?? data["dob"] ?? "").toString();
       final String calculatedAge = dob.isNotEmpty
           ? _calculateAge(dob).toString()
@@ -753,24 +753,21 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       final String bio = (data["BIO"] ?? data["bio"] ?? data["Bio"] ?? "")
           .toString()
           .trim();
-      final String job =
-          (data["Occupation"] ?? data["occupation"] ?? "")
-              .toString();
-      final String height = (data["Height"] ?? data["height"] ?? "")
+      final String job = (data["Occupation"] ?? data["occupation"] ?? "")
           .toString();
-      final String lookingFor =
-          (data["Lookingfor"] ?? data["lookingFor"] ?? "")
-              .toString();
+      final String height = (data["Height"] ?? data["height"] ?? "").toString();
+      final String lookingFor = (data["Lookingfor"] ?? data["lookingFor"] ?? "")
+          .toString();
       final String gender = (data["Gender"] ?? data["gender"] ?? "").toString();
       final String orientation =
           (data["Orientation"] ?? data["orientation"] ?? "").toString();
-      final bool isVerified = data["IsVerified"] == true ||
+      final bool isVerified =
+          data["IsVerified"] == true ||
           data["IsVerified"]?.toString().toLowerCase() == "true" ||
           data["isVerified"] == true ||
           data["isVerified"]?.toString().toLowerCase() == "true";
       final String city =
-          (data["City"] ?? data["city"] ?? data["Country"] ?? "")
-              .toString();
+          (data["City"] ?? data["city"] ?? data["Country"] ?? "").toString();
       final String distance = (data["Distance"] ?? data["distance"] ?? "")
           .toString();
 
@@ -1181,7 +1178,8 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         ? _liveProfiles.length
         : sampleProfiles.length;
     final int currentProfileIndex = _currentIndex % profileCount;
-    final String? actionEmail = _liveProfiles.isNotEmpty &&
+    final String? actionEmail =
+        _liveProfiles.isNotEmpty &&
             currentProfileIndex < _liveProfileEmails.length
         ? _liveProfileEmails[currentProfileIndex]
         : null;
@@ -1200,6 +1198,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     }
 
     setState(() => _isSwiping = true);
+    // ignore: use_build_context_synchronously
     final sw = MediaQuery.of(context).size.width;
     setState(() {
       _dragX = toLike ? sw * 1.8 : -sw * 1.8;
@@ -1617,7 +1616,9 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                               Icon(
                                 Icons.verified_rounded,
                                 color: Colors.blue,
-                                size: isTablet ? AppSize.sp(22) : AppSize.sp(18),
+                                size: isTablet
+                                    ? AppSize.sp(22)
+                                    : AppSize.sp(18),
                               ),
                           ],
                         ),
@@ -1660,99 +1661,99 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                       if (!widget.isOwnProfile)
                         GestureDetector(
                           onTap: () async {
-                          final profileCount = _liveProfiles.isNotEmpty
-                              ? _liveProfiles.length
-                              : sampleProfiles.length;
-                          final idx = _currentIndex % profileCount;
-                          final bool nextLiked = !_favourites.contains(idx);
-                          setState(() {
-                            if (!nextLiked) {
-                              _favourites.remove(idx);
-                              _showSnack('Unliked 🤍', AppColors.grey);
-                            } else {
-                              _favourites.add(idx);
-                              _showSnack('Liked ❤️', const Color(0xFFFF5E62));
-                            }
-                          });
+                            final profileCount = _liveProfiles.isNotEmpty
+                                ? _liveProfiles.length
+                                : sampleProfiles.length;
+                            final idx = _currentIndex % profileCount;
+                            final bool nextLiked = !_favourites.contains(idx);
+                            setState(() {
+                              if (!nextLiked) {
+                                _favourites.remove(idx);
+                                _showSnack('Unliked 🤍', AppColors.grey);
+                              } else {
+                                _favourites.add(idx);
+                                _showSnack('Liked ❤️', const Color(0xFFFF5E62));
+                              }
+                            });
 
-                          final actionEmail =
-                              widget.userEmail ??
-                              widget.initialUserData?['EmailAddress']
-                                  ?.toString() ??
-                              widget.initialUserData?['email']?.toString();
-                          if (actionEmail == null ||
-                              actionEmail.trim().isEmpty) {
-                            return;
-                          }
-                          try {
-                            final myEmail =
-                                await SecureStorage().getUserEmail() ?? '';
-                            final response = await HomeService()
-                                .favoriteLikeViewInsert(
-                                  myEmail: myEmail.trim(),
-                                  actionEmail: actionEmail.trim(),
-                                  action: nextLiked ? 'like' : 'unlike',
+                            final actionEmail =
+                                widget.userEmail ??
+                                widget.initialUserData?['EmailAddress']
+                                    ?.toString() ??
+                                widget.initialUserData?['email']?.toString();
+                            if (actionEmail == null ||
+                                actionEmail.trim().isEmpty) {
+                              return;
+                            }
+                            try {
+                              final myEmail =
+                                  await SecureStorage().getUserEmail() ?? '';
+                              final response = await HomeService()
+                                  .favoriteLikeViewInsert(
+                                    myEmail: myEmail.trim(),
+                                    actionEmail: actionEmail.trim(),
+                                    action: nextLiked ? 'like' : 'unlike',
+                                  );
+                              if (response.statusCode < 200 ||
+                                  response.statusCode >= 300) {
+                                throw Exception('HTTP ${response.statusCode}');
+                              }
+                            } catch (_) {
+                              if (mounted) {
+                                setState(() {
+                                  if (nextLiked) {
+                                    _favourites.remove(idx);
+                                  } else {
+                                    _favourites.add(idx);
+                                  }
+                                });
+                                _showSnack(
+                                  'Like save nahi ho saka.',
+                                  AppColors.error,
                                 );
-                            if (response.statusCode < 200 ||
-                                response.statusCode >= 300) {
-                              throw Exception('HTTP ${response.statusCode}');
+                              }
                             }
-                          } catch (_) {
-                            if (mounted) {
-                              setState(() {
-                                if (nextLiked) {
-                                  _favourites.remove(idx);
-                                } else {
-                                  _favourites.add(idx);
-                                }
-                              });
-                              _showSnack(
-                                'Like save nahi ho saka.',
-                                AppColors.error,
-                              );
-                            }
-                          }
                           },
                           child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          width: isTablet ? AppSize.w(48) : AppSize.w(44),
-                          height: isTablet ? AppSize.h(48) : AppSize.h(44),
-                          decoration: BoxDecoration(
-                            color: _isFavourited
-                                ? const Color(
-                                    0xFFFF5E62,
-                                  ).withValues(alpha: 0.35)
-                                : Colors.black.withValues(alpha: 0.42),
-                            shape: BoxShape.circle,
-                            border: Border.all(
+                            duration: const Duration(milliseconds: 250),
+                            width: isTablet ? AppSize.w(48) : AppSize.w(44),
+                            height: isTablet ? AppSize.h(48) : AppSize.h(44),
+                            decoration: BoxDecoration(
                               color: _isFavourited
-                                  ? const Color(0xFFFF5E62)
-                                  : Colors.white70,
-                              width: 1.5,
+                                  ? const Color(
+                                      0xFFFF5E62,
+                                    ).withValues(alpha: 0.35)
+                                  : Colors.black.withValues(alpha: 0.42),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _isFavourited
+                                    ? const Color(0xFFFF5E62)
+                                    : Colors.white70,
+                                width: 1.5,
+                              ),
+                              boxShadow: _isFavourited
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFFFF5E62,
+                                        ).withValues(alpha: 0.50),
+                                        blurRadius: 10,
+                                        spreadRadius: 2,
+                                      ),
+                                    ]
+                                  : [],
                             ),
-                            boxShadow: _isFavourited
-                                ? [
-                                    BoxShadow(
-                                      color: const Color(
-                                        0xFFFF5E62,
-                                      ).withValues(alpha: 0.50),
-                                      blurRadius: 10,
-                                      spreadRadius: 2,
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          child: Center(
-                            child: Icon(
-                              _isFavourited
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              color: _isFavourited
-                                  ? const Color(0xFFFF5E62)
-                                  : Colors.white,
-                              size: isTablet ? 24.sp : 20.sp,
+                            child: Center(
+                              child: Icon(
+                                _isFavourited
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                color: _isFavourited
+                                    ? const Color(0xFFFF5E62)
+                                    : Colors.white,
+                                size: isTablet ? 24.sp : 20.sp,
+                              ),
                             ),
-                          ),
                           ),
                         ),
 
@@ -2183,53 +2184,6 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   //  BOTTOM ACTION ROW
   //  ✅ v6: Share Profile — white text+icon, safe bottom padding for BottomNav
   // ════════════════════════════════════════
-  Widget _bottomActionRow(ProfileModel p, bool isTablet) {
-    final btnH = isTablet ? AppSize.h(64) : AppSize.h(56);
-    final iconSz = isTablet ? AppSize.sp(22) : AppSize.sp(19);
-    final lblSz = isTablet ? AppSize.sp(13) : AppSize.sp(12);
-    // ✅ bottom nav ke upar dikhne ke liye extra bottom padding
-    final bottomPad = MediaQuery.of(context).padding.bottom + AppSize.h(70);
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomPad),
-      child: GestureDetector(
-        onTap: () {
-          _showSnack('Profile link copied 🔗', Colors.blueAccent);
-        },
-        child: Container(
-          height: btnH,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.blueAccent.withValues(alpha: 0.18),
-                Colors.transparent,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16.r),
-            border: Border.all(
-              color: Colors.blueAccent.withValues(alpha: 0.45),
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.link_rounded, color: Colors.white, size: iconSz),
-              SizedBox(height: AppSize.h(4)),
-              Text(
-                'Share Profile',
-                style: AppTextStyles.small.copyWith(
-                  color: Colors.white,
-                  fontSize: lblSz,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   // Widget _actionBtn({
   //   required IconData icon,

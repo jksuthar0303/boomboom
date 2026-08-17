@@ -156,7 +156,7 @@ class _LikesScreenState extends State<LikesScreen> {
         });
         return;
       }
-      final data = result is Map && result['Data'] is List
+      final data = result['Data'] is List
           ? (result['Data'] as List)
                 .whereType<Map>()
                 .map((item) => Map<String, dynamic>.from(item))
@@ -267,28 +267,32 @@ class _LikesScreenState extends State<LikesScreen> {
                                     top: -6,
                                     right: -3,
                                     child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: counts[index] > 9 ? 4.w : 5.w,
-                                      vertical: 1.5.h,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      borderRadius: BorderRadius.circular(10.r),
-                                      border: Border.all(
-                                        color: const Color(0xFF111111),
-                                        width: 1.2,
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: counts[index] > 9
+                                            ? 4.w
+                                            : 5.w,
+                                        vertical: 1.5.h,
                                       ),
-                                    ),
-                                    child: Text(
-                                      counts[index] > 99
-                                          ? '99+'
-                                          : counts[index].toString(),
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 7.sp,
-                                        fontWeight: FontWeight.w900,
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius: BorderRadius.circular(
+                                          10.r,
+                                        ),
+                                        border: Border.all(
+                                          color: const Color(0xFF111111),
+                                          width: 1.2,
+                                        ),
                                       ),
-                                    ),
+                                      child: Text(
+                                        counts[index] > 99
+                                            ? '99+'
+                                            : counts[index].toString(),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 7.sp,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
                                     ),
                                   ),
                               ],
@@ -634,8 +638,9 @@ class _LikesScreenState extends State<LikesScreen> {
       final now = DateTime.now();
       var value = now.year - date.year;
       if (now.month < date.month ||
-          (now.month == date.month && now.day < date.day))
+          (now.month == date.month && now.day < date.day)) {
         value--;
+      }
       age = value.toString();
     } catch (_) {}
     final image =
@@ -649,7 +654,8 @@ class _LikesScreenState extends State<LikesScreen> {
       'name': item['FullName'] ?? item['Name'] ?? 'Unknown',
       'age': age,
       'gender': item['Gender'] ?? 'Not specified',
-      'occupation': item['Occupation'] == null ||
+      'occupation':
+          item['Occupation'] == null ||
               item['Occupation'].toString().trim().toLowerCase() ==
                   'not specified'
           ? ''
