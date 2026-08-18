@@ -2,6 +2,7 @@ import 'package:boomboom/screens/home/travell/filterscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../../../authentication/userdetails.dart';
 import '../../../backend/routesmatch.dart';
@@ -10,7 +11,9 @@ import '../../../backend/travel_service.dart';
 import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../constant/colors.dart';
+import '../../../widget/app_image_helper.dart';
 import '../../../widget/snakbar.dart';
+import '../../../controller/travel_filter_controller.dart';
 import 'createtravel.dart';
 
 class TravelAlertScreen extends StatefulWidget {
@@ -189,9 +192,7 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
     if (email == null || email.trim().isEmpty) return;
 
     Get.dialog(
-      const Center(
-        child: CircularProgressIndicator(color: Color(0xFF8E2DE2)),
-      ),
+      const Center(child: CircularProgressIndicator(color: Color(0xFF8E2DE2))),
       barrierDismissible: false,
     );
 
@@ -206,7 +207,9 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
         NeuSnackbar.success("Journey deleted successfully!");
         _fetchMyJourneys();
       } else {
-        NeuSnackbar.error("Failed to delete journey: Server error ${response.statusCode}");
+        NeuSnackbar.error(
+          "Failed to delete journey: Server error ${response.statusCode}",
+        );
       }
     } catch (e) {
       Get.back(); // close loading dialog
@@ -285,29 +288,32 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
 
                       SizedBox(width: 8.w),
 
-                      _iconBox(
-                        Icons.tune,
-
-                        onTap: () {
-                          Get.bottomSheet(
-                            FractionallySizedBox(
-                              heightFactor: 0.72,
-
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(28),
+                      Obx(() {
+                        final isActive =
+                            TravelFilterController.instance.isFilterActive;
+                        return _iconBox(
+                          Icons.tune,
+                          active: isActive,
+                          onTap: () async {
+                            final res = await Get.bottomSheet(
+                              FractionallySizedBox(
+                                heightFactor: 0.72,
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(28),
+                                  ),
+                                  child: const TravelFilterScreen(),
                                 ),
-
-                                child: const TravelFilterScreen(),
                               ),
-                            ),
-
-                            isScrollControlled: true,
-
-                            backgroundColor: Colors.transparent,
-                          );
-                        },
-                      ),
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                            );
+                            if (res == true || mounted) {
+                              setState(() {});
+                            }
+                          },
+                        );
+                      }),
                     ],
                   ),
                 ],
@@ -410,9 +416,7 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
   Widget _upcomingArrivalsView(bool isTablet) {
     if (_isLoadingUpcoming) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF8E2DE2),
-        ),
+        child: CircularProgressIndicator(color: Color(0xFF8E2DE2)),
       );
     }
 
@@ -515,6 +519,9 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
       );
     }
 
+    final filteredTrips =
+        TravelFilterController.instance.applyFilterToJourneys(_upcomingTrips);
+
     return RefreshIndicator(
       onRefresh: _fetchUpcomingTrips,
       color: const Color(0xFF8E2DE2),
@@ -545,8 +552,9 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                               SizedBox(width: 6.w),
                               Text(
                                 "UPCOMING ARRIVALS",
-                                style: AppTextStyles.subHeading
-                                    .copyWith(letterSpacing: 1),
+                                style: AppTextStyles.subHeading.copyWith(
+                                  letterSpacing: 1,
+                                ),
                               ),
                             ],
                           ),
@@ -567,18 +575,43 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
               ],
             ),
           ),
-          SliverGrid(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final user = _upcomingTrips[index];
-              return _userCard(user, index);
-            }, childCount: _upcomingTrips.length),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: isTablet ? 3 : 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 0.62,
+          if (filteredTrips.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 40.h),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.filter_alt_off_rounded,
+                        color: Colors.white38,
+                        size: 36.sp,
+                      ),
+                      SizedBox(height: 8.h),
+                      Text(
+                        "No journeys match your filter",
+                        style: AppTextStyles.body.copyWith(
+                          color: Colors.white60,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverGrid(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final user = filteredTrips[index];
+                return _userCard(user, index);
+              }, childCount: filteredTrips.length),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isTablet ? 3 : 2,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 0.62,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -588,9 +621,7 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
   Widget _myJourneysView() {
     if (_isLoadingJourneys) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF8E2DE2),
-        ),
+        child: CircularProgressIndicator(color: Color(0xFF8E2DE2)),
       );
     }
 
@@ -730,6 +761,34 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
       );
     }
 
+    final filteredMyJourneys =
+        TravelFilterController.instance.applyFilterToJourneys(_myJourneys);
+
+    if (filteredMyJourneys.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 40.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.filter_alt_off_rounded,
+                color: Colors.white38,
+                size: 36.sp,
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                "No journeys match your filter",
+                style: AppTextStyles.body.copyWith(
+                  color: Colors.white60,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _fetchMyJourneys,
       color: const Color(0xFF8E2DE2),
@@ -739,10 +798,10 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
           parent: BouncingScrollPhysics(),
         ),
         padding: EdgeInsets.only(bottom: 24.h, top: 4.h),
-        itemCount: _myJourneys.length,
+        itemCount: filteredMyJourneys.length,
         separatorBuilder: (_, __) => SizedBox(height: 14.h),
         itemBuilder: (context, index) {
-          final item = _myJourneys[index];
+          final item = filteredMyJourneys[index];
           return _myJourneyCard(item);
         },
       ),
@@ -760,7 +819,8 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
     final journeyType = (item["JourneyType"] ?? "Trip").toString().trim();
     final travelStyle = (item["TravelStyle"] ?? "").toString().trim();
     final travelCompanion = (item["TravelCompanion"] ?? "").toString().trim();
-    final isHide = item["ishide"]?.toString().toLowerCase() == "true" ||
+    final isHide =
+        item["ishide"]?.toString().toLowerCase() == "true" ||
         item["ishide"]?.toString() == "1";
     final description = (item["Description"] ?? "").toString().trim();
 
@@ -769,9 +829,7 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF141B2D),
         borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.06),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.45),
@@ -845,7 +903,9 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                           vertical: 4.h,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFB14DFF).withValues(alpha: 0.15),
+                          color: const Color(
+                            0xFFB14DFF,
+                          ).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10.r),
                         ),
                         child: Text(
@@ -1072,7 +1132,7 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
               ),
               SizedBox(width: 6.w),
               Text(
-                "$fromDate  ➔  $toDate",
+                _formatDisplayDates(fromDate, toDate),
                 style: AppTextStyles.small.copyWith(
                   color: Colors.white70,
                   fontSize: 12.sp,
@@ -1122,20 +1182,25 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
   }
 
   /// 🔥 ICON BOX
-  Widget _iconBox(IconData icon, {VoidCallback? onTap}) {
+  Widget _iconBox(IconData icon, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
       onTap: onTap,
-
       child: Container(
         padding: EdgeInsets.all(8.w),
-
         decoration: BoxDecoration(
-          color: AppColors.secondary,
-
+          color: active
+              ? const Color(0xFFFF3D6D).withValues(alpha: 0.25)
+              : AppColors.secondary,
           borderRadius: BorderRadius.circular(10.r),
+          border: active
+              ? Border.all(color: const Color(0xFFFF3D6D), width: 1.2)
+              : null,
         ),
-
-        child: Icon(icon, color: Colors.white, size: 18.sp),
+        child: Icon(
+          icon,
+          color: active ? const Color(0xFFFF3D6D) : Colors.white,
+          size: 18.sp,
+        ),
       ),
     );
   }
@@ -1341,26 +1406,154 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
   //   );
   // }
 
-  /// 🔥 USER CARD — with heart icon top-right + index for liked state
+  String _getCountryFlag(String country) {
+    if (country.isEmpty) return "";
+    final c = country.toLowerCase().trim();
+    const map = {
+      "india": "🇮🇳",
+      "pakistan": "🇵🇰",
+      "belgium": "🇧🇪",
+      "austria": "🇦🇹",
+      "afghanistan": "🇦🇫",
+      "australia": "🇦🇺",
+      "united states": "🇺🇸",
+      "usa": "🇺🇸",
+      "united kingdom": "🇬🇧",
+      "uk": "🇬🇧",
+      "canada": "🇨🇦",
+      "germany": "🇩🇪",
+      "france": "🇫🇷",
+      "italy": "🇮🇹",
+      "spain": "🇪🇸",
+      "thailand": "🇹🇭",
+      "albania": "🇦🇱",
+      "andorra": "🇦🇩",
+      "aland islands": "🇦🇽",
+      "china": "🇨🇳",
+      "japan": "🇯🇵",
+      "brazil": "🇧🇷",
+      "russia": "🇷🇺",
+      "mexico": "🇲🇽",
+      "uae": "🇦🇪",
+      "dubai": "🇦🇪",
+      "turkey": "🇹🇷",
+      "netherlands": "🇳🇱",
+      "switzerland": "🇨🇭",
+      "sweden": "🇸🇪",
+    };
+    return map[c] ?? "";
+  }
+
+  String _formatLandingBadge(Map<String, dynamic> user) {
+    final fromDateStr = (user["FromDate"] ?? user["status"] ?? "").toString().trim();
+    if (fromDateStr.isEmpty) return "Upcoming";
+    try {
+      final date = DateTime.parse(fromDateStr);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tripDate = DateTime(date.year, date.month, date.day);
+      final diff = tripDate.difference(today).inDays;
+      if (diff == 0) return "Today";
+      if (diff > 0) return "$diff days";
+      return "${diff.abs()}d landed";
+    } catch (_) {
+      return fromDateStr;
+    }
+  }
+
+  String _formatDisplayDates(String? fromDateStr, String? toDateStr) {
+    if ((fromDateStr == null || fromDateStr.trim().isEmpty) &&
+        (toDateStr == null || toDateStr.trim().isEmpty)) {
+      return "Upcoming Trip";
+    }
+    try {
+      DateTime? from;
+      DateTime? to;
+      if (fromDateStr != null && fromDateStr.trim().isNotEmpty) {
+        from = DateTime.parse(fromDateStr.trim());
+      }
+      if (toDateStr != null && toDateStr.trim().isNotEmpty) {
+        to = DateTime.parse(toDateStr.trim());
+      }
+
+      if (from != null && to != null) {
+        final fDay = DateFormat('d MMM').format(from);
+        final tDay = DateFormat('d MMM, yyyy').format(to);
+        if (from.year != to.year) {
+          final fDayFull = DateFormat('d MMM, yyyy').format(from);
+          return "$fDayFull  ➔  $tDay";
+        }
+        return "$fDay  ➔  $tDay";
+      } else if (from != null) {
+        return DateFormat('d MMM, yyyy').format(from);
+      } else if (to != null) {
+        return DateFormat('d MMM, yyyy').format(to);
+      }
+    } catch (_) {}
+
+    return "${fromDateStr ?? ''} ${toDateStr != null && toDateStr.isNotEmpty ? '➔ $toDateStr' : ''}".trim();
+  }
+
+  String _calculateAgeFromDob(dynamic dobVal, dynamic ageVal) {
+    if (ageVal != null && ageVal.toString().trim().isNotEmpty && ageVal.toString().trim() != "null") {
+      return ageVal.toString().trim();
+    }
+    if (dobVal == null) return "";
+    final String str = dobVal.toString().trim();
+    if (str.isEmpty || str == "null") return "";
+    try {
+      final dob = DateTime.parse(str);
+      final now = DateTime.now();
+      int age = now.year - dob.year;
+      if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+        age--;
+      }
+      return age > 0 ? "$age" : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  /// 🔥 USER CARD — pixel-perfect matching reference design
   Widget _userCard(Map<String, dynamic> user, int index) {
     final bool isLiked = _likedIndexes.contains(index);
 
-    final String name = (user["FullName"] ?? user["name"] ?? user["Name"] ?? "Traveler").toString().trim();
-    final String age = (user["Age"] ?? user["age"] ?? "").toString().trim();
+    final String rawName =
+        (user["FullName"] ?? user["name"] ?? user["Name"] ?? "").toString().trim();
+    final String email = (user["Email"] ?? user["EmailAddress"] ?? user["email"] ?? "").toString().trim();
+    final String name = rawName.isNotEmpty
+        ? rawName
+        : (email.isNotEmpty ? email.split('@').first : "Traveler");
+
+    final String age = _calculateAgeFromDob(user["Dob"], user["Age"] ?? user["age"]);
     final String nameDisplay = age.isNotEmpty ? "$name, $age" : name;
-    final String image = (user["ProfileImage"] ?? user["image"] ?? user["Media"] ?? user["profileImage"] ?? "").toString().trim();
-    final String fromLoc = (user["FromCity"] != null && user["FromCity"].toString().trim().isNotEmpty)
-        ? user["FromCity"].toString().trim()
-        : (user["FromCountry"] ?? user["from"] ?? "").toString().trim();
-    final String toLoc = (user["ToCity"] != null && user["ToCity"].toString().trim().isNotEmpty)
-        ? user["ToCity"].toString().trim()
-        : (user["ToCountry"] ?? user["to"] ?? "").toString().trim();
-    final String routeDisplay = (fromLoc.isNotEmpty || toLoc.isNotEmpty)
-        ? "$fromLoc ➜ $toLoc"
+
+    final String image = (user["ProfileImage"] ??
+            user["image"] ??
+            user["Media"] ??
+            user["profileImage"] ??
+            "")
+        .toString()
+        .trim();
+
+    final String fromCountry = (user["FromCountry"] ?? user["from"] ?? "").toString().trim();
+    final String toCountry = (user["ToCountry"] ?? user["to"] ?? "").toString().trim();
+    final String fromCity = (user["FromCity"] ?? "").toString().trim();
+    final String toCity = (user["ToCity"] ?? "").toString().trim();
+
+    final String fromDisp = fromCountry.isNotEmpty ? fromCountry : fromCity;
+    final String toDisp = toCountry.isNotEmpty ? toCountry : toCity;
+    final String routeDisplay = (fromDisp.isNotEmpty || toDisp.isNotEmpty)
+        ? "$fromDisp ➜ $toDisp"
         : (user["route"] ?? "Upcoming Trip").toString();
+
     final String tag = (user["JourneyType"] ?? user["tag"] ?? user["TravelStyle"] ?? "Travel").toString().trim();
-    final String status = (user["status"] ?? user["FromDate"] ?? "Upcoming").toString().trim();
-    final String flag = (user["flag"] ?? "✈️").toString();
+    final String badgeText = _formatLandingBadge(user);
+
+    String flag = (user["flag"] ?? "").toString().trim();
+    if (flag.isEmpty || flag == "✈️") {
+      flag = _getCountryFlag(toCountry.isNotEmpty ? toCountry : fromCountry);
+    }
 
     return GestureDetector(
       onTap: () {
@@ -1370,80 +1563,92 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
         );
       },
       child: Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(24.r)),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.4),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Stack(
           children: [
+            /// 1. IMAGE BACKGROUND
             Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24.r),
-                child: image.isNotEmpty && image.startsWith("http")
-                    ? Image.network(
-                        image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) {
-                          return Container(
-                            color: const Color(0xFF1B2339),
-                            child: Icon(
-                              Icons.person,
-                              color: Colors.white38,
-                              size: 40.sp,
-                            ),
-                          );
-                        },
-                      )
-                    : Container(
-                        color: const Color(0xFF1B2339),
-                        child: Icon(
-                          Icons.person,
-                          color: Colors.white38,
-                          size: 40.sp,
-                        ),
-                      ),
+              child: AppNetworkImage(
+                imageUrl: image,
+                borderRadius: BorderRadius.circular(20.r),
+                fit: BoxFit.cover,
+                fallbackIcon: Icons.person,
+                backgroundColor: const Color(0xFF161E31),
               ),
             ),
 
+            /// 2. GRADIENT OVERLAY
             Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24.r),
+                  borderRadius: BorderRadius.circular(20.r),
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
+                    stops: const [0.3, 0.65, 1.0],
                     colors: [
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.85),
+                      Colors.black.withValues(alpha: 0.3),
+                      Colors.black.withValues(alpha: 0.92),
                     ],
                   ),
                 ),
               ),
             ),
 
-            /// STATUS BADGE — top left
-            if (status.isNotEmpty)
+            /// 3. STATUS BADGE — TOP LEFT (Green pill with check)
+            if (badgeText.isNotEmpty)
               Positioned(
-                top: 7.h,
-                left: 4.w,
+                top: 8.h,
+                left: 8.w,
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade600,
-                    borderRadius: BorderRadius.circular(30.r),
+                    color: const Color(0xFF00C853),
+                    borderRadius: BorderRadius.circular(20.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle, color: Colors.white, size: 10.sp),
-                      SizedBox(width: 4.w),
-                      Text(status, style: AppTextStyles.cardBadge),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: Colors.white,
+                        size: 11.sp,
+                      ),
+                      SizedBox(width: 3.w),
+                      Text(
+                        badgeText,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10.sp,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
 
-            /// 🔥 HEART ICON — top right
+            /// 4. HEART ICON — TOP RIGHT
             Positioned(
-              top: 10.h,
-              right: 10.w,
+              top: 6.h,
+              right: 6.w,
               child: GestureDetector(
                 onTap: () {
                   setState(() {
@@ -1454,17 +1659,14 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                     }
                   });
                 },
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (child, anim) =>
-                      ScaleTransition(scale: anim, child: child),
+                child: Container(
+                  padding: EdgeInsets.all(4.w),
                   child: Icon(
                     isLiked
                         ? Icons.favorite_rounded
                         : Icons.favorite_border_rounded,
-                    key: ValueKey(isLiked),
-                    color: isLiked ? Colors.red : Colors.white,
-                    size: 24.sp,
+                    color: isLiked ? Colors.redAccent : Colors.white,
+                    size: 22.sp,
                     shadows: const [
                       Shadow(color: Colors.black54, blurRadius: 6),
                     ],
@@ -1473,89 +1675,99 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
               ),
             ),
 
-            /// BOTTOM INFO
+            /// 5. BOTTOM INFO
             Positioned(
               left: 10.w,
               right: 10.w,
-              bottom: 8.h,
+              bottom: 10.h,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  /// NAME + FLAG
+                  /// Name + Age + Flag
                   Row(
                     children: [
-                      Expanded(
+                      Flexible(
                         child: Text(
                           nameDisplay,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.cardName,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5.sp,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                       if (flag.isNotEmpty) ...[
                         SizedBox(width: 4.w),
-                        Text(
-                          flag,
-                          style: TextStyle(fontSize: 14.sp),
-                        ),
+                        Text(flag, style: TextStyle(fontSize: 13.sp)),
                       ],
                     ],
                   ),
 
                   SizedBox(height: 3.h),
 
-                  /// FROM → TO
+                  /// Route (📍 Aland Islands ➜ Albania)
                   Row(
                     children: [
                       Icon(
-                        Icons.location_on_outlined,
+                        Icons.location_on,
                         color: Colors.white70,
-                        size: 10.sp,
+                        size: 11.sp,
                       ),
-                      SizedBox(width: 2.w),
+                      SizedBox(width: 3.w),
                       Expanded(
                         child: Text(
                           routeDisplay,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.cardDistance.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 9.sp,
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontWeight: FontWeight.w500,
+                            fontSize: 9.5.sp,
                           ),
                         ),
                       ),
                     ],
                   ),
 
-                  SizedBox(height: 5.h),
+                  SizedBox(height: 6.h),
 
-                  /// TAG BUTTON
+                  /// Journey Type White Pill Tag (🏷️ Business)
                   if (tag.isNotEmpty)
                     Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: 7.w,
-                        vertical: 3.h,
+                        horizontal: 9.w,
+                        vertical: 4.h,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(30.r),
+                        borderRadius: BorderRadius.circular(20.r),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.local_offer_outlined,
-                            size: 12.sp,
+                            Icons.sell_outlined,
+                            size: 11.sp,
                             color: Colors.black,
                           ),
                           SizedBox(width: 4.w),
                           Text(
                             tag,
-                            style: AppTextStyles.small.copyWith(
+                            style: TextStyle(
                               color: Colors.black,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 10.sp,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10.5.sp,
                             ),
                           ),
                         ],

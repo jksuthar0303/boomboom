@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:get/get_core/src/get_main.dart';
-import 'package:get/get_instance/src/extension_instance.dart';
-import 'package:get/get_state_manager/src/rx_flutter/rx_obx_widget.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../backend/countryapi.dart';
 import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../constant/colors.dart';
+import '../../../controller/filter_controller.dart';
 
 // ─────────────────────────────────────────────
 // DATA
@@ -231,6 +230,7 @@ class FilterPreferencesScreen extends StatefulWidget {
 
 class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
   int selectedTab = 0;
+  final FilterController _filterCtrl = FilterController.instance;
 
   double _minAge = 18;
   double _maxAge = 100;
@@ -240,19 +240,32 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
 
   final Set<String> _selectedGenders = {};
   final Set<String> _selectedInterests = {};
-  // final Set<String> _selectedEthnicities  = {};
   final Set<String> _selectedBodyTypes = {};
   final Set<String> _selectedHeights = {};
-  // final Set<String> _selectedEyeColors    = {};
-  // final Set<String> _selectedSmoking      = {};
   final Set<String> _selectedDrinking = {};
   final Set<String> _selectedWorkout = {};
-  // final Set<String> _selectedLanguages    = {};
-  // final Set<String> _selectedPersonality  = {};
   final Set<String> _selectedRelationship = {};
-  //final Set<String> _selectedShowProfile  = {};
-  // final Set<String> _selectedProfession = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Load current active filter values into screen
+    _minAge = _filterCtrl.minAge.value;
+    _maxAge = _filterCtrl.maxAge.value;
+    _distance = _filterCtrl.maxDistance.value;
+    _selectedNationality = _filterCtrl.selectedNationality.value;
+    _cityCountry = _filterCtrl.cityCountry.value;
+    _selectedGenders.addAll(_filterCtrl.selectedGenders);
+    _selectedRelationship.addAll(_filterCtrl.selectedRelationship);
+    _selectedBodyTypes.addAll(_filterCtrl.selectedBodyTypes);
+    _selectedHeights.addAll(_filterCtrl.selectedHeights);
+    _selectedDrinking.addAll(_filterCtrl.selectedDrinking);
+    _selectedWorkout.addAll(_filterCtrl.selectedWorkout);
+    _selectedInterests.addAll(_filterCtrl.selectedInterests);
+  }
+
   void _clearAll() {
+    _filterCtrl.clearFilters();
     setState(() {
       _minAge = 18;
       _maxAge = 100;
@@ -261,27 +274,54 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
       _selectedNationality = null;
       _selectedGenders.clear();
       _selectedInterests.clear();
-      //_selectedEthnicities.clear();  _selectedBodyTypes.clear();
-      _selectedHeights.clear(); // _selectedEyeColors.clear();
-      // _selectedSmoking.clear();      _selectedDrinking.clear();
-      _selectedWorkout.clear(); // _selectedLanguages.clear();
-      // _selectedPersonality.clear();  _selectedRelationship.clear();
-      //_selectedShowProfile.clear();
-      // _selectedProfession.clear();
+      _selectedHeights.clear();
+      _selectedBodyTypes.clear();
+      _selectedDrinking.clear();
+      _selectedWorkout.clear();
+      _selectedRelationship.clear();
     });
-  }
 
-  void _applyFilters() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Filters Applied!',
+          'Filters Cleared!',
+          style: AppTextStyles.body.copyWith(color: AppColors.white),
+        ),
+        backgroundColor: Colors.grey.shade800,
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _applyFilters() {
+    // Save to FilterController
+    _filterCtrl.minAge.value = _minAge;
+    _filterCtrl.maxAge.value = _maxAge;
+    _filterCtrl.maxDistance.value = _distance;
+    _filterCtrl.selectedNationality.value = _selectedNationality;
+    _filterCtrl.cityCountry.value = _cityCountry;
+    _filterCtrl.selectedGenders.assignAll(_selectedGenders);
+    _filterCtrl.selectedRelationship.assignAll(_selectedRelationship);
+    _filterCtrl.selectedBodyTypes.assignAll(_selectedBodyTypes);
+    _filterCtrl.selectedHeights.assignAll(_selectedHeights);
+    _filterCtrl.selectedDrinking.assignAll(_selectedDrinking);
+    _filterCtrl.selectedWorkout.assignAll(_selectedWorkout);
+    _filterCtrl.selectedInterests.assignAll(_selectedInterests);
+
+    _filterCtrl.notifyFilterApplied();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Filters Applied Successfully!',
           style: AppTextStyles.body.copyWith(color: AppColors.white),
         ),
         backgroundColor: const Color(0xFFE8335A),
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 1),
       ),
     );
+
+    Navigator.pop(context, true);
   }
 
   @override

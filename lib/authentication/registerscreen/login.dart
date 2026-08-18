@@ -1,4 +1,4 @@
-import 'package:boomboom/authentication/registerscreen/updatepassword.dart';
+import 'package:boomboom/authentication/registerscreen/forgot_password_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -168,12 +168,16 @@ class _LoginScreenState extends State<LoginScreen> {
               alignment: Alignment.centerRight,
               child: GestureDetector(
                 onTap: () {
-                  Get.to(() => Updatepassword());
+                  Get.to(
+                    () => ForgotPasswordScreen(initialEmail: email),
+                    transition: Transition.cupertino,
+                    duration: const Duration(milliseconds: 400),
+                  );
                 },
                 child: Text(
                   "Forgot Password ?",
                   style: AppTextStyles.body.copyWith(
-                    color: Colors.white,
+                    color: const Color(0xFF00E5FF),
                     fontSize: AppSize.sp(11),
                     fontWeight: FontWeight.w600,
                   ),

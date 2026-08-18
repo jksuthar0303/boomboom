@@ -8,9 +8,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_navigation/src/extension_navigation.dart';
 import 'package:get/get_navigation/src/routes/transitions_type.dart';
-
 import '../../../authentication/boomboom.dart';
 import '../../../constant/apptextstyle.dart';
+import '../../../controller/filter_controller.dart';
 
 class YourMatchesSection extends StatelessWidget {
   const YourMatchesSection({super.key});
@@ -75,9 +75,7 @@ class YourMatchesSection extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 12.w),
 
         children: [
-          ...data.map(
-            (e) => smallCard(e["name"]!, e["age"]!, e["img"]!, isTablet),
-          ),
+          ...data.map((e) => smallCard(e, isTablet)),
 
           seeAllCard(context, isTablet),
         ],
@@ -85,11 +83,19 @@ class YourMatchesSection extends StatelessWidget {
     );
   }
 
-  /// SMALL CARD
-  Widget smallCard(String name, String age, String image, bool isTablet) {
+  Widget smallCard(Map<String, dynamic> e, bool isTablet) {
+    final name = e["name"]?.toString() ?? "";
+    final age = e["age"]?.toString() ?? "";
+    final image = e["img"]?.toString() ?? "";
     return GestureDetector(
       onTap: () {
-        Get.to(() => BoomProfileScreen(), transition: Transition.rightToLeft);
+        Get.to(
+          () => BoomProfileScreen(
+            userEmail: e["EmailAddress"]?.toString() ?? e["email"]?.toString(),
+            initialUserData: e,
+          ),
+          transition: Transition.rightToLeft,
+        );
       },
 
       child: Container(
@@ -308,33 +314,49 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
             final List<Map<String, dynamic>> mapped = [];
             for (var u in rawList) {
-              final String name = (u["FullName"] ?? "User").toString();
-              final String dob = (u["Dob"] ?? "").toString();
+              final Map<String, dynamic> rawMap = u is Map
+                  ? Map<String, dynamic>.from(u)
+                  : {};
+              final String name =
+                  (rawMap["FullName"] ?? rawMap["name"] ?? "User").toString();
+              final String dob = (rawMap["Dob"] ?? rawMap["dob"] ?? "")
+                  .toString();
               final int age = _calculateAge(dob);
               final bool isOnline =
-                  u["IsOnline"]?.toString().toLowerCase() == "true";
+                  rawMap["IsOnline"]?.toString().toLowerCase() == "true";
               final bool isVerified =
-                  u["IsVerified"]?.toString().toLowerCase() == "true";
-              final String lookingFor = (u["Lookingfor"] ?? "Serious Love")
-                  .toString();
+                  rawMap["IsVerified"]?.toString().toLowerCase() == "true";
+              final String lookingFor =
+                  (rawMap["Lookingfor"] ??
+                          rawMap["lookingFor"] ??
+                          "Serious Love")
+                      .toString();
               final String distance = _calculateDistance(
-                u["Lat"]?.toString(),
-                u["Lon"]?.toString(),
+                rawMap["Lat"]?.toString(),
+                rawMap["Lon"]?.toString(),
               );
-              final String media = (u["Media"] ?? "").toString();
+              final String media =
+                  (rawMap["Media"] ?? rawMap["media"] ?? rawMap["Photo"] ?? "")
+                      .toString();
 
-              mapped.add({
+              final Map<String, dynamic> item = Map<String, dynamic>.from(
+                rawMap,
+              );
+              item.addAll({
                 "name": name,
+                "FullName": name,
                 "age": "$age",
                 "isOnline": isOnline,
                 "isVerified": isVerified,
                 "lookingFor": lookingFor,
                 "distance": distance,
                 "img": media,
-                "country": "India",
+                "Media": media,
+                "country": rawMap["Country"] ?? "India",
                 "liked": false,
-                "raw": u,
+                "raw": rawMap,
               });
+              mapped.add(item);
             }
 
             if (mounted) {
@@ -423,12 +445,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
   Future<void> toggleLike(int index) async {
     final user = filteredUsers[index];
-    final actionEmail = (user["EmailAddress"] ??
-            user["email"] ??
-            user["raw"]?["EmailAddress"] ??
-            user["raw"]?["email"])
-        ?.toString()
-        .trim();
+    final actionEmail =
+        (user["EmailAddress"] ??
+                user["email"] ??
+                user["raw"]?["EmailAddress"] ??
+                user["raw"]?["email"])
+            ?.toString()
+            .trim();
     if (actionEmail == null || actionEmail.isEmpty) return;
 
     final bool nextLiked = !(user["liked"] == true);
@@ -518,49 +541,25 @@ class _MatchesScreenState extends State<MatchesScreen> {
             /// SEARCH BAR
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 12.w),
-              child: Row(
-                children: [
-                  /// SEARCH BAR
-                  Expanded(
-                    child: Container(
-                      height: 48.h,
-                      padding: EdgeInsets.symmetric(horizontal: 12.w),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade900,
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: TextField(
-                        controller: searchController,
-                        onChanged: searchUsers,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          icon: Icon(Icons.search, color: Colors.white70),
-                          hintText: "country, name, age, district",
-                          hintStyle: TextStyle(color: Colors.white54),
-                        ),
-                      ),
-                    ),
+              child: Container(
+                height: 48.h,
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade900,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: TextField(
+                  controller: searchController,
+                  onChanged: searchUsers,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    icon: Icon(Icons.search, color: Colors.white70),
+                    hintText: "country, name, age, district",
+                    hintStyle: TextStyle(color: Colors.white54),
                   ),
-
-                  SizedBox(width: 10.w),
-
-                  /// FILTER BUTTON
-                  GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      width: 48.w,
-                      height: 48.h,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade900,
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: Icon(Icons.tune, color: Colors.white, size: 20.sp),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             SizedBox(height: 15.h),
@@ -574,272 +573,369 @@ class _MatchesScreenState extends State<MatchesScreen> {
                         strokeWidth: 2.5,
                       ),
                     )
-                  : filteredUsers.isEmpty
-                  ? const Center(
-                      child: Text(
-                        "No users found",
-                        style: TextStyle(color: Colors.white60),
-                      ),
-                    )
-                  : GridView.builder(
-                      padding: EdgeInsets.symmetric(horizontal: 6.w),
-                      itemCount: filteredUsers.length,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 6.w,
-                        mainAxisSpacing: 6.h,
-                        childAspectRatio: 0.62,
-                      ),
-                      itemBuilder: (_, index) {
-                        final user = filteredUsers[index];
-                        final String img = (user["img"] ?? "").toString();
-                        final bool hasValidImg =
-                            img.isNotEmpty &&
-                            img.toLowerCase() != "null" &&
-                            (img.startsWith("http") || img.startsWith("https"));
-                        final bool isOnline = user["isOnline"] == true;
-                        final bool isVerified = user["isVerified"] == true;
+                  : Builder(
+                      builder: (context) {
+                        final displayList = FilterController.instance
+                            .applyFilterToUsers(
+                              searchController.text.trim().isEmpty
+                                  ? allUsers
+                                  : allUsers.where((user) {
+                                      final q = searchController.text
+                                          .toLowerCase()
+                                          .trim();
+                                      final name =
+                                          (user["FullName"] ??
+                                                  user["name"] ??
+                                                  "")
+                                              .toString()
+                                              .toLowerCase();
+                                      final lookingFor =
+                                          (user["Lookingfor"] ??
+                                                  user["lookingFor"] ??
+                                                  "")
+                                              .toString()
+                                              .toLowerCase();
+                                      final age = (user["age"] ?? "")
+                                          .toString()
+                                          .toLowerCase();
+                                      final country =
+                                          (user["Country"] ??
+                                                  user["country"] ??
+                                                  "")
+                                              .toString()
+                                              .toLowerCase();
+                                      final city =
+                                          (user["City"] ?? user["city"] ?? "")
+                                              .toString()
+                                              .toLowerCase();
+                                      final district =
+                                          (user["District"] ??
+                                                  user["district"] ??
+                                                  "")
+                                              .toString()
+                                              .toLowerCase();
 
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => BoomProfileScreen(
-                                  userEmail: user["EmailAddress"]?.toString() ??
-                                      user["email"]?.toString(),
-                                  initialUserData: user,
+                                      return name.contains(q) ||
+                                          lookingFor.contains(q) ||
+                                          age.contains(q) ||
+                                          country.contains(q) ||
+                                          city.contains(q) ||
+                                          district.contains(q);
+                                    }).toList(),
+                              userPosition: _currentPosition,
+                            );
+
+                        if (displayList.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.filter_alt_off_rounded,
+                                  color: Colors.white38,
+                                  size: 36.sp,
+                                ),
+                                SizedBox(height: 8.h),
+                                const Text(
+                                  "No users found matching filters",
+                                  style: TextStyle(color: Colors.white60),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return GridView.builder(
+                          padding: EdgeInsets.symmetric(horizontal: 6.w),
+                          itemCount: displayList.length,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 6.w,
+                                mainAxisSpacing: 6.h,
+                                childAspectRatio: 0.62,
+                              ),
+                          itemBuilder: (_, index) {
+                            final user = displayList[index];
+                            final String img = (user["img"] ?? "").toString();
+                            final bool hasValidImg =
+                                img.isNotEmpty &&
+                                img.toLowerCase() != "null" &&
+                                (img.startsWith("http") ||
+                                    img.startsWith("https"));
+                            final bool isOnline = user["isOnline"] == true;
+                            final bool isVerified = user["isVerified"] == true;
+
+                            return GestureDetector(
+                              onTap: () {
+                                final rawMap = (user["raw"] is Map)
+                                    ? Map<String, dynamic>.from(user["raw"])
+                                    : Map<String, dynamic>.from(user);
+                                final email =
+                                    rawMap["EmailAddress"]?.toString() ??
+                                    rawMap["email"]?.toString() ??
+                                    user["EmailAddress"]?.toString() ??
+                                    user["email"]?.toString();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BoomProfileScreen(
+                                      userEmail: email,
+                                      initialUserData: rawMap,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(18.r),
+                                  color: const Color(0xFF151515),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                    width: 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.45,
+                                      ),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(18.r),
+                                  child: Stack(
+                                    children: [
+                                      /// BACKGROUND IMAGE / AVATAR
+                                      Positioned.fill(
+                                        child: hasValidImg
+                                            ? Image.network(
+                                                img,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    _buildNoImageBackground(
+                                                      user["name"],
+                                                    ),
+                                              )
+                                            : _buildNoImageBackground(
+                                                user["name"],
+                                              ),
+                                      ),
+
+                                      /// DARK GRADIENT OVERLAY
+                                      Positioned.fill(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.bottomCenter,
+                                              end: Alignment.topCenter,
+                                              colors: [
+                                                Colors.black.withValues(
+                                                  alpha: 0.95,
+                                                ),
+                                                Colors.black.withValues(
+                                                  alpha: 0.2,
+                                                ),
+                                                Colors.transparent,
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      /// TOP LEFT STATUS
+                                      Positioned(
+                                        top: 10.h,
+                                        left: 10.w,
+                                        child: Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 8.w,
+                                            vertical: 4.h,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.5,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20.r,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 6.w,
+                                                height: 6.w,
+                                                decoration: BoxDecoration(
+                                                  color: isOnline
+                                                      ? const Color(0xFF00E676)
+                                                      : Colors.grey,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              SizedBox(width: 4.w),
+                                              Text(
+                                                isOnline ? "Online" : "Offline",
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 9.sp,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+
+                                      /// TOP RIGHT HEART
+                                      Positioned(
+                                        top: 10.h,
+                                        right: 10.w,
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            toggleLike(index);
+                                          },
+                                          child: Icon(
+                                            user["liked"]
+                                                ? Icons.favorite_rounded
+                                                : Icons.favorite_border_rounded,
+                                            color: user["liked"]
+                                                ? Colors.red
+                                                : Colors.white,
+                                            size: 22.sp,
+                                          ),
+                                        ),
+                                      ),
+
+                                      /// BOTTOM DETAILS
+                                      Positioned(
+                                        left: 8.w,
+                                        right: 8.w,
+                                        bottom: 10.h,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            /// NAME & AGE
+                                            Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    "${user["name"]}, ${user["age"]}",
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      fontSize: 13.sp,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (isVerified) ...[
+                                                  SizedBox(width: 3.w),
+                                                  Icon(
+                                                    Icons.verified_rounded,
+                                                    color: Colors.cyanAccent,
+                                                    size: 13.sp,
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+
+                                            SizedBox(height: 4.h),
+
+                                            /// DISTANCE & LOOKING FOR
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Container(
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal: 6.w,
+                                                    vertical: 2.h,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black
+                                                        .withValues(
+                                                          alpha: 0.45,
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12.r,
+                                                        ),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.location_on,
+                                                        color:
+                                                            Colors.purpleAccent,
+                                                        size: 9.sp,
+                                                      ),
+                                                      SizedBox(width: 2.w),
+                                                      Text(
+                                                        "${user["distance"]}",
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 9.sp,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal: 6.w,
+                                                    vertical: 2.h,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black
+                                                        .withValues(
+                                                          alpha: 0.45,
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12.r,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: Colors.cyanAccent
+                                                          .withValues(
+                                                            alpha: 0.4,
+                                                          ),
+                                                      width: 0.8,
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    "${user["lookingFor"]}",
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: Colors.cyanAccent,
+                                                      fontSize: 8.5.sp,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
                           },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(18.r),
-                              color: const Color(0xFF151515),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08),
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.45),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(18.r),
-                              child: Stack(
-                                children: [
-                                  /// BACKGROUND IMAGE / AVATAR
-                                  Positioned.fill(
-                                    child: hasValidImg
-                                        ? Image.network(
-                                            img,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                                _buildNoImageBackground(
-                                                  user["name"],
-                                                ),
-                                          )
-                                        : _buildNoImageBackground(user["name"]),
-                                  ),
-
-                                  /// DARK GRADIENT OVERLAY
-                                  Positioned.fill(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.bottomCenter,
-                                          end: Alignment.topCenter,
-                                          colors: [
-                                            Colors.black.withValues(
-                                              alpha: 0.95,
-                                            ),
-                                            Colors.black.withValues(alpha: 0.2),
-                                            Colors.transparent,
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                  /// TOP LEFT STATUS
-                                  Positioned(
-                                    top: 10.h,
-                                    left: 10.w,
-                                    child: Container(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 8.w,
-                                        vertical: 4.h,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          20.r,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 6.w,
-                                            height: 6.w,
-                                            decoration: BoxDecoration(
-                                              color: isOnline
-                                                  ? const Color(0xFF00E676)
-                                                  : Colors.grey,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          SizedBox(width: 4.w),
-                                          Text(
-                                            isOnline ? "Online" : "Offline",
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 9.sp,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-
-                                  /// TOP RIGHT HEART
-                                  Positioned(
-                                    top: 10.h,
-                                    right: 10.w,
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        toggleLike(index);
-                                      },
-                                      child: Icon(
-                                        user["liked"]
-                                            ? Icons.favorite_rounded
-                                            : Icons.favorite_border_rounded,
-                                        color: user["liked"]
-                                            ? Colors.red
-                                            : Colors.white,
-                                        size: 22.sp,
-                                      ),
-                                    ),
-                                  ),
-
-                                  /// BOTTOM DETAILS
-                                  Positioned(
-                                    left: 8.w,
-                                    right: 8.w,
-                                    bottom: 10.h,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        /// NAME & AGE
-                                        Row(
-                                          children: [
-                                            Flexible(
-                                              child: Text(
-                                                "${user["name"]}, ${user["age"]}",
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w900,
-                                                  fontSize: 13.sp,
-                                                ),
-                                              ),
-                                            ),
-                                            if (isVerified) ...[
-                                              SizedBox(width: 3.w),
-                                              Icon(
-                                                Icons.verified_rounded,
-                                                color: Colors.cyanAccent,
-                                                size: 13.sp,
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-
-                                        SizedBox(height: 4.h),
-
-                                        /// DISTANCE & LOOKING FOR
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 6.w,
-                                                vertical: 2.h,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withValues(
-                                                  alpha: 0.45,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(12.r),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons.location_on,
-                                                    color: Colors.purpleAccent,
-                                                    size: 9.sp,
-                                                  ),
-                                                  SizedBox(width: 2.w),
-                                                  Text(
-                                                    "${user["distance"]}",
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 9.sp,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 6.w,
-                                                vertical: 2.h,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withValues(
-                                                  alpha: 0.45,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(12.r),
-                                                border: Border.all(
-                                                  color: Colors.cyanAccent
-                                                      .withValues(alpha: 0.4),
-                                                  width: 0.8,
-                                                ),
-                                              ),
-                                              child: Text(
-                                                "${user["lookingFor"]}",
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: Colors.cyanAccent,
-                                                  fontSize: 8.5.sp,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
                         );
                       },
                     ),

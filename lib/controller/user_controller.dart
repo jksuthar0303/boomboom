@@ -5,6 +5,7 @@ import 'package:xml/xml.dart' as xml;
 import '../backend/registerservice.dart';
 import '../backend/secure_storage.dart';
 import '../authentication/welcomscreens.dart';
+import '../authentication/registerscreen/imagesselection.dart';
 import '../widget/snakbar.dart';
 
 import 'auth_controller.dart';
@@ -13,6 +14,8 @@ class UserController extends GetxController {
   final RegisterService _registerService = RegisterService();
 
   final RxBool isLoading = false.obs;
+  final RxString uploadStatus = "Saving profile...".obs;
+  final RxDouble uploadProgress = 0.0.obs;
 
   // Profile Update Fields
   final RxString fullName = "".obs;
@@ -63,6 +66,9 @@ class UserController extends GetxController {
         NeuSnackbar.error("Session expired. Please log in again.");
         return false;
       }
+
+      uploadStatus.value = "Saving profile information...";
+      uploadProgress.value = 0.1;
 
       final response = await _registerService.updateProfile(
         email: email,
@@ -122,11 +128,65 @@ class UserController extends GetxController {
               );
             }
 
-            // 🚀 Trigger complete profile sync from server in the background
+            final newImages = UploadPhotosScreen.getNewSelectedImages();
+            final newVideos = UploadPhotosScreen.getNewSelectedVideos();
+            final int totalFiles = newImages.length + newVideos.length;
+            int fileIndex = 0;
+
+            // 🚀 Upload newly selected photos via MediaInsert
+            for (var file in newImages) {
+              fileIndex++;
+              uploadStatus.value = "Uploading photo $fileIndex of ${newImages.length}...";
+              try {
+                final bytes = await file.readAsBytes();
+                final base64Str = base64Encode(bytes);
+                debugPrint("🔥 [UserController] Uploading photo Base64 via MediaInsert...");
+                final mediaRes = await _registerService.mediaInsert(
+                  email: email,
+                  mediaBase64: base64Str,
+                  type: "image",
+                  onSendProgress: (sent, total) {
+                    if (total > 0 && totalFiles > 0) {
+                      uploadProgress.value = (fileIndex - 1 + (sent / total)) / totalFiles;
+                    }
+                  },
+                );
+                debugPrint("🔥 [UserController MediaInsert Photo Status]: ${mediaRes.statusCode}");
+              } catch (e) {
+                debugPrint("[UserController MediaInsert Photo Error]: $e");
+              }
+            }
+
+            // 🚀 Upload newly selected videos via MediaInsert
+            for (var file in newVideos) {
+              fileIndex++;
+              uploadStatus.value = "Uploading video...";
+              try {
+                final bytes = await file.readAsBytes();
+                final base64Str = base64Encode(bytes);
+                debugPrint("🔥 [UserController] Uploading video Base64 via MediaInsert...");
+                final mediaRes = await _registerService.mediaInsert(
+                  email: email,
+                  mediaBase64: base64Str,
+                  type: "video",
+                  onSendProgress: (sent, total) {
+                    if (total > 0 && totalFiles > 0) {
+                      uploadProgress.value = (fileIndex - 1 + (sent / total)) / totalFiles;
+                    }
+                  },
+                );
+                debugPrint("🔥 [UserController MediaInsert Video Status]: ${mediaRes.statusCode}");
+              } catch (e) {
+                debugPrint("[UserController MediaInsert Video Error]: $e");
+              }
+            }
+
+            // 🚀 Fetch full profile from server and save to local storage immediately
+            uploadStatus.value = "Syncing profile...";
+            uploadProgress.value = 0.95;
             final authCtrl = Get.put(AuthController());
-            authCtrl.fetchAndStoreFullProfile(email: email).catchError((e) {
-              debugPrint("Background profile sync error: $e");
-            });
+            await authCtrl.fetchAndStoreFullProfile(email: email);
+            uploadProgress.value = 1.0;
 
             NeuSnackbar.success("Profile updated successfully!");
             return true;

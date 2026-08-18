@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:xml/xml.dart' as xml;
-
 import '../../../authentication/boomboom.dart';
 import '../../../backend/home_service.dart';
 import '../../../backend/secure_storage.dart';
+import '../../../controller/filter_controller.dart';
 
 // ignore: camel_case_types
 class verifyuser extends StatelessWidget {
@@ -80,7 +80,10 @@ class _ActiveuserState extends State<Activeuser> {
             res.first.innerText,
           );
           if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
-            parsedActive = _mapUserList(jsonResult["Data"], defaultOnline: true);
+            parsedActive = _mapUserList(
+              jsonResult["Data"],
+              defaultOnline: true,
+            );
           }
         }
       }
@@ -126,32 +129,45 @@ class _ActiveuserState extends State<Activeuser> {
   }) {
     final List<Map<String, dynamic>> mapped = [];
     for (var u in rawList) {
-      final String name = (u["FullName"] ?? "User").toString();
-      final String dob = (u["Dob"] ?? "").toString();
+      final Map<String, dynamic> rawMap = u is Map
+          ? Map<String, dynamic>.from(u)
+          : {};
+      final String name = (rawMap["FullName"] ?? rawMap["name"] ?? "User")
+          .toString();
+      final String dob = (rawMap["Dob"] ?? rawMap["dob"] ?? "").toString();
       final int age = _calculateAge(dob);
       final bool isOnline =
-          u["IsOnline"]?.toString().toLowerCase() == "true" || defaultOnline;
+          rawMap["IsOnline"]?.toString().toLowerCase() == "true" ||
+          defaultOnline;
       final bool isVerified =
-          u["IsVerified"]?.toString().toLowerCase() == "true" ||
+          rawMap["IsVerified"]?.toString().toLowerCase() == "true" ||
           defaultVerified;
-      final String lookingFor = (u["Lookingfor"] ?? "Serious Love").toString();
+      final String lookingFor =
+          (rawMap["Lookingfor"] ?? rawMap["lookingFor"] ?? "Serious Love")
+              .toString();
       final String distance = _calculateDistance(
-        u["Lat"]?.toString(),
-        u["Lon"]?.toString(),
+        rawMap["Lat"]?.toString(),
+        rawMap["Lon"]?.toString(),
       );
-      final String media = (u["Media"] ?? "").toString();
+      final String media =
+          (rawMap["Media"] ?? rawMap["media"] ?? rawMap["Photo"] ?? "")
+              .toString();
 
-      mapped.add({
+      final Map<String, dynamic> item = Map<String, dynamic>.from(rawMap);
+      item.addAll({
         "name": name,
+        "FullName": name,
         "age": "$age",
         "isOnline": isOnline,
         "isVerified": isVerified,
         "lookingFor": lookingFor,
         "distance": distance,
         "img": media,
+        "Media": media,
         "liked": false,
-        "raw": u,
+        "raw": rawMap,
       });
+      mapped.add(item);
     }
     return mapped;
   }
@@ -205,12 +221,16 @@ class _ActiveuserState extends State<Activeuser> {
 
   void searchUsers(String value) {
     final list = selectedTab == 0 ? activeUsers : verifiedUsers;
+    final filtered = FilterController.instance.applyFilterToUsers(
+      list,
+      userPosition: _currentPosition,
+    );
     setState(() {
       final search = value.toLowerCase().trim();
       if (search.isEmpty) {
-        filteredUsers = list;
+        filteredUsers = filtered;
       } else {
-        filteredUsers = list.where((user) {
+        filteredUsers = filtered.where((user) {
           final name = user["name"].toString().toLowerCase();
           final lookingFor = user["lookingFor"].toString().toLowerCase();
           final age = user["age"].toString().toLowerCase();
@@ -230,8 +250,9 @@ class _ActiveuserState extends State<Activeuser> {
   }
 
   Widget _buildNoImageBackground(String name) {
-    final String initial =
-        name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : "U";
+    final String initial = name.trim().isNotEmpty
+        ? name.trim()[0].toUpperCase()
+        : "U";
 
     return Container(
       width: double.infinity,
@@ -439,292 +460,277 @@ class _ActiveuserState extends State<Activeuser> {
                       ),
                     )
                   : filteredUsers.isEmpty
-                      ? Center(
-                          child: Text(
-                            selectedTab == 0
-                                ? "No active users found"
-                                : "No verified users found",
-                            style: const TextStyle(color: Colors.white60),
-                          ),
-                        )
-                      : GridView.builder(
-                          padding: EdgeInsets.symmetric(horizontal: 6.w),
-                          itemCount: filteredUsers.length,
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 6.w,
-                            mainAxisSpacing: 6.h,
-                            childAspectRatio: 0.62,
-                          ),
-                          itemBuilder: (_, index) {
-                            final user = filteredUsers[index];
-                            final String img = (user["img"] ?? "").toString();
-                            final bool hasValidImg = img.isNotEmpty &&
-                                img.toLowerCase() != "null" &&
-                                (img.startsWith("http") ||
-                                    img.startsWith("https"));
-                            final bool isOnline = user["isOnline"] == true;
-                            final bool isVerified = user["isVerified"] == true;
+                  ? Center(
+                      child: Text(
+                        selectedTab == 0
+                            ? "No active users found"
+                            : "No verified users found",
+                        style: const TextStyle(color: Colors.white60),
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: EdgeInsets.symmetric(horizontal: 6.w),
+                      itemCount: filteredUsers.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 6.w,
+                        mainAxisSpacing: 6.h,
+                        childAspectRatio: 0.62,
+                      ),
+                      itemBuilder: (_, index) {
+                        final user = filteredUsers[index];
+                        final String img = (user["img"] ?? "").toString();
+                        final bool hasValidImg =
+                            img.isNotEmpty &&
+                            img.toLowerCase() != "null" &&
+                            (img.startsWith("http") || img.startsWith("https"));
+                        final bool isOnline = user["isOnline"] == true;
+                        final bool isVerified = user["isVerified"] == true;
 
-                            return GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => BoomProfileScreen(
-                                      userEmail: user["EmailAddress"]
-                                              ?.toString() ??
-                                          user["email"]?.toString(),
-                                      initialUserData: user,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(18.r),
-                                  color: const Color(0xFF151515),
-                                  border: Border.all(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.08),
-                                    width: 1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.45),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(18.r),
-                                  child: Stack(
-                                    children: [
-                                      /// BACKGROUND IMAGE / AVATAR
-                                      Positioned.fill(
-                                        child: hasValidImg
-                                            ? Image.network(
-                                                img,
-                                                fit: BoxFit.cover,
-                                                errorBuilder:
-                                                    (_, __, ___) =>
-                                                        _buildNoImageBackground(
-                                                  user["name"],
-                                                ),
-                                              )
-                                            : _buildNoImageBackground(
-                                                user["name"],
-                                              ),
-                                      ),
-
-                                      /// DARK GRADIENT OVERLAY
-                                      Positioned.fill(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.bottomCenter,
-                                              end: Alignment.topCenter,
-                                              colors: [
-                                                Colors.black
-                                                    .withValues(alpha: 0.95),
-                                                Colors.black
-                                                    .withValues(alpha: 0.2),
-                                                Colors.transparent,
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
-                                      /// TOP LEFT STATUS
-                                      Positioned(
-                                        top: 10.h,
-                                        left: 10.w,
-                                        child: Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 8.w,
-                                            vertical: 4.h,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black
-                                                .withValues(alpha: 0.5),
-                                            borderRadius:
-                                                BorderRadius.circular(20.r),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Container(
-                                                width: 6.w,
-                                                height: 6.w,
-                                                decoration: BoxDecoration(
-                                                  color: isOnline
-                                                      ? const Color(0xFF00E676)
-                                                      : Colors.grey,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                              SizedBox(width: 4.w),
-                                              Text(
-                                                isOnline ? "Online" : "Offline",
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 9.sp,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-
-                                      /// TOP RIGHT HEART
-                                      Positioned(
-                                        top: 10.h,
-                                        right: 10.w,
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            toggleLike(index);
-                                          },
-                                          child: Icon(
-                                            user["liked"]
-                                                ? Icons.favorite_rounded
-                                                : Icons
-                                                    .favorite_border_rounded,
-                                            color: user["liked"]
-                                                ? Colors.red
-                                                : Colors.white,
-                                            size: 22.sp,
-                                          ),
-                                        ),
-                                      ),
-
-                                      /// BOTTOM DETAILS
-                                      Positioned(
-                                        left: 8.w,
-                                        right: 8.w,
-                                        bottom: 10.h,
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            /// NAME & AGE
-                                            Row(
-                                              children: [
-                                                Flexible(
-                                                  child: Text(
-                                                    "${user["name"]}, ${user["age"]}",
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                      fontSize: 13.sp,
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (isVerified) ...[
-                                                  SizedBox(width: 3.w),
-                                                  Icon(
-                                                    Icons.verified_rounded,
-                                                    color: Colors.cyanAccent,
-                                                    size: 13.sp,
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-
-                                            SizedBox(height: 4.h),
-
-                                            /// DISTANCE & LOOKING FOR
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Container(
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 6.w,
-                                                    vertical: 2.h,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.black
-                                                        .withValues(
-                                                            alpha: 0.45),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            12.r),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.location_on,
-                                                        color: Colors
-                                                            .purpleAccent,
-                                                        size: 9.sp,
-                                                      ),
-                                                      SizedBox(width: 2.w),
-                                                      Text(
-                                                        "${user["distance"]}",
-                                                        style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 9.sp,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Container(
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 6.w,
-                                                    vertical: 2.h,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.black
-                                                        .withValues(
-                                                            alpha: 0.45),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            12.r),
-                                                    border: Border.all(
-                                                      color: Colors.cyanAccent
-                                                          .withValues(
-                                                              alpha: 0.4),
-                                                      width: 0.8,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    "${user["lookingFor"]}",
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      color: Colors.cyanAccent,
-                                                      fontSize: 8.5.sp,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BoomProfileScreen(
+                                  userEmail:
+                                      user["EmailAddress"]?.toString() ??
+                                      user["email"]?.toString(),
+                                  initialUserData: user,
                                 ),
                               ),
                             );
                           },
-                        ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18.r),
+                              color: const Color(0xFF151515),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18.r),
+                              child: Stack(
+                                children: [
+                                  /// BACKGROUND IMAGE / AVATAR
+                                  Positioned.fill(
+                                    child: hasValidImg
+                                        ? Image.network(
+                                            img,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                _buildNoImageBackground(
+                                                  user["name"],
+                                                ),
+                                          )
+                                        : _buildNoImageBackground(user["name"]),
+                                  ),
+
+                                  /// DARK GRADIENT OVERLAY
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.bottomCenter,
+                                          end: Alignment.topCenter,
+                                          colors: [
+                                            Colors.black.withValues(
+                                              alpha: 0.95,
+                                            ),
+                                            Colors.black.withValues(alpha: 0.2),
+                                            Colors.transparent,
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  /// TOP LEFT STATUS
+                                  Positioned(
+                                    top: 10.h,
+                                    left: 10.w,
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 8.w,
+                                        vertical: 4.h,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          20.r,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 6.w,
+                                            height: 6.w,
+                                            decoration: BoxDecoration(
+                                              color: isOnline
+                                                  ? const Color(0xFF00E676)
+                                                  : Colors.grey,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          SizedBox(width: 4.w),
+                                          Text(
+                                            isOnline ? "Online" : "Offline",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 9.sp,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  /// TOP RIGHT HEART
+                                  Positioned(
+                                    top: 10.h,
+                                    right: 10.w,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        toggleLike(index);
+                                      },
+                                      child: Icon(
+                                        user["liked"]
+                                            ? Icons.favorite_rounded
+                                            : Icons.favorite_border_rounded,
+                                        color: user["liked"]
+                                            ? Colors.red
+                                            : Colors.white,
+                                        size: 22.sp,
+                                      ),
+                                    ),
+                                  ),
+
+                                  /// BOTTOM DETAILS
+                                  Positioned(
+                                    left: 8.w,
+                                    right: 8.w,
+                                    bottom: 10.h,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        /// NAME & AGE
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                "${user["name"]}, ${user["age"]}",
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 13.sp,
+                                                ),
+                                              ),
+                                            ),
+                                            if (isVerified) ...[
+                                              SizedBox(width: 3.w),
+                                              Icon(
+                                                Icons.verified_rounded,
+                                                color: Colors.cyanAccent,
+                                                size: 13.sp,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+
+                                        SizedBox(height: 4.h),
+
+                                        /// DISTANCE & LOOKING FOR
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 6.w,
+                                                vertical: 2.h,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.45,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12.r),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.location_on,
+                                                    color: Colors.purpleAccent,
+                                                    size: 9.sp,
+                                                  ),
+                                                  SizedBox(width: 2.w),
+                                                  Text(
+                                                    "${user["distance"]}",
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 9.sp,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 6.w,
+                                                vertical: 2.h,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.45,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12.r),
+                                                border: Border.all(
+                                                  color: Colors.cyanAccent
+                                                      .withValues(alpha: 0.4),
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                "${user["lookingFor"]}",
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: Colors.cyanAccent,
+                                                  fontSize: 8.5.sp,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

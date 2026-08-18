@@ -45,54 +45,45 @@ class _MainScreenState extends State<MainScreen> {
       body: Stack(
         children: [
           Positioned.fill(child: pages[index]),
-          // Positioned(
-          //   bottom: 1.h,
-          //   left: 12.w,
-          //   right: 12.w,
-          //   child: _customNavBar(),
-          // ),
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
-            child: _customNavBar(),
+            child: _customNavBar(context),
           ),
         ],
       ),
     );
   }
 
-  Widget _customNavBar() {
-    return Container(
+  Widget _customNavBar(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
-      padding: EdgeInsets.symmetric(vertical: 10.h),
+    return Container(
+      padding: EdgeInsets.only(
+        top: 12.h,
+        bottom: bottomInset > 0 ? bottomInset + 8.h : 20.h,
+      ),
       decoration: BoxDecoration(
-        color: AppColors.secondary,
-        // borderRadius: BorderRadius.circular(30),
+        color: const Color(0xFF141420),
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(30.r),
-          topRight: Radius.circular(30.r),
+          topLeft: Radius.circular(28.r),
+          topRight: Radius.circular(28.r),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.6),
-            blurRadius: 20,
-            offset: const Offset(5, 5),
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withValues(alpha: 0.06),
+            width: 1,
           ),
-          const BoxShadow(
-            color: Colors.white10,
-            blurRadius: 10,
-            offset: Offset(-5, -5),
-          ),
-        ],
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          nav(Icons.home, 0, AppColors.navHome),
-          nav(Icons.location_on, 1, AppColors.navLocation),
+          nav(Icons.home_rounded, 0, AppColors.navHome),
+          nav(Icons.location_on_rounded, 1, AppColors.navLocation),
           navImage("assets/logos.png", 2, AppColors.navBoomBoom),
-          nav(Icons.favorite, 3, AppColors.navFavourite),
+          nav(Icons.favorite_rounded, 3, AppColors.navFavourite),
           navWithBadge(
             Icons.forum_rounded,
             4,

@@ -47,8 +47,10 @@ class AuthController extends GetxController {
                   for (var item in mediaList) {
                     final url = item["Media"] ?? item["MediaName"];
                     final type = item["Type"] ?? "image";
+                    final id = item["Id"] ?? item["id"] ?? item["MediaId"];
                     if (url != null && url.toString().isNotEmpty) {
                       mediaItems.add({
+                        "Id": id?.toString(),
                         "Url": url.toString(),
                         "Type": type.toString(),
                       });

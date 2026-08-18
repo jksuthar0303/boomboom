@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../../../backend/countryapi.dart';
+import '../../../controller/travel_filter_controller.dart';
 
 class TravelFilterScreen extends StatefulWidget {
   const TravelFilterScreen({super.key});
@@ -18,8 +19,8 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
 
   String selectedField = "";
 
-  /// 🔥 SORT
-  String selectedSort = "Newest First";
+  /// 🔥 SORT / DATE CATEGORY
+  String selectedSort = "All date ";
 
   // ignore: non_constant_identifier_names
   final List<String> Datecategory = [
@@ -60,11 +61,23 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
   @override
   void initState() {
     super.initState();
-
     controller.fetchCountries();
+    _loadFromController();
+  }
 
-    startDate = DateTime.now();
-    endDate = DateTime.now();
+  void _loadFromController() {
+    final tCtrl = TravelFilterController.instance;
+    selectedSort = tCtrl.selectedDateCategory.value;
+    controller.selectedCountry.value = tCtrl.selectedCountry.value ?? "";
+    controller.fromCountry.value = tCtrl.fromCountry.value ?? "";
+    controller.fromCity.value = tCtrl.fromCity.value ?? "";
+    controller.destinationCountry.value = tCtrl.destinationCountry.value ?? "";
+    controller.destinationCity.value = tCtrl.destinationCity.value ?? "";
+    selectedJourney.addAll(tCtrl.selectedJourneyTypes);
+    selectedCategory.addAll(tCtrl.selectedCategories);
+    selectedGender.addAll(tCtrl.selectedGenders);
+    startDate = tCtrl.startDate.value ?? DateTime.now();
+    endDate = tCtrl.endDate.value ?? DateTime.now();
   }
 
   @override
@@ -166,7 +179,7 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
 
                     Obx(
                       () => _dropdown(
-                        controller.fromCountry.value,
+                        controller.selectedCountry.value,
                         "Nationality",
                         Icons.flag,
                       ),
@@ -495,13 +508,22 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
+                              final tCtrl = TravelFilterController.instance;
+                              tCtrl.clearFilters();
                               setState(() {
                                 selectedJourney.clear();
                                 selectedCategory.clear();
                                 selectedGender.clear();
-
-                                selectedSort = "Newest First";
+                                selectedSort = "All date ";
+                                controller.selectedCountry.value = "";
+                                controller.fromCountry.value = "";
+                                controller.fromCity.value = "";
+                                controller.destinationCountry.value = "";
+                                controller.destinationCity.value = "";
+                                startDate = DateTime.now();
+                                endDate = DateTime.now();
                               });
+                              Navigator.pop(context, true);
                             },
 
                             child: Container(
@@ -532,7 +554,37 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
 
                         Expanded(
                           child: GestureDetector(
-                            onTap: () {},
+                            onTap: () {
+                              final tCtrl = TravelFilterController.instance;
+                              tCtrl.selectedDateCategory.value = selectedSort;
+                              tCtrl.selectedCountry.value =
+                                  controller.selectedCountry.value.trim().isEmpty
+                                      ? null
+                                      : controller.selectedCountry.value.trim();
+                              tCtrl.fromCountry.value =
+                                  controller.fromCountry.value.trim().isEmpty
+                                      ? null
+                                      : controller.fromCountry.value.trim();
+                              tCtrl.fromCity.value =
+                                  controller.fromCity.value.trim().isEmpty
+                                      ? null
+                                      : controller.fromCity.value.trim();
+                              tCtrl.destinationCountry.value =
+                                  controller.destinationCountry.value.trim().isEmpty
+                                      ? null
+                                      : controller.destinationCountry.value.trim();
+                              tCtrl.destinationCity.value =
+                                  controller.destinationCity.value.trim().isEmpty
+                                      ? null
+                                      : controller.destinationCity.value.trim();
+                              tCtrl.selectedJourneyTypes.assignAll(selectedJourney);
+                              tCtrl.selectedCategories.assignAll(selectedCategory);
+                              tCtrl.selectedGenders.assignAll(selectedGender);
+                              tCtrl.startDate.value = startDate;
+                              tCtrl.endDate.value = endDate;
+                              tCtrl.notifyFilterApplied();
+                              Navigator.pop(context, true);
+                            },
 
                             child: Container(
                               height: isTablet ? 62.h : 56.h,
@@ -626,9 +678,44 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
   Widget _dropdown(String selectedValue, String title, IconData icon) {
     return GestureDetector(
       onTap: () {
+        if (title == "From City" && controller.fromCountry.value.trim().isEmpty) {
+          Get.snackbar(
+            "Select Country",
+            "Please select From Country first",
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: const Color(0xFF22222E),
+            colorText: Colors.white,
+            margin: EdgeInsets.all(16.w),
+            borderRadius: 12.r,
+          );
+          return;
+        }
+        if (title == "Destination City" &&
+            controller.destinationCountry.value.trim().isEmpty) {
+          Get.snackbar(
+            "Select Country",
+            "Please select Destination Country first",
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: const Color(0xFF22222E),
+            colorText: Colors.white,
+            margin: EdgeInsets.all(16.w),
+            borderRadius: 12.r,
+          );
+          return;
+        }
+
         selectedField = title;
 
-        _openBottomSheet();
+        if (title == "From City" || title == "Destination City") {
+          final country = title == "From City"
+              ? controller.fromCountry.value
+              : controller.destinationCountry.value;
+          controller.fetchCities(country);
+          _openCityBottomSheet(title, country);
+        } else {
+          controller.filterCountries("");
+          _openCountryBottomSheet(title);
+        }
       },
 
       child: Container(
@@ -713,10 +800,7 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
   }
 
   /// 🔥 COUNTRY BOTTOM SHEET
-  /// 🔥 COUNTRY BOTTOM SHEET
-  /// 🔥 COUNTRY BOTTOM SHEET
-  /// 🔥 COUNTRY BOTTOM SHEET
-  void _openBottomSheet() {
+  void _openCountryBottomSheet(String title) {
     Get.bottomSheet(
       Container(
         height: 500.h,
@@ -766,7 +850,18 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
               ),
             ),
 
-            SizedBox(height: 22.h),
+            SizedBox(height: 16.h),
+
+            Text(
+              "Select $title",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+
+            SizedBox(height: 14.h),
 
             /// 🔥 SEARCH FIELD
             Container(
@@ -810,12 +905,12 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
                     size: 22.sp,
                   ),
 
-                  contentPadding: EdgeInsets.symmetric(vertical: 18.h),
+                  contentPadding: EdgeInsets.symmetric(vertical: 14.h),
                 ),
               ),
             ),
 
-            SizedBox(height: 20.h),
+            SizedBox(height: 16.h),
 
             /// 🔥 COUNTRY LIST
             Expanded(
@@ -825,25 +920,23 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
 
                   itemCount: controller.filteredCountries.length,
 
-                  separatorBuilder: (_, _) => SizedBox(height: 12.h),
+                  separatorBuilder: (_, _) => SizedBox(height: 10.h),
 
                   itemBuilder: (_, i) {
                     final country = controller.filteredCountries[i];
 
                     return InkWell(
-                      borderRadius: BorderRadius.circular(20.r),
+                      borderRadius: BorderRadius.circular(16.r),
 
                       onTap: () {
-                        if (selectedField == "Nationality") {
+                        if (title == "Nationality") {
+                          controller.selectedCountry.value = country["name"];
+                        } else if (title == "From Country") {
                           controller.fromCountry.value = country["name"];
-                        } else if (selectedField == "From Country") {
-                          controller.fromCountry.value = country["name"];
-                        } else if (selectedField == "From City") {
-                          controller.fromCity.value = country["name"];
-                        } else if (selectedField == "Destination Country") {
+                          controller.fromCity.value = "";
+                        } else if (title == "Destination Country") {
                           controller.destinationCountry.value = country["name"];
-                        } else if (selectedField == "Destination City") {
-                          controller.destinationCity.value = country["name"];
+                          controller.destinationCity.value = "";
                         }
 
                         Get.back();
@@ -852,26 +945,17 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
                       child: Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 14.w,
-                          vertical: 14.h,
+                          vertical: 12.h,
                         ),
 
                         decoration: BoxDecoration(
-                          /// 🔥 CARD SHINE COLOR
                           color: const Color(0xFF4A5065),
 
-                          borderRadius: BorderRadius.circular(20.r),
+                          borderRadius: BorderRadius.circular(16.r),
 
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.06),
                           ),
-
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
                         ),
 
                         child: Row(
@@ -884,8 +968,8 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
                                   ? Image.network(
                                       country["flag"],
 
-                                      width: 36.w,
-                                      height: 24.h,
+                                      width: 34.w,
+                                      height: 22.h,
 
                                       fit: BoxFit.cover,
                                     )
@@ -901,7 +985,7 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
 
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 15.sp,
+                                  fontSize: 14.sp,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -910,7 +994,7 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
                             Icon(
                               Icons.arrow_forward_ios_rounded,
                               color: Colors.white38,
-                              size: 16.sp,
+                              size: 14.sp,
                             ),
                           ],
                         ),
@@ -924,12 +1008,241 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
         ),
       ),
 
-      /// 🔥 IMPORTANT
       backgroundColor: Colors.transparent,
-
-      /// 🔥 DIM BACKGROUND
       barrierColor: Colors.black.withValues(alpha: 0.55),
+      isScrollControlled: true,
+    );
+  }
 
+  /// 🔥 CITY BOTTOM SHEET
+  void _openCityBottomSheet(String title, String countryName) {
+    Get.bottomSheet(
+      Container(
+        height: 500.h,
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF40465A), Color(0xFF313546), Color(0xFF262A36)],
+          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34.r)),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.60),
+              blurRadius: 45,
+              spreadRadius: 10,
+              offset: const Offset(0, -12),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            /// TOP HANDLE
+            Container(
+              width: 65.w,
+              height: 6.h,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Colors.white70, Colors.white24],
+                ),
+                borderRadius: BorderRadius.circular(30.r),
+              ),
+            ),
+
+            SizedBox(height: 16.h),
+
+            Text(
+              "Cities in $countryName",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+
+            SizedBox(height: 14.h),
+
+            /// SEARCH FIELD
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF4A5065),
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: TextField(
+                onChanged: (value) {
+                  controller.filterCities(value);
+                },
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w500,
+                ),
+                decoration: InputDecoration(
+                  hintText: "Search city or enter custom...",
+                  hintStyle: TextStyle(color: Colors.white54, fontSize: 14.sp),
+                  border: InputBorder.none,
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.white60,
+                    size: 22.sp,
+                  ),
+                  contentPadding: EdgeInsets.symmetric(vertical: 14.h),
+                ),
+              ),
+            ),
+
+            SizedBox(height: 16.h),
+
+            /// CITY LIST
+            Expanded(
+              child: Obx(() {
+                if (controller.isLoadingCities.value) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                }
+
+                final hasTyped =
+                    controller.searchCityText.value.trim().isNotEmpty;
+                final customQuery = controller.searchCityText.value.trim();
+                final citiesList = controller.filteredCities;
+
+                if (citiesList.isEmpty && !hasTyped) {
+                  return Center(
+                    child: Text(
+                      "No cities found. Type above to enter custom city.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white54, fontSize: 13.sp),
+                    ),
+                  );
+                }
+
+                return ListView(
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    // Custom user typed option
+                    if (hasTyped && !citiesList.contains(customQuery)) ...[
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16.r),
+                        onTap: () {
+                          if (title == "From City") {
+                            controller.fromCity.value = customQuery;
+                          } else if (title == "Destination City") {
+                            controller.destinationCity.value = customQuery;
+                          }
+                          Get.back();
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14.w,
+                            vertical: 12.h,
+                          ),
+                          margin: EdgeInsets.only(bottom: 10.h),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF3D6D).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(16.r),
+                            border: Border.all(
+                              color: const Color(0xFFFF3D6D).withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.add_location_alt_rounded,
+                                color: Color(0xFFFF3D6D),
+                              ),
+                              SizedBox(width: 12.w),
+                              Expanded(
+                                child: Text(
+                                  "Use \"$customQuery\"",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    ...citiesList.map((cityName) {
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 10.h),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16.r),
+                          onTap: () {
+                            if (title == "From City") {
+                              controller.fromCity.value = cityName.toString();
+                            } else if (title == "Destination City") {
+                              controller.destinationCity.value = cityName.toString();
+                            }
+                            Get.back();
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 14.w,
+                              vertical: 12.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4A5065),
+                              borderRadius: BorderRadius.circular(16.r),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.06),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_city_rounded,
+                                  color: Colors.white54,
+                                ),
+                                SizedBox(width: 14.w),
+                                Expanded(
+                                  child: Text(
+                                    cityName.toString(),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  color: Colors.white38,
+                                  size: 14.sp,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       isScrollControlled: true,
     );
   }

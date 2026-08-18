@@ -11,6 +11,7 @@ import '../../../backend/secure_storage.dart';
 import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../constant/colors.dart';
+import '../../../controller/filter_controller.dart';
 
 class FullCardScreen extends StatefulWidget {
   const FullCardScreen({super.key});
@@ -20,6 +21,7 @@ class FullCardScreen extends StatefulWidget {
 }
 
 class _FullCardScreenState extends State<FullCardScreen> {
+  final FilterController _filterCtrl = FilterController.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _users = [];
   Position? _currentPosition;
@@ -135,37 +137,59 @@ class _FullCardScreenState extends State<FullCardScreen> {
       return _buildLoadingShimmer();
     }
 
-    if (_users.isEmpty) {
-      return Center(
-        child: Text(
-          "No new users found",
-          style: AppTextStyles.body.copyWith(color: AppColors.grey),
-        ),
+    return Obx(() {
+      // Trigger on filter change
+      // ignore: unused_local_variable
+      final version = _filterCtrl.filterVersion.value;
+      final displayUsers = _filterCtrl.applyFilterToUsers(
+        _users,
+        userPosition: _currentPosition,
       );
-    }
 
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      itemCount: _users.length,
-      padding: EdgeInsets.symmetric(horizontal: AppSize.w(10)),
-      itemBuilder: (_, index) {
-        final user = _users[index];
-
-        return GestureDetector(
-          onTap: () {
-            Get.to(
-              () => BoomProfileScreen(
-                userEmail: user["EmailAddress"]?.toString() ??
-                    user["email"]?.toString(),
-                initialUserData: user,
+      if (displayUsers.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.filter_alt_off_rounded,
+                color: AppColors.grey,
+                size: 36.sp,
               ),
-              transition: Transition.rightToLeft,
-            );
-          },
-          child: _card(user, index),
+              SizedBox(height: 8.h),
+              Text(
+                "No profiles match your filter",
+                style: AppTextStyles.body.copyWith(color: AppColors.grey),
+              ),
+            ],
+          ),
         );
-      },
-    );
+      }
+
+      return ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: displayUsers.length,
+        padding: EdgeInsets.symmetric(horizontal: AppSize.w(10)),
+        itemBuilder: (_, index) {
+          final user = displayUsers[index];
+
+          return GestureDetector(
+            onTap: () {
+              Get.to(
+                () => BoomProfileScreen(
+                  userEmail:
+                      user["EmailAddress"]?.toString() ??
+                      user["email"]?.toString(),
+                  initialUserData: user,
+                ),
+                transition: Transition.rightToLeft,
+              );
+            },
+            child: _card(user, index),
+          );
+        },
+      );
+    });
   }
 
   Widget _buildLoadingShimmer() {
@@ -196,19 +220,16 @@ class _FullCardScreenState extends State<FullCardScreen> {
 
   /// 🎨 Card background when user has no media uploaded yet
   Widget _buildNoImageBackground(String fullName) {
-    final String initial =
-        fullName.trim().isNotEmpty ? fullName.trim()[0].toUpperCase() : "U";
+    final String initial = fullName.trim().isNotEmpty
+        ? fullName.trim()[0].toUpperCase()
+        : "U";
 
     return Container(
       width: double.infinity,
       height: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFF28133E),
-            Color(0xFF1B1B2F),
-            Color(0xFF110E1D),
-          ],
+          colors: [Color(0xFF28133E), Color(0xFF1B1B2F), Color(0xFF110E1D)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -265,19 +286,18 @@ class _FullCardScreenState extends State<FullCardScreen> {
   Widget _card(Map<String, dynamic> user, int index) {
     final String fullName = (user["FullName"] ?? "User").toString();
     final int age = _calculateAge(user["Dob"]?.toString());
-    final bool isOnline =
-        user["IsOnline"]?.toString().toLowerCase() == "true";
+    final bool isOnline = user["IsOnline"]?.toString().toLowerCase() == "true";
     final bool isVerified =
         user["IsVerified"]?.toString().toLowerCase() == "true";
-    final String lookingFor =
-        (user["Lookingfor"] ?? "Serious Love").toString();
+    final String lookingFor = (user["Lookingfor"] ?? "Serious Love").toString();
     final String distance = _calculateDistance(
       user["Lat"]?.toString(),
       user["Lon"]?.toString(),
     );
 
     final String? mediaStr = user["Media"]?.toString();
-    final bool hasValidImage = mediaStr != null &&
+    final bool hasValidImage =
+        mediaStr != null &&
         mediaStr.isNotEmpty &&
         mediaStr.toLowerCase() != "null" &&
         (mediaStr.startsWith("http") || mediaStr.startsWith("https"));
@@ -294,10 +314,7 @@ class _FullCardScreenState extends State<FullCardScreen> {
           width: 1,
         ),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.8),
-            blurRadius: 10,
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 10),
         ],
       ),
       child: ClipRRect(
@@ -434,10 +451,10 @@ class _FullCardScreenState extends State<FullCardScreen> {
                       final String userKey =
                           (user["id"] ?? user["EmailAddress"] ?? index)
                               .toString();
-                      final String? actionEmail = (user["EmailAddress"] ??
-                              user["email"])
-                          ?.toString()
-                          .trim();
+                      final String? actionEmail =
+                          (user["EmailAddress"] ?? user["email"])
+                              ?.toString()
+                              .trim();
                       final bool nextLiked = !_likedUserIds.contains(userKey);
                       setState(() {
                         if (!nextLiked) {
@@ -482,31 +499,33 @@ class _FullCardScreenState extends State<FullCardScreen> {
                       padding: EdgeInsets.all(8.w),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _likedUserIds.contains(
-                                  (user["id"] ?? user["EmailAddress"] ?? index)
-                                      .toString(),
-                                )
+                        color:
+                            _likedUserIds.contains(
+                              (user["id"] ?? user["EmailAddress"] ?? index)
+                                  .toString(),
+                            )
                             ? const Color(0xFFFF5E62).withValues(alpha: 0.35)
                             : Colors.black.withValues(alpha: 0.45),
                         border: Border.all(
-                          color: _likedUserIds.contains(
-                                    (user["id"] ??
-                                            user["EmailAddress"] ??
-                                            index)
-                                        .toString(),
-                                  )
+                          color:
+                              _likedUserIds.contains(
+                                (user["id"] ?? user["EmailAddress"] ?? index)
+                                    .toString(),
+                              )
                               ? const Color(0xFFFF5E62)
                               : Colors.white24,
                           width: 1.2,
                         ),
-                        boxShadow: _likedUserIds.contains(
-                                  (user["id"] ?? user["EmailAddress"] ?? index)
-                                      .toString(),
-                                )
+                        boxShadow:
+                            _likedUserIds.contains(
+                              (user["id"] ?? user["EmailAddress"] ?? index)
+                                  .toString(),
+                            )
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFFFF5E62)
-                                      .withValues(alpha: 0.45),
+                                  color: const Color(
+                                    0xFFFF5E62,
+                                  ).withValues(alpha: 0.45),
                                   blurRadius: 8,
                                   spreadRadius: 1,
                                 ),
@@ -515,15 +534,16 @@ class _FullCardScreenState extends State<FullCardScreen> {
                       ),
                       child: Icon(
                         _likedUserIds.contains(
-                                  (user["id"] ?? user["EmailAddress"] ?? index)
-                                      .toString(),
-                                )
+                              (user["id"] ?? user["EmailAddress"] ?? index)
+                                  .toString(),
+                            )
                             ? Icons.favorite_rounded
                             : Icons.favorite_border_rounded,
-                        color: _likedUserIds.contains(
-                                  (user["id"] ?? user["EmailAddress"] ?? index)
-                                      .toString(),
-                                )
+                        color:
+                            _likedUserIds.contains(
+                              (user["id"] ?? user["EmailAddress"] ?? index)
+                                  .toString(),
+                            )
                             ? const Color(0xFFFF5E62)
                             : Colors.white,
                         size: 20.sp,

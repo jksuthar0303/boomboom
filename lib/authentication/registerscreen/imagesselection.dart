@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player/video_player.dart';
+import 'package:xml/xml.dart' as xml;
 
 import '../../constant/apptextstyle.dart';
 import '../../constant/colors.dart';
@@ -16,11 +17,23 @@ class UploadPhotosScreen extends StatefulWidget {
   final bool isRegister;
   const UploadPhotosScreen({super.key, this.isRegister = false});
 
+  static List<File> getNewSelectedImages() {
+    return _UploadPhotosScreenState.activeState?.images
+            .whereType<File>()
+            .toList() ??
+        [];
+  }
+
+  static List<File> getNewSelectedVideos() {
+    return _UploadPhotosScreenState.activeState?.videos ?? [];
+  }
+
   @override
   State<UploadPhotosScreen> createState() => _UploadPhotosScreenState();
 }
 
 class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
+  static _UploadPhotosScreenState? activeState;
   final ImagePicker _picker = ImagePicker();
 
   List<File?> images = List.generate(6, (_) => null);
@@ -49,6 +62,7 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
   @override
   void initState() {
     super.initState();
+    activeState = this;
     _loadExistingPhotos();
   }
 
@@ -70,7 +84,12 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
               if (m is Map) {
                 url = m["Url"] ?? m["Media"];
                 type = m["Type"] ?? "image";
-                id = m["Id"]?.toString() ?? m["id"]?.toString();
+                id =
+                    m["Id"]?.toString() ??
+                    m["id"]?.toString() ??
+                    m["MediaId"]?.toString() ??
+                    m["mediaId"]?.toString() ??
+                    m["PhotoId"]?.toString();
               } else if (m is String) {
                 url = m;
               }
@@ -108,9 +127,13 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
     }
   }
 
-  /// 🔥 PICK MULTIPLE IMAGES (AUTO FILL)
+  /// 🔥 PICK MULTIPLE IMAGES (AUTO FILL WITH COMPRESSION)
   Future<void> pickImages() async {
-    final picked = await _picker.pickMultiImage();
+    final picked = await _picker.pickMultiImage(
+      imageQuality: 70,
+      maxWidth: 1080,
+      maxHeight: 1080,
+    );
     if (picked.isEmpty) return;
 
     int index = 0;
@@ -130,34 +153,114 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
     setState(() {});
   }
 
-  /// ❌ REMOVE IMAGE
+  /// ❌ REMOVE IMAGE WITH CONFIRMATION DIALOG
   Future<void> removeImage(int i) async {
-    final id = imageIds[i];
-    if (id != null && id.isNotEmpty) {
-      // Server image delete
+    // 1. Show Confirmation Dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161626),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+          side: const BorderSide(color: Colors.white12),
+        ),
+        title: Text(
+          "Delete Photo",
+          style: AppTextStyles.body.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          "Are you sure you want to delete this photo from your profile?",
+          style: AppTextStyles.small.copyWith(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Colors.white60),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              "Delete",
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    String? id = imageIds[i];
+    final String? currentUrl = imageUrls[i];
+
+    // 2. If it's a server image, delete it via MediaDelete SOAP API
+    if (id != null || currentUrl != null) {
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) =>
             const Center(child: CircularProgressIndicator(color: Colors.white)),
       );
+
       try {
         final email = await SecureStorage().getUserEmail() ?? "";
         if (email.isNotEmpty) {
-          final res = await RegisterService().mediaDelete(
-            id: int.parse(id),
-            email: email,
-          );
-          if (res.statusCode == 200) {
-            // Re-fetch complete profile
-            await Get.put(
-              AuthController(),
-            ).fetchAndStoreFullProfile(email: email);
+          // If ID is missing, refresh profile to fetch fresh Media IDs
+          if (id == null && currentUrl != null) {
+            final freshRes = await RegisterService().showCompleteProfile(
+              email: email,
+            );
+            if (freshRes.statusCode == 200) {
+              final doc = xml.XmlDocument.parse(freshRes.body);
+              final res = doc.findAllElements('ShowCompleteProfileResult');
+              if (res.isNotEmpty) {
+                final jsonProfile = jsonDecode(res.first.innerText);
+                if (jsonProfile["ResultSets"] is List &&
+                    jsonProfile["ResultSets"].length > 2) {
+                  final List mediaList = jsonProfile["ResultSets"][2];
+                  for (var m in mediaList) {
+                    final mUrl = m["Media"] ?? m["MediaName"];
+                    if (mUrl != null && currentUrl.contains(mUrl.toString())) {
+                      id = m["Id"]?.toString() ?? m["id"]?.toString();
+                      break;
+                    }
+                  }
+                }
+              }
+            }
           }
+
+          if (id != null && id.isNotEmpty) {
+            debugPrint(
+              "🔥 [MediaDelete] Calling API for ID: $id, Email: $email",
+            );
+            final res = await RegisterService().mediaDelete(
+              id: int.parse(id),
+              email: email,
+            );
+            debugPrint(
+              "🔥 [MediaDelete Response]: ${res.statusCode} - ${res.body}",
+            );
+          }
+
+          // Re-fetch and sync complete profile
+          await Get.put(
+            AuthController(),
+          ).fetchAndStoreFullProfile(email: email);
         }
       } catch (e) {
         debugPrint("Error deleting image: $e");
       }
+
       if (mounted) {
         Navigator.pop(context); // close loader
       }
@@ -479,11 +582,60 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
                           right: 6,
                           child: GestureDetector(
                             onTap: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: const Color(0xFF161626),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16.r),
+                                    side: const BorderSide(
+                                      color: Colors.white12,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    "Delete Video",
+                                    style: AppTextStyles.body.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  content: Text(
+                                    "Are you sure you want to delete this video from your profile?",
+                                    style: AppTextStyles.small.copyWith(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(ctx, false),
+                                      child: const Text(
+                                        "Cancel",
+                                        style: TextStyle(color: Colors.white60),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text(
+                                        "Delete",
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (confirm != true || !mounted) return;
+
                               if (isNetworkVideo) {
                                 final id = videoIds[i];
                                 if (id.isNotEmpty) {
                                   // Server video delete
                                   showDialog(
+                                    // ignore: use_build_context_synchronously
                                     context: context,
                                     barrierDismissible: false,
                                     builder: (_) => const Center(

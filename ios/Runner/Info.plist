@@ -9,7 +9,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.583671036879-om8jgqbsgfml3ubimpgqhnquqmkc5ren</string>
+				<string>com.googleusercontent.apps.674512383672-dmrqohc9vrh981ndalm46aik5mrveo3t</string>
 			</array>
 		</dict>
 	</array>
@@ -89,5 +89,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
 </dict>
 </plist>

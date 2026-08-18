@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import '../../backend/home_service.dart';
+import '../../backend/permission_service.dart';
 import '../../backend/registerservice.dart';
 import '../../backend/secure_storage.dart';
 import '../../controller/auth_controller.dart';
@@ -26,6 +27,7 @@ import 'homescreenitems/eventscreens/eventscreens.dart';
 import 'homescreenitems/homefilterscreen.dart';
 import 'homescreenitems/newmatches.dart';
 import 'homescreenitems/notificationscreen.dart';
+import '../../controller/filter_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -484,7 +486,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     HomeScreen.state = this;
     _checkLoginAndLoadProfile();
-    _checkAndRequestLocation();
     _fetchEveryoneUsers();
     _fetchOnlineUsers();
     _fetchVerifiedUsers();
@@ -518,6 +519,60 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final authController = Get.isRegistered<AuthController>()
         ? Get.find<AuthController>()
         : Get.put(AuthController());
+
+    // 🔥 1. Update Online Status to True on Server
+    try {
+      RegisterService()
+          .updateOnlineStatus(email: storedEmail, isOnline: true)
+          .then((res) {
+            debugPrint(
+              "[Home] UpdateOnlineStatus (True) status: ${res.statusCode}",
+            );
+          })
+          .catchError((e) {
+            debugPrint("[Home] UpdateOnlineStatus error: $e");
+          });
+    } catch (e) {
+      debugPrint("[Home] UpdateOnlineStatus exception: $e");
+    }
+
+    // 🔔 2. Check & Request Notification Permission + Update FCM Token
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final isNotifGranted = await PermissionService.isNotificationGranted();
+        if (!isNotifGranted) {
+          await PermissionService.requestNotificationPermission(
+            showRationaleOnPermanentlyDenied: false,
+          );
+        }
+      } catch (e) {
+        debugPrint("[Home] Notification permission error: $e");
+      }
+
+      try {
+        await authController.updateFCMTokenIfAvailable(email: storedEmail);
+      } catch (e) {
+        debugPrint("[Home] FCM Token update error: $e");
+      }
+
+      // 📍 3. Check & Request Location Permission + Update Current GPS City
+      try {
+        final locPermission = await PermissionService.requestLocationPermission(
+          showRationaleOnPermanentlyDenied: false,
+        );
+        if (locPermission == LocationPermission.always ||
+            locPermission == LocationPermission.whileInUse) {
+          final position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+            ),
+          );
+          _updateCityFromCoordinates(position.latitude, position.longitude);
+        }
+      } catch (e) {
+        debugPrint("[Home] Location permission error: $e");
+      }
+    });
 
     // Shared storage mein check karein ki profile data saved hai ya nahi
     final cachedJsonStr = await SecureStorage().getProfileJson();
@@ -747,17 +802,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                       SizedBox(width: 10.w),
 
-                      // Filter Icon — unchanged
+                      // Filter Icon — connected to FilterController
                       GestureDetector(
-                        onTap: () =>
-                            Get.to(() => const FilterPreferencesScreen()),
-                        child: CircleAvatar(
-                          backgroundColor: Colors.grey.shade800,
-                          child: const Icon(
-                            Icons.tune_rounded,
-                            color: Colors.white,
-                          ),
-                        ),
+                        onTap: () async {
+                          await Get.to(() => const FilterPreferencesScreen());
+                          setState(() {});
+                        },
+                        child: Obx(() {
+                          final isActive =
+                              FilterController.instance.isFilterActive;
+                          return CircleAvatar(
+                            backgroundColor: isActive
+                                ? const Color(0xFFE8335A)
+                                : Colors.grey.shade800,
+                            child: const Icon(
+                              Icons.tune_rounded,
+                              color: Colors.white,
+                            ),
+                          );
+                        }),
                       ),
                     ],
                   ),
@@ -1004,8 +1067,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   );
                 }
 
-                // Show only 5 users on HomeScreen
-                final displayUsers = rawList.take(5).toList();
+                // Filter profiles in frontend memory
+                final filtered = FilterController.instance.applyFilterToUsers(
+                  rawList,
+                );
+                final displayUsers = filtered.take(5).toList();
 
                 return _activeVerifiedUserRow(displayUsers, isActive);
               },
@@ -1150,8 +1216,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   );
                 }
 
-                // First 11 users from API, 12th is "See All"
-                final displayUsers = _everyoneUsers.take(11).toList();
+                // Filter profiles in frontend memory
+                final filtered = FilterController.instance.applyFilterToUsers(
+                  _everyoneUsers,
+                );
+                // First 11 filtered users from API, 12th is "See All"
+                final displayUsers = filtered.take(11).toList();
 
                 return GridView.builder(
                   shrinkWrap: true,

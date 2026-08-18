@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "583671036879",
-    "project_id": "boomboom-7394b",
-    "storage_bucket": "boomboom-7394b.firebasestorage.app"
+    "project_number": "674512383672",
+    "project_id": "boomboomdating-8051c",
+    "storage_bucket": "boomboomdating-8051c.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:583671036879:android:e30bbc87db4965c42cb0ba",
+        "mobilesdk_app_id": "1:674512383672:android:f8a46cf11beeb197284e4d",
         "android_client_info": {
           "package_name": "com.boomboom.dating"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCjU6aYepvVx1IEKdMtNymF4cG-nKmYfLA"
+          "current_key": "AIzaSyDy6Qq3-y-Kh9_Ft9tzmxOvPJWf2wOUJcU"
         }
       ],
       "services": {

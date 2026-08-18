@@ -8,6 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import 'dart:convert';
+import 'dart:math';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:xml/xml.dart' as xml;
 import '../backend/registerservice.dart';
@@ -31,6 +32,85 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   final TextEditingController emailController = TextEditingController();
   bool _locationPermissionAsked = false;
   bool _isGoogleLoading = false;
+  bool _isSendingOtp = false;
+
+  Future<void> _handleSendEmailOtp() async {
+    final email = emailController.text.trim();
+    if (email.isEmpty) {
+      Get.snackbar(
+        "Error",
+        "Please enter your email address",
+        backgroundColor: AppColors.error,
+        colorText: AppColors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(email)) {
+      Get.snackbar(
+        "Invalid Email",
+        "Please enter a valid email address",
+        backgroundColor: AppColors.error,
+        colorText: AppColors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    if (_isSendingOtp) return;
+    setState(() => _isSendingOtp = true);
+
+    try {
+      // 1. Generate 6-digit random OTP
+      final otp = (100000 + Random().nextInt(900000)).toString();
+      debugPrint("🚀 [WelcomeScreen] Generated OTP: $otp for $email");
+
+      // 2. Call SendEmailOTP SOAP API
+      await RegisterService().sendEmailOTP(email: email, otp: otp);
+
+      // 3. Save OTP in SecureStorage with 5-minute expiry
+      await SecureStorage().saveUserEmail(email);
+      await SecureStorage().saveEmailOtp(email: email, otp: otp);
+
+      if (!mounted) return;
+      setState(() => _isSendingOtp = false);
+
+      // 4. Show success snackbar with Spam folder tip
+      Get.snackbar(
+        "OTP Sent Successfully!",
+        "6-digit code has been sent to $email. (Check your Inbox / Spam folder)",
+        backgroundColor: const Color(0xFF1E293B),
+        colorText: Colors.white,
+        icon: const Icon(
+          Icons.mark_email_read_rounded,
+          color: Color(0xFF00E676),
+        ),
+        duration: const Duration(seconds: 5),
+        snackPosition: SnackPosition.TOP,
+        margin: EdgeInsets.all(12.w),
+        borderRadius: 12.r,
+      );
+
+      // 5. Navigate to EmailOtpScreen
+      Get.to(
+        () => EmailOtpScreen(email: email),
+        transition: Transition.rightToLeft,
+        duration: const Duration(milliseconds: 400),
+      );
+    } catch (e) {
+      debugPrint("❌ [WelcomeScreen] Error sending OTP: $e");
+      if (mounted) setState(() => _isSendingOtp = false);
+      Get.snackbar(
+        "Failed to send OTP",
+        "Unable to send verification code. Please check your network & try again.",
+        backgroundColor: AppColors.error,
+        colorText: AppColors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -71,7 +151,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email']);
-      
+
       // Clear previous cached session so account selection dialog always appears
       try {
         await googleSignIn.signOut();
@@ -87,26 +167,25 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       final String googleEmail = account.email.trim();
 
       // Check if user exists with profile in backend
-      final response =
-          await RegisterService().showCompleteProfile(email: googleEmail);
+      final response = await RegisterService().showCompleteProfile(
+        email: googleEmail,
+      );
 
       if (response.statusCode == 200) {
         final doc = xml.XmlDocument.parse(response.body);
         final res = doc.findAllElements('ShowCompleteProfileResult');
         if (res.isNotEmpty) {
-          final Map<String, dynamic> profileJson =
-              jsonDecode(res.first.innerText);
+          final Map<String, dynamic> profileJson = jsonDecode(
+            res.first.innerText,
+          );
           final int status = profileJson["Status"] ?? 0;
           if (status == 1 && profileJson["ResultSets"] is List) {
             final List resultSets = profileJson["ResultSets"];
-            if (resultSets.length >= 2 &&
-                (resultSets[1] as List).isNotEmpty) {
+            if (resultSets.length >= 2 && (resultSets[1] as List).isNotEmpty) {
               // Existing registered user -> Save & Go to MainScreen
               await SecureStorage().saveUserEmail(googleEmail);
               final AuthController authController = Get.put(AuthController());
-              await authController.fetchAndStoreFullProfile(
-                email: googleEmail,
-              );
+              await authController.fetchAndStoreFullProfile(email: googleEmail);
               await authController.updateFCMTokenIfAvailable(
                 email: googleEmail,
               );
@@ -126,9 +205,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       // New User or Incomplete Profile -> Save email & Go to CompleteProfileScreen
       await SecureStorage().saveUserEmail(googleEmail);
       if (mounted) setState(() => _isGoogleLoading = false);
-      Get.to(
-        () => CompleteProfileScreen(email: googleEmail),
-      );
+      Get.to(() => CompleteProfileScreen(email: googleEmail));
     } catch (e) {
       if (mounted) setState(() => _isGoogleLoading = false);
       debugPrint("[Google Sign In Error]: $e");
@@ -344,25 +421,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
               /// 🚀 Send Email OTP Button (Gradient)
               GestureDetector(
-                onTap: () async {
-                  if (emailController.text.trim().isEmpty) {
-                    Get.snackbar(
-                      "Error",
-                      "Please enter email",
-                      backgroundColor: AppColors.error,
-                      colorText: AppColors.white,
-                    );
-                    return;
-                  }
-                  await SecureStorage().saveUserEmail(
-                    emailController.text.trim(),
-                  );
-                  Get.to(
-                    () => EmailOtpScreen(email: emailController.text.trim()),
-                    transition: Transition.rightToLeft,
-                    duration: const Duration(milliseconds: 400),
-                  );
-                },
+                onTap: _isSendingOtp ? null : _handleSendEmailOtp,
                 child: Container(
                   height: AppSize.h(48),
                   width: double.infinity,
@@ -377,13 +436,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text("Send Email OTP", style: AppTextStyles.button),
-                      SizedBox(width: AppSize.w(10)),
-                      Icon(
-                        Icons.send_outlined,
-                        color: AppColors.white,
-                        size: AppSize.sp(16),
-                      ),
+                      if (_isSendingOtp)
+                        SizedBox(
+                          width: AppSize.w(18),
+                          height: AppSize.w(18),
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      else ...[
+                        Text("Send Email OTP", style: AppTextStyles.button),
+                        SizedBox(width: AppSize.w(10)),
+                        Icon(
+                          Icons.send_outlined,
+                          color: AppColors.white,
+                          size: AppSize.sp(16),
+                        ),
+                      ],
                     ],
                   ),
                 ),

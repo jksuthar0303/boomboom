@@ -140,12 +140,12 @@ class TravelService {
     }
   }
 
-  /// SOAP ShowUpcomingTrips request
+  /// SOAP ShowTravelUpcoming request
   Future<List<Map<String, dynamic>>> showUpcomingTrips() async {
     final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ShowUpcomingTrips xmlns="$namespace" />
+    <ShowTravelUpcoming xmlns="$namespace" />
   </soap:Body>
 </soap:Envelope>'''.trim();
 
@@ -154,7 +154,7 @@ class TravelService {
       xmlBody: xmlBody,
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': '"${namespace}ShowUpcomingTrips"',
+        'SOAPAction': '"${namespace}ShowTravelUpcoming"',
       },
     );
 
@@ -177,14 +177,14 @@ class TravelService {
           }
         }
       } catch (e) {
-        debugPrint("Direct JSON parse in ShowUpcomingTrips: $e");
+        debugPrint("Direct JSON parse in ShowTravelUpcoming: $e");
       }
 
       // 2. Check XML SOAP result element
       try {
         if (body.contains("<")) {
           final doc = xml.XmlDocument.parse(body);
-          final resultEl = doc.findAllElements('ShowUpcomingTripsResult');
+          final resultEl = doc.findAllElements('ShowTravelUpcomingResult');
           if (resultEl.isNotEmpty) {
             final innerJson = resultEl.first.innerText.trim();
             final decoded = jsonDecode(innerJson);
@@ -196,7 +196,7 @@ class TravelService {
           }
         }
       } catch (e) {
-        debugPrint("XML doc parse in ShowUpcomingTrips: $e");
+        debugPrint("XML doc parse in ShowTravelUpcoming: $e");
       }
 
       return [];

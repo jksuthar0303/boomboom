@@ -190,8 +190,14 @@ class ExploreUsersScreen extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-
-                MaterialPageRoute(builder: (_) => const BoomProfileScreen()),
+                MaterialPageRoute(
+                  builder: (_) => BoomProfileScreen(
+                    userEmail:
+                        user["EmailAddress"]?.toString() ??
+                        user["email"]?.toString(),
+                    initialUserData: user,
+                  ),
+                ),
               );
             },
 

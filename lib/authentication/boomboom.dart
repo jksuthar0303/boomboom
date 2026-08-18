@@ -711,11 +711,20 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
               profileData = Map<String, dynamic>.from(jsonResult["Data"].first);
             }
 
-            profileData ??= widget.initialUserData;
-
             if (profileData != null) {
+              final Map<String, dynamic> merged = {};
+              if (widget.initialUserData != null) {
+                if (widget.initialUserData!["raw"] is Map) {
+                  merged.addAll(
+                    Map<String, dynamic>.from(widget.initialUserData!["raw"]),
+                  );
+                }
+                merged.addAll(widget.initialUserData!);
+              }
+              merged.addAll(profileData);
+
               _parseAndSetOtherProfile(
-                profileData,
+                merged,
                 rawInterests,
                 rawMedia,
                 rawLifestyle,
@@ -763,18 +772,27 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   }
 
   ProfileModel? _buildProfileFromMap(
-    Map<String, dynamic> data, [
+    Map<String, dynamic> rawInput, [
     List<dynamic>? rawInterests,
     List<dynamic>? rawMedia,
     List<dynamic>? rawLifestyle,
   ]) {
     try {
+      final Map<String, dynamic> data = (rawInput["raw"] is Map)
+          ? {...Map<String, dynamic>.from(rawInput["raw"]), ...rawInput}
+          : rawInput;
+
       final String name = (data["FullName"] ?? data["name"] ?? "").toString();
       final String dob = (data["Dob"] ?? data["dob"] ?? "").toString();
       final String calculatedAge = dob.isNotEmpty
           ? _calculateAge(dob).toString()
           : (data["age"] ?? "24").toString();
-      final String bio = (data["BIO"] ?? data["bio"] ?? data["Bio"] ?? "")
+      final String bio = (data["BIO"] ??
+              data["bio"] ??
+              data["Bio"] ??
+              data["about"] ??
+              data["About"] ??
+              "")
           .toString()
           .trim();
       final String job = (data["Occupation"] ?? data["occupation"] ?? "")
@@ -794,8 +812,9 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           (data["City"] ?? data["city"] ?? data["Country"] ?? "").toString();
       final double? latitude = double.tryParse(data['Lat']?.toString() ?? '');
       final double? longitude = double.tryParse(data['Lon']?.toString() ?? '');
-      final String apiCountry =
-          (data['Country'] ?? data['country'] ?? '').toString().trim();
+      final String apiCountry = (data['Country'] ?? data['country'] ?? '')
+          .toString()
+          .trim();
       final String resolvedCountry = apiCountry.isNotEmpty
           ? apiCountry
           : (latitude != null &&
@@ -1157,15 +1176,25 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     if (widget.isOwnProfile) {
       _loadOwnProfile();
     } else if (widget.userEmail != null || widget.initialUserData != null) {
+      final rawUser = widget.initialUserData;
+      final Map<String, dynamic> mergedInitial = rawUser != null
+          ? (rawUser["raw"] is Map
+              ? {...Map<String, dynamic>.from(rawUser["raw"]), ...rawUser}
+              : rawUser)
+          : {};
+
       final email =
           widget.userEmail ??
-          widget.initialUserData?["EmailAddress"]?.toString() ??
-          widget.initialUserData?["email"]?.toString() ??
+          mergedInitial["EmailAddress"]?.toString() ??
+          mergedInitial["email"]?.toString() ??
+          mergedInitial["ActionEmail"]?.toString() ??
           "";
+
+      if (mergedInitial.isNotEmpty) {
+        _parseAndSetOtherProfile(mergedInitial);
+      }
       if (email.isNotEmpty) {
         _loadOtherUserProfile(email);
-      } else if (widget.initialUserData != null) {
-        _parseAndSetOtherProfile(widget.initialUserData!);
       }
     } else {
       // ── Load live profiles from ShowAllExceptMe for swipe feed ──
@@ -2127,11 +2156,14 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         ),
         SizedBox(height: AppSize.h(10)),
         Text(
-          p.about,
+          p.about.trim().isNotEmpty ? p.about : "No bio added yet.",
           style: AppTextStyles.body.copyWith(
             fontSize: isTablet ? AppSize.sp(13) : AppSize.sp(15),
             height: 1.7,
-            fontWeight: FontWeight.w700,
+            color: p.about.trim().isNotEmpty
+                ? AppColors.white
+                : AppColors.textSecondary,
+            fontWeight: FontWeight.w500,
           ),
         ),
         SizedBox(height: AppSize.h(14)),

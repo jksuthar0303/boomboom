@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../backend/home_service.dart';
+import '../../../backend/secure_storage.dart';
 import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../model/notification.dart';
@@ -19,6 +23,8 @@ class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
 
   bool _allNotifications = true;
+  bool _isLoading = true;
+  String? _loadError;
 
   late final List<NotifItem> _notifications;
 
@@ -91,7 +97,73 @@ class _NotificationSettingsScreenState
         value: true,
       ),
     ];
+
+    _loadNotificationSettings();
   }
+
+  Future<void> _loadNotificationSettings() async {
+    try {
+      final email = await SecureStorage().getUserEmail();
+      if (email == null || email.trim().isEmpty) {
+        throw Exception('User email not found.');
+      }
+
+      final token = await SecureStorage().getUserToken();
+      final response = await HomeService().showSettingsByEmail(
+        email: email.trim(),
+        token: token,
+      );
+
+      final document = XmlResponseJson.decode(response.body);
+      final data = document['Data'];
+      if (document['Status'].toString() != '1' || data is! List) {
+        throw Exception(document['Message']?.toString() ?? 'Unable to load settings.');
+      }
+
+      final settingsByType = <String, bool>{};
+      for (final row in data) {
+        if (row is Map) {
+          final type = row['Type']?.toString();
+          if (type != null) {
+            settingsByType[_normalise(type)] = _toBool(row['Mode']);
+          }
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        for (final item in _notifications) {
+          final value = settingsByType[_normalise(_apiTypeFor(item.id))];
+          if (value != null) item.value = value;
+        }
+        _allNotifications = _notifications.every((item) => item.value);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  String _apiTypeFor(String id) {
+    switch (id) {
+      case 'messages': return 'Message Notifications';
+      case 'match_notif': return 'Match Notifications';
+      case 'likes': return 'Likes Notifications';
+      case 'who_viewed': return 'Who viewed you';
+      case 'cross_path': return 'Cross Path Notification';
+      case 'travel_alerts': return 'Traveller Alerts';
+      case 'free_tonight': return 'Free Tonight Alerts';
+      default: return id;
+    }
+  }
+
+  String _normalise(String value) => value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+  bool _toBool(dynamic value) => value.toString().toLowerCase() == 'true' || value.toString() == '1';
 
   void _onAllToggle(bool val) {
 
@@ -143,7 +215,9 @@ class _NotificationSettingsScreenState
 
               Expanded(
 
-                child: SingleChildScrollView(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: Colors.amber))
+                    : SingleChildScrollView(
 
                   padding: EdgeInsets.symmetric(
                     horizontal: hPad,
@@ -153,6 +227,16 @@ class _NotificationSettingsScreenState
                   child: Column(
 
                     children: [
+
+                      if (_loadError != null)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 10.h),
+                          child: Text(
+                            _loadError!,
+                            style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 11.sp),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
 
                       _allNotificationCard(),
 
@@ -452,4 +536,16 @@ class _NotificationSettingsScreenState
 
         onChanged: onChanged,
       );
+}
+
+/// Extracts the JSON payload from the SOAP/XML response returned by .NET.
+class XmlResponseJson {
+  static Map<String, dynamic> decode(String body) {
+    final start = body.indexOf('{');
+    final end = body.lastIndexOf('}');
+    if (start < 0 || end <= start) throw const FormatException('Invalid settings response.');
+    final decoded = jsonDecode(body.substring(start, end + 1));
+    if (decoded is! Map) throw const FormatException('Invalid settings payload.');
+    return Map<String, dynamic>.from(decoded);
+  }
 }

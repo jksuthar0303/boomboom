@@ -141,8 +141,80 @@ class _UpdateProfileTabsScreenState extends State<UpdateProfileTabsScreen> {
                       showDialog(
                         context: context,
                         barrierDismissible: false,
-                        builder: (_) => const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
+                        builder: (_) => Dialog(
+                          backgroundColor: Colors.transparent,
+                          insetPadding: EdgeInsets.symmetric(horizontal: 32.w),
+                          child: Container(
+                            padding: EdgeInsets.all(22.w),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF161626),
+                              borderRadius: BorderRadius.circular(20.r),
+                              border: Border.all(
+                                color: AppColors.accent.withValues(alpha: 0.3),
+                                width: 1.2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.8),
+                                  blurRadius: 25,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.accent,
+                                  ),
+                                  strokeWidth: 3.5,
+                                ),
+                                SizedBox(height: 18.h),
+                                Obx(() {
+                                  return Text(
+                                    userController.uploadStatus.value,
+                                    style: AppTextStyles.body.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  );
+                                }),
+                                SizedBox(height: 14.h),
+                                Obx(() {
+                                  final progress =
+                                      userController.uploadProgress.value;
+                                  return Column(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius:
+                                            BorderRadius.circular(10.r),
+                                        child: LinearProgressIndicator(
+                                          value: progress > 0 ? progress : null,
+                                          backgroundColor: Colors.white12,
+                                          valueColor:
+                                              const AlwaysStoppedAnimation<
+                                                  Color>(
+                                            AppColors.accent,
+                                          ),
+                                          minHeight: 8.h,
+                                        ),
+                                      ),
+                                      SizedBox(height: 8.h),
+                                      Text(
+                                        "${(progress * 100).toInt()}%",
+                                        style: AppTextStyles.small.copyWith(
+                                          color: AppColors.accent,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
                         ),
                       );
 

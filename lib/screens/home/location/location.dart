@@ -710,16 +710,22 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
               snapSizes: const [0.10, 0.50, 0.90],
               builder: (context, scrollController) {
                 return Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1A1A1A),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141420),
                     borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(28),
+                      top: Radius.circular(28.r),
+                    ),
+                    border: Border(
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1,
+                      ),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black54,
+                        color: Colors.black.withValues(alpha: 0.6),
                         blurRadius: 20,
-                        offset: Offset(0, -4),
+                        offset: const Offset(0, -3),
                       ),
                     ],
                   ),
@@ -761,7 +767,7 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                               width: 48,
                               height: 5,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF666666),
+                                color: Colors.white.withValues(alpha: 0.25),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                             ),
@@ -1359,10 +1365,10 @@ class _CategoryRow extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(4.w),
         decoration: BoxDecoration(
-          color: const Color(0xFF22222E),
+          color: const Color(0xFF1B1B2B),
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: Colors.white.withValues(alpha: 0.08),
             width: 1,
           ),
         ),

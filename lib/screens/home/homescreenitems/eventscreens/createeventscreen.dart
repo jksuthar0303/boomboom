@@ -1,11 +1,22 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:geocoding/geocoding.dart' as geo;
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+
+import '../../../../backend/secure_storage.dart';
+import '../../../../backend/tonight_service.dart';
 import '../../../../constant/apptextstyle.dart';
 import '../../../../constant/colors.dart';
 import '../../../../widget/outlinedbutton.dart';
+import '../../../../widget/snakbar.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -18,12 +29,23 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _descController = TextEditingController();
   final _locationController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _picker = ImagePicker();
+  final TonightService _tonightService = TonightService();
 
   DateTime selectedDate = DateTime.now();
   TimeOfDay selectedTime = const TimeOfDay(hour: 19, minute: 10);
 
-  /// ✅ Empty string = kuch select nahi hua
+  /// ✅ Selected Category
   String selectedCategory = "";
+
+  /// 📸 Selected Image & Base64
+  File? _selectedImage;
+  String _imageBase64 = "";
+
+  /// ⏳ Loading & GPS States
+  bool _isLoading = false;
+  String _loadingStatus = "";
+  bool _isDetectingLocation = false;
 
   final List<Map<String, dynamic>> categories = [
     {
@@ -62,12 +84,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       "icon": Icons.location_on_outlined,
       "color": AppColors.accent,
     },
-    {
-      "title": "Party",
-      "subtitle": "Discreet & exclusive company.",
-      "icon": Icons.workspace_premium_outlined,
-      "color": Colors.pinkAccent,
-    },
   ];
 
   @override
@@ -76,6 +92,443 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _locationController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 📍 GPS & CURRENT LOCATION AUTO-DETECTION
+  // ─────────────────────────────────────────────────────────────
+
+  Future<void> _detectCurrentLocation() async {
+    if (_isDetectingLocation) return;
+
+    setState(() => _isDetectingLocation = true);
+
+    try {
+      // 1. Check if GPS / Location Services are enabled
+      final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _isDetectingLocation = false);
+        _showEnableGpsDialog();
+        return;
+      }
+
+      // 2. Check & Request Permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _isDetectingLocation = false);
+          NeuSnackbar.warning("Location permission was denied.");
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() => _isDetectingLocation = false);
+        _showPermissionSettingsDialog();
+        return;
+      }
+
+      // 3. Get Current Position
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
+
+      if (position == null) {
+        setState(() => _isDetectingLocation = false);
+        NeuSnackbar.error("Unable to get current location coordinates. Please try again.");
+        return;
+      }
+
+      // 4. Reverse Geocode Coordinates to City/Country Name
+      try {
+        final geocoder = geo.Geocoding();
+        final List<geo.Placemark> placemarks = await geocoder.placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          final locality = p.locality?.trim() ?? '';
+          final subLocality = p.subLocality?.trim() ?? '';
+          final adminArea = p.administrativeArea?.trim() ?? '';
+          final country = p.country?.trim() ?? '';
+
+          String formattedLocation = '';
+          if (subLocality.isNotEmpty && locality.isNotEmpty && subLocality != locality) {
+            formattedLocation = '$subLocality, $locality';
+          } else if (locality.isNotEmpty) {
+            formattedLocation = locality;
+          } else if (adminArea.isNotEmpty) {
+            formattedLocation = adminArea;
+          }
+
+          if (country.isNotEmpty) {
+            formattedLocation = formattedLocation.isNotEmpty
+                ? '$formattedLocation, $country'
+                : country;
+          }
+
+          if (formattedLocation.isEmpty) {
+            formattedLocation = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          }
+
+          setState(() {
+            _locationController.text = formattedLocation;
+          });
+
+          NeuSnackbar.success("Location detected: $formattedLocation");
+        } else {
+          setState(() {
+            _locationController.text =
+                '${position!.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          });
+        }
+      } catch (e) {
+        // Fallback to coordinates
+        setState(() {
+          _locationController.text =
+              '${position!.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+        });
+      }
+    } catch (e) {
+      NeuSnackbar.error("Error detecting location: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _isDetectingLocation = false);
+      }
+    }
+  }
+
+  void _showEnableGpsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+          side: const BorderSide(color: AppColors.purple, width: 1),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.location_off_rounded, color: Colors.amber, size: 24),
+            SizedBox(width: 10.w),
+            Text(
+              "Turn On GPS",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 16.sp,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          "Your device GPS / Location service is turned off. Please enable GPS to automatically detect your current location.",
+          style: GoogleFonts.poppins(
+            color: Colors.white70,
+            fontSize: 13.sp,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              "Cancel",
+              style: GoogleFonts.poppins(color: Colors.white54),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.purple,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await Geolocator.openLocationSettings();
+            },
+            child: Text(
+              "Open Settings",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPermissionSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131A2A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+          side: const BorderSide(color: AppColors.purple, width: 1),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.security_rounded, color: Colors.pinkAccent, size: 24),
+            SizedBox(width: 10.w),
+            Text(
+              "Permission Required",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 16.sp,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          "Location permission is permanently denied. Please grant location access from app settings.",
+          style: GoogleFonts.poppins(
+            color: Colors.white70,
+            fontSize: 13.sp,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              "Cancel",
+              style: GoogleFonts.poppins(color: Colors.white54),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.purple,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await Geolocator.openAppSettings();
+            },
+            child: Text(
+              "App Settings",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 📸 IMAGE PICKER & COMPRESSION
+  // ─────────────────────────────────────────────────────────────
+
+  void _showImagePickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF131A2A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 45.w,
+                  height: 4.h,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                ),
+                SizedBox(height: 18.h),
+                Text(
+                  "Select Photo",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 17.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 20.h),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _imagePickerOption(
+                      icon: Icons.photo_library_rounded,
+                      label: "Gallery",
+                      color: AppColors.purple,
+                      source: ImageSource.gallery,
+                    ),
+                    _imagePickerOption(
+                      icon: Icons.camera_alt_rounded,
+                      label: "Camera",
+                      color: Colors.pinkAccent,
+                      source: ImageSource.camera,
+                    ),
+                  ],
+                ),
+                SizedBox(height: 10.h),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _imagePickerOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required ImageSource source,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.pop(context);
+        _pickAndCompressImage(source);
+      },
+      child: Column(
+        children: [
+          Container(
+            width: 60.w,
+            height: 60.w,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withValues(alpha: 0.4)),
+            ),
+            child: Icon(icon, color: color, size: 28.sp),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: Colors.white70,
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickAndCompressImage(ImageSource source) async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 70,
+      );
+
+      if (file != null) {
+        setState(() {
+          _loadingStatus = "Compressing photo...";
+        });
+
+        final bytes = await file.readAsBytes();
+        final base64Str = base64Encode(bytes);
+
+        setState(() {
+          _selectedImage = File(file.path);
+          _imageBase64 = base64Str;
+          _loadingStatus = "";
+        });
+      }
+    } catch (e) {
+      NeuSnackbar.error("Failed to select image: $e");
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 🚀 SUBMIT / CREATE TONIGHT
+  // ─────────────────────────────────────────────────────────────
+
+  Future<void> _createTonight() async {
+    if (selectedCategory.isEmpty) {
+      NeuSnackbar.error("Please select what you are planning!");
+      return;
+    }
+
+    final desc = _descController.text.trim();
+    if (desc.isEmpty) {
+      NeuSnackbar.error("Please enter a description for your Tonight plan!");
+      return;
+    }
+
+    final loc = _locationController.text.trim();
+    if (loc.isEmpty) {
+      NeuSnackbar.error("Please enter a location!");
+      return;
+    }
+
+    // Get user email
+    final email = await SecureStorage().getUserEmail();
+    if (email == null || email.trim().isEmpty) {
+      NeuSnackbar.error("User email not found. Please log in again.");
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadingStatus = "Publishing your Tonight...";
+    });
+
+    try {
+      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+      final formattedTime = _formatTime(selectedTime);
+
+      final result = await _tonightService.insertTonight(
+        planning: selectedCategory,
+        description: desc,
+        location: loc,
+        imageBase64: _imageBase64,
+        date: formattedDate,
+        time: formattedTime,
+        email: email.trim(),
+      );
+
+      if (!mounted) return;
+
+      final status = result["Status"] ?? result["status"];
+      if (status == 1 || status == "1" || status == true) {
+        NeuSnackbar.success("Your Tonight has been published successfully! 🎉");
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
+      } else {
+        final msg = result["Message"] ?? result["message"] ?? "Failed to create Tonight.";
+        NeuSnackbar.error(msg.toString());
+      }
+    } catch (e) {
+      NeuSnackbar.error("Error creating Tonight: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadingStatus = "";
+        });
+      }
+    }
   }
 
   void _showCategoryBottomSheet() {
@@ -101,26 +554,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                TextField(
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: "Search category...",
-                    hintStyle: const TextStyle(color: Colors.white54),
-                    prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                    filled: true,
-                    fillColor: Colors.black26,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
                 Expanded(
                   child: ListView.builder(
                     itemCount: categories.length,
@@ -130,19 +564,15 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                           setState(() {
                             selectedCategory = categories[index]["title"];
                           });
-
                           Navigator.pop(context);
                         },
                         child: Container(
                           margin: EdgeInsets.only(bottom: 14.h),
                           padding: EdgeInsets.all(16.w),
-
                           decoration: BoxDecoration(
                             color: AppColors.cardBg,
                             borderRadius: BorderRadius.circular(24.r),
-
                             border: Border.all(color: AppColors.cardBorder),
-
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: .25),
@@ -151,31 +581,25 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                               ),
                             ],
                           ),
-
                           child: Row(
                             children: [
                               Container(
                                 width: 50.w,
                                 height: 50.w,
-
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-
                                   border: Border.all(
                                     color: categories[index]["color"],
                                     width: 1.5,
                                   ),
                                 ),
-
                                 child: Icon(
                                   categories[index]["icon"],
                                   color: categories[index]["color"],
                                   size: 28.sp,
                                 ),
                               ),
-
                               SizedBox(width: 16.w),
-
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,9 +612,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-
                                     SizedBox(height: 5.h),
-
                                     Text(
                                       categories[index]["subtitle"],
                                       style: TextStyle(
@@ -202,16 +624,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                   ],
                                 ),
                               ),
-
                               Container(
                                 width: 42.w,
                                 height: 42.w,
-
                                 decoration: BoxDecoration(
                                   color: AppColors.surface,
                                   shape: BoxShape.circle,
                                 ),
-
                                 child: Icon(
                                   Icons.chevron_right,
                                   color: AppColors.white.withValues(alpha: .8),
@@ -236,10 +655,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   //  RESPONSIVE HELPERS
   // ─────────────────────────────────────────────────────────────
 
-  /// Tablet threshold
   bool _isTablet(BuildContext ctx) => MediaQuery.of(ctx).size.width > 600;
 
-  /// Responsive font size: phone value → scaled up for tablet
   double _fs(BuildContext ctx, double phone, {double tabletScale = 1.20}) {
     final base = _isTablet(ctx) ? phone * tabletScale : phone;
     return base.sp;
@@ -252,8 +669,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   @override
   Widget build(BuildContext context) {
     final isTablet = _isTablet(context);
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final hPad = isTablet ? 28.0 : 18.0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -262,95 +677,156 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ),
       child: Scaffold(
         backgroundColor: AppColors.bg,
-        resizeToAvoidBottomInset: true,
         body: SafeArea(
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            padding: EdgeInsets.only(
-              left: hPad.w,
-              right: hPad.w,
-              top: isTablet ? 22.h : 16.h,
-              bottom: bottomInset + 28.h,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── TOP BAR ────────────────────────────────────
-                _buildTopBar(context, isTablet),
-
-                SizedBox(height: isTablet ? 28.h : 22.h),
-
-                // ── HERO BANNER ─────────────────────────────────
-                _buildHeroBanner(context, isTablet),
-
-                SizedBox(height: isTablet ? 28.h : 22.h),
-
-                // ── CATEGORY DROPDOWN ───────────────────────────
-                _buildCategoryDropdown(context, isTablet),
-
-                SizedBox(height: isTablet ? 20.h : 16.h),
-
-                // ── DESCRIPTION ─────────────────────────────────
-                _descriptionField(context, isTablet),
-
-                SizedBox(height: isTablet ? 20.h : 16.h),
-
-                // ── LOCATION ────────────────────────────────────
-                _locationField(context, isTablet),
-
-                SizedBox(height: isTablet ? 20.h : 16.h),
-
-                // ── ADD PHOTO ───────────────────────────────────
-                _buildAddPhoto(context, isTablet),
-
-                SizedBox(height: 8.h),
-
-                Text(
-                  "✨ A good photo gets more people excited!",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white54,
-                    fontSize: _fs(context, 11),
-                  ),
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 32.w : 18.w,
+                  vertical: 14.h,
                 ),
-
-                SizedBox(height: isTablet ? 24.h : 18.h),
-
-                // ── DATE + TIME ─────────────────────────────────
-                Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _dateCard(context, isTablet)),
-                    SizedBox(width: 14.w),
-                    Expanded(child: _timeCard(context, isTablet)),
+                    _buildTopBar(context, isTablet),
+                    SizedBox(height: isTablet ? 24.h : 18.h),
+                    _buildHeroBanner(context, isTablet),
+                    SizedBox(height: isTablet ? 24.h : 18.h),
+                    _buildCategoryDropdown(context, isTablet),
+                    SizedBox(height: isTablet ? 20.h : 16.h),
+                    _descriptionField(context, isTablet),
+                    SizedBox(height: isTablet ? 20.h : 16.h),
+                    _locationField(context, isTablet),
+                    SizedBox(height: isTablet ? 20.h : 16.h),
+                    _buildAddPhoto(context, isTablet),
+                    SizedBox(height: 8.h),
+                    Text(
+                      "✨ A good photo gets more people excited!",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white54,
+                        fontSize: _fs(context, 11),
+                      ),
+                    ),
+                    SizedBox(height: isTablet ? 24.h : 18.h),
+                    Row(
+                      children: [
+                        Expanded(child: _dateCard(context, isTablet)),
+                        SizedBox(width: 14.w),
+                        Expanded(child: _timeCard(context, isTablet)),
+                      ],
+                    ),
+                    SizedBox(height: isTablet ? 40.h : 32.h),
+
+                    // ── CREATE BUTTON ────────────────────────────────
+                    _isLoading
+                        ? Container(
+                            width: double.infinity,
+                            height: (isTablet ? 70 : 62).h,
+                            decoration: BoxDecoration(
+                              color: AppColors.purple.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(30.r),
+                              border: Border.all(color: AppColors.purple),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 22.w,
+                                  height: 22.w,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                ),
+                                SizedBox(width: 12.w),
+                                Text(
+                                  _loadingStatus.isNotEmpty ? _loadingStatus : "Creating Tonight...",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: _fs(context, 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : GradientBorderButton(
+                            title: "Create Tonight",
+                            isTablet: isTablet,
+                            width: double.infinity,
+                            height: isTablet ? 70 : 62,
+                            onTap: _createTonight,
+                          ),
+
+                    SizedBox(height: 18.h),
+
+                    Center(
+                      child: Text(
+                        "🛡️ Your event will be visible to people in your area.",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white54,
+                          fontSize: _fs(context, 11),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 28.h),
                   ],
                 ),
+              ),
 
-                SizedBox(height: isTablet ? 40.h : 32.h),
-
-                // ── CREATE BUTTON ────────────────────────────────
-                GradientBorderButton(
-                  title: "Create Tonight",
-                  isTablet: isTablet,
-                  width: double.infinity,
-                  height: isTablet ? 70 : 62,
-                  onTap: () {},
-                ),
-
-                SizedBox(height: 18.h),
-
-                Center(
-                  child: Text(
-                    "🛡️ Your event will be visible to people in your area.",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white54,
-                      fontSize: _fs(context, 11),
+              // ── FULLSCREEN PROGRESS OVERLAY IF UPLOADING ───────────────
+              if (_isLoading)
+                Container(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  child: Center(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+                      margin: EdgeInsets.symmetric(horizontal: 40.w),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131A2A),
+                        borderRadius: BorderRadius.circular(20.r),
+                        border: Border.all(color: AppColors.purple.withValues(alpha: 0.5)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.purple),
+                          ),
+                          SizedBox(height: 16.h),
+                          Text(
+                            _loadingStatus.isNotEmpty ? _loadingStatus : "Publishing Tonight...",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(height: 6.h),
+                          Text(
+                            "Please wait a moment",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white54,
+                              fontSize: 11.sp,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-
-                SizedBox(height: 28.h),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -464,9 +940,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  ✅ CATEGORY DROPDOWN — FIXED
-  //  Sirf "Select ▼" dikhega, click par list open hogi,
-  //  select karne par value neeche show hogi
+  //  CATEGORY DROPDOWN
   // ─────────────────────────────────────────────────────────────
 
   Widget _buildCategoryDropdown(BuildContext context, bool isTablet) {
@@ -487,7 +961,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ),
       child: Row(
         children: [
-          // ── Left Icon ──
           Container(
             width: iconSize.w,
             height: iconSize.w,
@@ -501,10 +974,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               size: _fs(context, 22),
             ),
           ),
-
           SizedBox(width: 14.w),
-
-          // ── Label + Selected Value ──
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,25 +988,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  // ✅ Agar kuch select nahi → "Select" dikhao
                   selectedCategory.isEmpty ? "Select" : selectedCategory,
                   style: GoogleFonts.poppins(
-                    color: selectedCategory.isEmpty
-                        ? Colors.white38
-                        : Colors.white,
-                    fontWeight: selectedCategory.isEmpty
-                        ? FontWeight.w400
-                        : FontWeight.w600,
+                    color: selectedCategory.isEmpty ? Colors.white38 : Colors.white,
+                    fontWeight: selectedCategory.isEmpty ? FontWeight.w400 : FontWeight.w600,
                     fontSize: _fs(context, 15),
                   ),
                 ),
               ],
             ),
           ),
-
           SizedBox(width: 6.w),
-
-          // ✅ Sirf arrow visible hoga — dropdown yahan attach hai
           GestureDetector(
             onTap: _showCategoryBottomSheet,
             child: Icon(
@@ -638,7 +1100,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  LOCATION FIELD
+  //  LOCATION FIELD (WITH GPS TARGET BUTTON)
   // ─────────────────────────────────────────────────────────────
 
   Widget _locationField(BuildContext context, bool isTablet) {
@@ -675,7 +1137,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 fontSize: _fs(context, 14),
               ),
               decoration: InputDecoration(
-                hintText: "Add a location",
+                hintText: "Add a location or tap GPS",
                 hintStyle: GoogleFonts.poppins(
                   color: Colors.white38,
                   fontSize: _fs(context, 14),
@@ -686,10 +1148,29 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
               ),
             ),
           ),
-          Icon(
-            Icons.my_location_rounded,
-            color: AppColors.purple,
-            size: _fs(context, 22),
+          GestureDetector(
+            onTap: _detectCurrentLocation,
+            child: Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: AppColors.purple.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: _isDetectingLocation
+                  ? SizedBox(
+                      width: 18.w,
+                      height: 18.w,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.purple),
+                      ),
+                    )
+                  : Icon(
+                      Icons.my_location_rounded,
+                      color: AppColors.purple,
+                      size: _fs(context, 20),
+                    ),
+            ),
           ),
         ],
       ),
@@ -697,14 +1178,99 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  ADD PHOTO
+  //  ADD PHOTO (WITH PREVIEW & COMPRESSION)
   // ─────────────────────────────────────────────────────────────
 
   Widget _buildAddPhoto(BuildContext context, bool isTablet) {
     final iconBoxSize = isTablet ? 52.0 : 46.0;
 
+    if (_selectedImage != null) {
+      return Container(
+        width: double.infinity,
+        height: 140.h,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: AppColors.purple),
+          image: DecorationImage(
+            image: FileImage(_selectedImage!),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20.r),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.4),
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.6),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10.h,
+              right: 10.w,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedImage = null;
+                    _imageBase64 = "";
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.all(6.w),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: Colors.white,
+                    size: 18.sp,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 10.h,
+              left: 14.w,
+              child: GestureDetector(
+                onTap: _showImagePickerSheet,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, color: Colors.white70, size: 14.sp),
+                      SizedBox(width: 4.w),
+                      Text(
+                        "Change Photo",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 11.sp,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return GestureDetector(
-      onTap: () {},
+      onTap: _showImagePickerSheet,
       child: DottedBorder(
         options: RoundedRectDottedBorderOptions(
           color: AppColors.purple,
@@ -725,7 +1291,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           ),
           child: Row(
             children: [
-              // Left icon
               Container(
                 width: iconBoxSize.w,
                 height: iconBoxSize.w,
@@ -739,9 +1304,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   size: _fs(context, 22),
                 ),
               ),
-
               SizedBox(width: 14.w),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -765,8 +1328,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   ],
                 ),
               ),
-
-              // Right "+" icon
               Container(
                 width: iconBoxSize.w,
                 height: iconBoxSize.w,
@@ -786,6 +1347,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ),
     );
   }
+
   // ─────────────────────────────────────────────────────────────
   //  DATE CARD
   // ─────────────────────────────────────────────────────────────

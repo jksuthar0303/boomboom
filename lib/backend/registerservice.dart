@@ -99,6 +99,34 @@ class RegisterService {
     );
   }
 
+  /// SOAP MediaDelete request
+  Future<XmlResponse> mediaDelete({
+    required int id,
+    required String email,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <MediaDelete xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Id>$id</Id>
+      <Email>$email</Email>
+    </MediaDelete>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/MediaDelete"',
+      },
+    );
+  }
+
   /// SOAP Login request
   Future<XmlResponse> login({
     required String email,
@@ -123,6 +151,48 @@ class RegisterService {
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
       headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
+    );
+  }
+
+  /// SOAP SendEmailOTP request
+  Future<XmlResponse> sendEmailOTP({
+    required String email,
+    required String otp,
+  }) async {
+    debugPrint("🔥 [SendEmailOTP Request] Email: $email, OTP: $otp");
+
+    final String cleanEmail = email
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+    final String cleanOtp = otp
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <SendEmailOTP xmlns="$namespace">
+      <Email>$cleanEmail</Email>
+      <OTP>$cleanOtp</OTP>
+    </SendEmailOTP>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"${namespace}SendEmailOTP"',
+      },
     );
   }
 
@@ -185,21 +255,52 @@ class RegisterService {
   }) async {
     final String xmlBody =
         '''<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
     <ForgotPassword xmlns="$namespace">
       <token>${AppConstants.dummyToken}</token>
       <EmailAddress>$email</EmailAddress>
       <NewPassword>$newPassword</NewPassword>
     </ForgotPassword>
-  </soap12:Body>
-</soap12:Envelope>'''
+  </soap:Body>
+</soap:Envelope>'''
             .trim();
 
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
-      headers: {'Content-Type': 'application/soap+xml; charset=utf-8'},
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/ForgotPassword"',
+      },
+    );
+  }
+
+  /// SOAP UpdateOnlineStatus request
+  Future<XmlResponse> updateOnlineStatus({
+    required String email,
+    required bool isOnline,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <UpdateOnlineStatus xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <IsOnline>${isOnline ? 'True' : 'False'}</IsOnline>
+    </UpdateOnlineStatus>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/UpdateOnlineStatus"',
+      },
     );
   }
 
@@ -537,34 +638,6 @@ class RegisterService {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         'SOAPAction': '"http://tempuri.org/ShowCompleteProfile"',
-      },
-    );
-  }
-
-  /// SOAP MediaDelete request
-  Future<XmlResponse> mediaDelete({
-    required int id,
-    required String email,
-  }) async {
-    final String xmlBody =
-        '''<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Body>
-    <MediaDelete xmlns="$namespace">
-      <token>${AppConstants.dummyToken}</token>
-      <Id>$id</Id>
-      <Email>$email</Email>
-    </MediaDelete>
-  </soap:Body>
-</soap:Envelope>'''
-            .trim();
-
-    return await _client.postXml(
-      endpoint: AppConstants.apiEndpoint,
-      xmlBody: xmlBody,
-      headers: {
-        'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': '"http://tempuri.org/MediaDelete"',
       },
     );
   }

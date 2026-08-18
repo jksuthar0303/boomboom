@@ -9,6 +9,40 @@ class HomeService {
 
   static const String namespace = AppConstants.tempuriNamespace;
 
+  /// SOAP ShowSettingsByEmail request.
+  /// The service returns an XML response whose inner text is JSON.
+  Future<XmlResponse> showSettingsByEmail({
+    required String email,
+    String? token,
+  }) async {
+    final cleanEmail = _escapeXml(email);
+    final xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ShowSettingsByEmail xmlns="$namespace">
+      <token>${token ?? AppConstants.dummyToken}</token>
+      <Email>$cleanEmail</Email>
+    </ShowSettingsByEmail>
+  </soap:Body>
+</soap:Envelope>'''.trim();
+
+    return _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"${namespace}ShowSettingsByEmail"',
+      },
+    );
+  }
+
+  String _escapeXml(String value) => value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&apos;');
+
   /// SOAP FavoriteLikeView_Insert request.
   Future<XmlResponse> favoriteLikeViewInsert({
     required String myEmail,

@@ -31,7 +31,10 @@ Yeh woh APIs hain jo backend se fully connected hain aur project ke services/con
 | 17 | `InsertTravel` | POST (SOAP XML) | User ki Travel/Journey create karna (JourneyType, TravelStyle, TravelCompanion, ishide, FromLocation, Destination, Dates, Description, Email) | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
 | 18 | `ShowTravelByEmail` | POST (SOAP XML) | Logged-in user ke sabhi created journeys fetch karna by Email | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
 | 19 | `DeleteTravel` | POST (SOAP XML) | User ki created travel journey delete karna by ID and Email | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
-| 20 | `ShowUpcomingTrips` | POST (SOAP XML) | Sabhi travelers ki upcoming trips fetch karna (Arrivals tab ke liye) | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
+| 20 | `ShowTravelUpcoming` | POST (SOAP XML) | Sabhi travelers ki upcoming trips fetch karna (Arrivals tab ke liye) | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
+| 21 | `InsertTonight` | POST (SOAP XML) | Tonight event create/publish karna (Planning, Description, Location, Image Base64, Date, Time, Email) | [`lib/backend/tonight_service.dart`](file:///g:/boomboom/lib/backend/tonight_service.dart) |
+| 22 | `ShowTonight` | POST (SOAP XML) | Nearby Free Tonight events fetch karna by Email, Radius, and Planning filter | [`lib/backend/tonight_service.dart`](file:///g:/boomboom/lib/backend/tonight_service.dart) |
+| 23 | `SendEmailOTP` | POST (SOAP XML) | User verification ke liye 6-digit email OTP bhejna (Email, OTP) | [`lib/backend/registerservice.dart`](file:///g:/boomboom/lib/backend/registerservice.dart) |
 
 ---
 

@@ -1,12 +1,11 @@
-// freetonightscreen.dart
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:get/get_core/src/get_main.dart';
-import 'package:get/get_navigation/src/extension_navigation.dart';
-import 'package:get/get_navigation/src/routes/transitions_type.dart';
-
+import 'package:get/get.dart';
+import '../../../../backend/secure_storage.dart';
+import '../../../../backend/tonight_service.dart';
+import '../../../../widget/app_image_helper.dart';
+import 'createeventscreen.dart';
 import 'eventprofile.dart';
 
 class FreeTonightScreen extends StatefulWidget {
@@ -17,86 +16,201 @@ class FreeTonightScreen extends StatefulWidget {
 }
 
 class _FreeTonightScreenState extends State<FreeTonightScreen> {
+  final TonightService _tonightService = TonightService();
+
   String selectedCategory = "All";
-  RangeValues _distanceRange = const RangeValues(0, 20);
+  RangeValues _distanceRange = const RangeValues(0, 50);
   final Set<int> _likedIndexes = {};
+
+  List<Map<String, dynamic>> _tonightList = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTonightData();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 📡 FETCH TONIGHT DATA VIA API
+  // ─────────────────────────────────────────────────────────────
+
+  Future<void> _fetchTonightData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final email = await SecureStorage().getUserEmail() ?? "";
+
+      // Clean category filter (remove leading emojis e.g. "🍽 Dinner" -> "Dinner")
+      String planningFilter = selectedCategory;
+      if (planningFilter == "All") {
+        planningFilter = "";
+      } else {
+        planningFilter = planningFilter
+            .replaceAll(RegExp(r'^[^\w]+'), '')
+            .trim();
+      }
+
+      final result = await _tonightService.showTonight(
+        email: email.trim(),
+        radius: _distanceRange.end,
+        planning: planningFilter,
+      );
+
+      if (mounted) {
+        setState(() {
+          _tonightList = result;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _calculateAgeFromDob(dynamic dobVal, dynamic ageVal) {
+    if (ageVal != null &&
+        ageVal.toString().trim().isNotEmpty &&
+        ageVal.toString().trim() != "null") {
+      return ageVal.toString().trim();
+    }
+    if (dobVal == null) return "";
+    final String str = dobVal.toString().trim();
+    if (str.isEmpty || str == "null") return "";
+    try {
+      final dob = DateTime.parse(str);
+      final now = DateTime.now();
+      int age = now.year - dob.year;
+      if (now.month < dob.month ||
+          (now.month == dob.month && now.day < dob.day)) {
+        age--;
+      }
+      return age > 0 ? "$age" : "";
+    } catch (_) {
+      return "";
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     bool isTablet = size.width > 600;
 
-    final filteredPeople = selectedCategory == "All"
-        ? people
-        : people.where((e) => e.type == selectedCategory).toList();
-
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: isTablet ? 28 : 16,
-        vertical: 12,
+        horizontal: isTablet ? 28.w : 16.w,
+        vertical: 12.h,
       ),
       child: Column(
         children: [
-          /// CATEGORY CHIPS
+          /// 1. CATEGORY CHIPS
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             child: Row(
               children: [
                 categoryChip(
                   title: "All",
                   selected: selectedCategory == "All",
-                  onTap: () => setState(() => selectedCategory = "All"),
+                  onTap: () {
+                    if (selectedCategory != "All") {
+                      setState(() => selectedCategory = "All");
+                      _fetchTonightData();
+                    }
+                  },
                 ),
                 categoryChip(
                   title: "🍽 Dinner",
                   selected: selectedCategory == "🍽 Dinner",
-                  onTap: () => setState(() => selectedCategory = "🍽 Dinner"),
+                  onTap: () {
+                    if (selectedCategory != "🍽 Dinner") {
+                      setState(() => selectedCategory = "🍽 Dinner");
+                      _fetchTonightData();
+                    }
+                  },
                 ),
                 categoryChip(
                   title: "🎉 Party",
                   selected: selectedCategory == "🎉 Party",
-                  onTap: () => setState(() => selectedCategory = "🎉 Party"),
+                  onTap: () {
+                    if (selectedCategory != "🎉 Party") {
+                      setState(() => selectedCategory = "🎉 Party");
+                      _fetchTonightData();
+                    }
+                  },
                 ),
                 categoryChip(
                   title: "💬 Chat, Meet-up",
                   selected: selectedCategory == "💬 Chat, Meet-up",
-                  onTap: () =>
-                      setState(() => selectedCategory = "💬 Chat, Meet-up"),
+                  onTap: () {
+                    if (selectedCategory != "💬 Chat, Meet-up") {
+                      setState(() => selectedCategory = "💬 Chat, Meet-up");
+                      _fetchTonightData();
+                    }
+                  },
                 ),
                 categoryChip(
                   title: "Drinks Tonight",
                   selected: selectedCategory == "Drinks Tonight",
-                  onTap: () =>
-                      setState(() => selectedCategory = "Drinks Tonight"),
+                  onTap: () {
+                    if (selectedCategory != "Drinks Tonight") {
+                      setState(() => selectedCategory = "Drinks Tonight");
+                      _fetchTonightData();
+                    }
+                  },
                 ),
                 categoryChip(
                   title: "Party Buddy",
                   selected: selectedCategory == "Party Buddy",
-                  onTap: () => setState(() => selectedCategory = "Party Buddy"),
+                  onTap: () {
+                    if (selectedCategory != "Party Buddy") {
+                      setState(() => selectedCategory = "Party Buddy");
+                      _fetchTonightData();
+                    }
+                  },
                 ),
                 categoryChip(
                   title: "Spontaneous Plans",
                   selected: selectedCategory == "Spontaneous Plans",
-                  onTap: () =>
-                      setState(() => selectedCategory = "Spontaneous Plans"),
+                  onTap: () {
+                    if (selectedCategory != "Spontaneous Plans") {
+                      setState(() => selectedCategory = "Spontaneous Plans");
+                      _fetchTonightData();
+                    }
+                  },
                 ),
                 categoryChip(
                   title: "Night Out",
                   selected: selectedCategory == "Night Out",
-                  onTap: () => setState(() => selectedCategory = "Night Out"),
+                  onTap: () {
+                    if (selectedCategory != "Night Out") {
+                      setState(() => selectedCategory = "Night Out");
+                      _fetchTonightData();
+                    }
+                  },
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 14),
+          SizedBox(height: 14.h),
 
-          /// DISTANCE RANGE SLIDER
+          /// 2. DISTANCE RANGE SLIDER
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 8.h),
             decoration: BoxDecoration(
               color: const Color(0xFF11182B),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(20.r),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,15 +218,19 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.location_on, color: Colors.pink, size: 16),
-                        SizedBox(width: 5),
+                        Icon(
+                          Icons.location_on,
+                          color: Colors.pink,
+                          size: 16.sp,
+                        ),
+                        SizedBox(width: 5.w),
                         Text(
                           "Distance",
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 14,
+                            fontSize: 14.sp,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -120,10 +238,7 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                     ),
                     Text(
                       "${_distanceRange.start.toStringAsFixed(0)} km – ${_distanceRange.end.toStringAsFixed(0)} km",
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 12.sp),
                     ),
                   ],
                 ),
@@ -138,9 +253,9 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                     ),
                     showValueIndicator: ShowValueIndicator.onDrag,
                     valueIndicatorColor: Colors.pinkAccent,
-                    valueIndicatorTextStyle: const TextStyle(
+                    valueIndicatorTextStyle: TextStyle(
                       color: Colors.white,
-                      fontSize: 11,
+                      fontSize: 11.sp,
                     ),
                   ),
                   child: RangeSlider(
@@ -152,18 +267,19 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                       "${_distanceRange.end.toStringAsFixed(0)} km",
                     ),
                     onChanged: (v) => setState(() => _distanceRange = v),
+                    onChangeEnd: (_) => _fetchTonightData(),
                   ),
                 ),
-                const Row(
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       "0 km",
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                      style: TextStyle(color: Colors.white38, fontSize: 11.sp),
                     ),
                     Text(
                       "150 km",
-                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                      style: TextStyle(color: Colors.white38, fontSize: 11.sp),
                     ),
                   ],
                 ),
@@ -171,27 +287,48 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
             ),
           ),
 
-          const SizedBox(height: 14),
+          SizedBox(height: 14.h),
 
-          /// GRID
+          /// 3. BODY (LOADING / ERROR / EMPTY / GRID)
           Expanded(
-            child: GridView.builder(
-              scrollCacheExtent: ScrollCacheExtent.pixels(1000),
-              itemCount: filteredPeople.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: isTablet ? 3 : 2,
-                crossAxisSpacing: 6,
-                mainAxisSpacing: 6,
-                childAspectRatio: isTablet ? 0.78 : 0.68,
-              ),
-              itemBuilder: (context, index) =>
-                  personCard(filteredPeople[index], isTablet, index),
-            ),
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.pinkAccent,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : _errorMessage != null
+                ? _buildErrorState()
+                : _tonightList.isEmpty
+                ? _buildEmptyState(isTablet)
+                : RefreshIndicator(
+                    color: Colors.pinkAccent,
+                    backgroundColor: const Color(0xFF131A2A),
+                    onRefresh: _fetchTonightData,
+                    child: GridView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      scrollCacheExtent: ScrollCacheExtent.pixels(1000),
+                      itemCount: _tonightList.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isTablet ? 3 : 2,
+                        crossAxisSpacing: 8.w,
+                        mainAxisSpacing: 8.h,
+                        childAspectRatio: isTablet ? 0.78 : 0.68,
+                      ),
+                      itemBuilder: (context, index) =>
+                          _personCard(_tonightList[index], isTablet, index),
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
+
+  // ─────────────────────────────────────────────────────────────
+  // 🔘 CATEGORY CHIP
+  // ─────────────────────────────────────────────────────────────
 
   Widget categoryChip({
     required String title,
@@ -201,10 +338,10 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(right: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        margin: EdgeInsets.only(right: 10.w),
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 9.h),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(14.r),
           gradient: selected
               ? const LinearGradient(
                   colors: [Color(0xFFFF3DA1), Color(0xFFFF007A)],
@@ -214,76 +351,231 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
         ),
         child: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w500,
-            fontSize: 13,
+            fontSize: 13.sp,
           ),
         ),
       ),
     );
   }
 
-  IconData getTypeIcon(String type) {
-    switch (type) {
-      case "🍽 Dinner":
-        return Icons.restaurant_menu_rounded;
+  // ─────────────────────────────────────────────────────────────
+  // 📭 EMPTY STATE
+  // ─────────────────────────────────────────────────────────────
 
-      case "🎉 Party":
-        return Icons.celebration_rounded;
-
-      case "💬 Chat, Meet-up":
-        return Icons.forum_rounded;
-
-      default:
-        return Icons.local_activity_rounded;
-    }
+  Widget _buildEmptyState(bool isTablet) {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 90.w,
+                height: 90.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFFF3DA1).withValues(alpha: 0.18),
+                      const Color(0xFF6A5AE0).withValues(alpha: 0.18),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: const Color(0xFFFF3DA1).withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  Icons.nightlife_rounded,
+                  size: 44.sp,
+                  color: const Color(0xFFFF3DA1),
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                "No Tonight Plans Found",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                "No one in your area is free tonight for this vibe yet.\nBe the first to create one!",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 12.5.sp,
+                  height: 1.5,
+                ),
+              ),
+              SizedBox(height: 20.h),
+              GestureDetector(
+                onTap: () async {
+                  final res = await Get.to(() => const CreateEventScreen());
+                  if (res == true) {
+                    _fetchTonightData();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 22.w,
+                    vertical: 12.h,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF3DA1), Color(0xFFFF007A)],
+                    ),
+                    borderRadius: BorderRadius.circular(25.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF007A).withValues(alpha: 0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add_rounded, color: Colors.white, size: 18.sp),
+                      SizedBox(width: 6.w),
+                      Text(
+                        "Create Your Tonight",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  Widget personCard(PersonModel item, bool isTablet, int index) {
+  // ─────────────────────────────────────────────────────────────
+  // ⚠️ ERROR STATE
+  // ─────────────────────────────────────────────────────────────
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(20.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              color: Colors.pinkAccent,
+              size: 48.sp,
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              "Unable to load Tonight plans",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 6.h),
+            Text(
+              _errorMessage ?? "Something went wrong",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white54, fontSize: 12.sp),
+            ),
+            SizedBox(height: 16.h),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF3DA1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20.r),
+                ),
+              ),
+              onPressed: _fetchTonightData,
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              label: const Text("Retry", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 👤 USER CARD
+  // ─────────────────────────────────────────────────────────────
+
+  Widget _personCard(Map<String, dynamic> item, bool isTablet, int index) {
+    final rawName = (item["FullName"] ?? item["Name"] ?? item["name"] ?? "")
+        .toString()
+        .trim();
+    final email = (item["Email"] ?? item["EmailAddress"] ?? item["email"] ?? "")
+        .toString()
+        .trim();
+    final name = rawName.isNotEmpty
+        ? rawName
+        : (email.isNotEmpty ? email.split('@').first : "Traveler");
+
+    final age = _calculateAgeFromDob(item["Dob"], item["Age"] ?? item["age"]);
+    final nameDisplay = age.isNotEmpty ? "$name, $age" : name;
+
+    final image =
+        (item["Image"] ??
+                item["ProfileImage"] ??
+                item["image"] ??
+                item["Media"] ??
+                "")
+            .toString()
+            .trim();
+
+    final planning =
+        (item["Planning"] ?? item["tag"] ?? item["type"] ?? "Tonight")
+            .toString()
+            .trim();
+    final location =
+        (item["Location"] ?? item["FromCity"] ?? item["location"] ?? "Nearby")
+            .toString()
+            .trim();
+    final timeStr = (item["Time"] ?? item["Date"] ?? "Tonight")
+        .toString()
+        .trim();
+
     return GestureDetector(
       onTap: () {
         Get.to(
-          const ProfileDetailsScreen(),
+          () => ProfileDetailsScreen(data: item),
           transition: Transition.rightToLeft,
           duration: const Duration(milliseconds: 350),
         );
       },
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20.r),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            /// IMAGE — optimized fast load
-            Positioned.fill(
-              child: CachedNetworkImage(
-                imageUrl: "${item.image}?w=800&q=90&fit=crop",
-                fit: BoxFit.cover,
-                memCacheWidth: 800,
-                fadeInDuration: Duration.zero,
-
-                placeholder: (context, url) => Container(
-                  color: const Color(0xFF11182B),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.pinkAccent,
-                      strokeWidth: 1.5,
-                    ),
-                  ),
-                ),
-
-                errorWidget: (context, url, error) => Container(
-                  color: const Color(0xFF1a1a2e),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white24,
-                    size: 48,
-                  ),
-                ),
-              ),
+            /// 📸 IMAGE VIA GLOBAL HELPER
+            AppNetworkImage(
+              imageUrl: image,
+              fit: BoxFit.cover,
+              fallbackIcon: Icons.person,
+              fallbackIconSize: 48.sp,
+              backgroundColor: const Color(0xFF161E31),
             ),
 
-            /// GRADIENT OVERLAY
+            /// 🎨 GRADIENT OVERLAY
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -292,7 +584,7 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                   stops: const [0.35, 1.0],
                   colors: [
                     Colors.black.withValues(alpha: 0.03),
-                    Colors.black.withValues(alpha: 0.90),
+                    Colors.black.withValues(alpha: 0.92),
                   ],
                 ),
               ),
@@ -301,25 +593,19 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
             /// SUBTLE BORDER
             Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
             ),
 
-            /// TOP — ACTIVE + HEART
+            /// 🏷️ TOP — PLANNING TAG + HEART
             Positioned(
-              top: 6,
-              left: 9,
-              right: 9,
+              top: 8.h,
+              left: 9.w,
+              right: 9.w,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Container(
-                  //   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  //   decoration: BoxDecoration(
-                  //     color: Colors.black.withOpacity(0.50),
-                  //     borderRadius: BorderRadius.circular(20),
-                  //   ),
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(30.r),
@@ -330,25 +616,24 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                       ),
                     ),
                     child: Container(
-                      margin: EdgeInsets.all(1.5.w), // ✅ border thickness
-                      height: 18.h, // ✅ inner height kam
+                      margin: EdgeInsets.all(1.2.w),
                       padding: EdgeInsets.symmetric(
-                        horizontal: 7.w,
-                        vertical: 2.h,
+                        horizontal: 8.w,
+                        vertical: 3.h,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.70),
+                        color: Colors.black.withValues(alpha: 0.75),
                         borderRadius: BorderRadius.circular(28.r),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            item.type,
+                            planning,
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
-                              fontSize: 9.sp,
+                              fontSize: 9.5.sp,
                             ),
                           ),
                         ],
@@ -375,7 +660,7 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                         color: _likedIndexes.contains(index)
                             ? Colors.red
                             : Colors.white,
-                        size: 30,
+                        size: 26.sp,
                         shadows: const [
                           Shadow(color: Colors.black54, blurRadius: 6),
                         ],
@@ -386,7 +671,7 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
               ),
             ),
 
-            /// BOTTOM INFO
+            /// 👤 BOTTOM INFO
             Positioned(
               bottom: 8.h,
               left: 7.w,
@@ -399,7 +684,7 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          "${item.name}, ${item.age}",
+                          nameDisplay,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.white,
@@ -408,13 +693,8 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(width: 2.w),
+                      SizedBox(width: 3.w),
                       Icon(Icons.verified, color: Colors.blue, size: 14.sp),
-                      SizedBox(width: 2.w),
-                      Text(
-                        item.flag,
-                        style: TextStyle(fontSize: isTablet ? 15.sp : 13.sp),
-                      ),
                     ],
                   ),
 
@@ -423,15 +703,20 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      profileBadge("${item.flag} India", Icons.public),
-
-                      SizedBox(height: 4.h),
-
+                      profileBadge(location, Icons.location_on),
+                      SizedBox(height: 3.h),
                       Row(
                         children: [
-                          profileBadge("50 km away", Icons.location_on),
-                          SizedBox(width: 4.w),
-                          profileBadge(item.lastSeen, Icons.access_time),
+                          Flexible(
+                            child: profileBadge(
+                              "${_distanceRange.end.toInt()} km away",
+                              Icons.near_me,
+                            ),
+                          ),
+                          SizedBox(width: 3.w),
+                          Flexible(
+                            child: profileBadge(timeStr, Icons.access_time),
+                          ),
                         ],
                       ),
                     ],
@@ -447,9 +732,9 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
 
   Widget profileBadge(String text, IconData icon) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 3.h),
+      padding: EdgeInsets.symmetric(horizontal: 4.5.w, vertical: 2.5.h),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.50),
+        color: Colors.black.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.10),
@@ -459,14 +744,18 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 8.sp, color: Colors.white70),
+          Icon(icon, size: 7.5.sp, color: Colors.white70),
           SizedBox(width: 2.w),
-          Text(
-            text,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 10.sp,
-              fontWeight: FontWeight.w500,
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 8.5.sp,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -474,162 +763,3 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
     );
   }
 }
-
-class PersonModel {
-  final String name;
-  final int age;
-  final String image;
-  final String type;
-  final String flag;
-  final String height;
-  final String lastSeen;
-
-  PersonModel({
-    required this.name,
-    required this.age,
-    required this.image,
-    required this.type,
-    required this.flag,
-    required this.height,
-    required this.lastSeen,
-  });
-}
-
-List<PersonModel> people = [
-  PersonModel(
-    name: "Anaya",
-    age: 24,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'4\"",
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-    type: "🍽 Dinner",
-  ),
-  PersonModel(
-    name: "Riya",
-    age: 23,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'3\"",
-    image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-    type: "💬 Chat, Meet-up",
-  ),
-  // ✅ Karan ki image fix — working URL
-  PersonModel(
-    name: "Karan",
-    age: 26,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'11\"",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
-    type: "🎉 Party",
-  ),
-  PersonModel(
-    name: "Sneha",
-    age: 22,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'5\"",
-    image: "https://images.unsplash.com/photo-1517841905240-472988babdf9",
-    type: "🎉 Party",
-  ),
-  PersonModel(
-    name: "Arjun",
-    age: 27,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "6'0\"",
-    image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d",
-    type: "🍽 Dinner",
-  ),
-  PersonModel(
-    name: "Megha",
-    age: 25,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'4\"",
-    image: "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df",
-    type: "💬 Chat, Meet-up",
-  ),
-  PersonModel(
-    name: "Aarav",
-    age: 28,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'10\"",
-    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e",
-    type: "🎉 Party",
-  ),
-  PersonModel(
-    name: "Kiara",
-    age: 21,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'6\"",
-    image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1",
-    type: "🍽 Dinner",
-  ),
-  PersonModel(
-    name: "Vivaan",
-    age: 29,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "6'1\"",
-    image: "https://images.unsplash.com/photo-1463453091185-61582044d556",
-    type: "💬 Chat, Meet-up",
-  ),
-  PersonModel(
-    name: "Tanya",
-    age: 24,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'5\"",
-    image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
-    type: "🎉 Party",
-  ),
-  PersonModel(
-    name: "Rahul",
-    age: 30,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'9\"",
-    image: "https://images.unsplash.com/photo-1500048993953-d23a436266cf",
-    type: "🍽 Dinner",
-  ),
-  PersonModel(
-    name: "Ishita",
-    age: 23,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'3\"",
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f",
-    type: "💬 Chat, Meet-up",
-  ),
-  PersonModel(
-    name: "Kabir",
-    age: 27,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'11\"",
-    image: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7",
-    type: "🎉 Party",
-  ),
-  PersonModel(
-    name: "Sara",
-    age: 22,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'4\"",
-    image: "https://images.unsplash.com/photo-1520813792240-56fc4a3765a7",
-    type: "🍽 Dinner",
-  ),
-  PersonModel(
-    name: "Dev",
-    age: 26,
-    flag: "🇮🇳",
-    lastSeen: "55 sec ago",
-    height: "5'10\"",
-    image: "https://images.unsplash.com/photo-1480455624313-e29b44bbfde1",
-    type: "💬 Chat, Meet-up",
-  ),
-];

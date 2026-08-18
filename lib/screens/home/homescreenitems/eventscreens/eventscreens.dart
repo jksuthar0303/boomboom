@@ -148,7 +148,12 @@ class _EventsScreenState extends State<EventsScreen> {
                           Icons.add,
                           isTablet,
                           isAccent: true,
-                          onTap: () => Get.to(CreateEventScreen()),
+                          onTap: () async {
+                            final res = await Get.to(() => const CreateEventScreen());
+                            if (res == true && mounted) {
+                              setState(() {});
+                            }
+                          },
                         ),
                       ],
                     ),

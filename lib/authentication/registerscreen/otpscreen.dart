@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:boomboom/authentication/registerscreen/registerfirst.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sms_autofill/sms_autofill.dart';
 
+import '../../backend/registerservice.dart';
+import '../../backend/secure_storage.dart';
 import '../../constant/appsize.dart';
 import '../../constant/apptextstyle.dart';
 import '../../constant/colors.dart';
@@ -33,7 +37,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
 
   bool isLoading = false;
   bool isResending = false;
-  int seconds = 30;
+  int seconds = 60;
   Timer? timer;
 
   // ================= INIT =================
@@ -51,7 +55,6 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
     await SmsAutoFill().listenForCode();
   }
 
-  /// ✅ Yeh method auto call hota hai jab SMS aata hai
   @override
   void codeUpdated() {
     if (code != null && code!.length == 6) {
@@ -64,20 +67,19 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
       controllers[i].text = otpCode[i];
     }
     setState(() {});
-    // Last box pe focus le jao
     FocusScope.of(context).requestFocus(focusNodes[5]);
   }
 
   // ================= TIMER =================
 
   void startTimer() {
-    seconds = 30;
+    seconds = 60;
     timer?.cancel();
     timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (seconds == 0) {
         timer.cancel();
       } else {
-        setState(() => seconds--);
+        if (mounted) setState(() => seconds--);
       }
     });
   }
@@ -87,7 +89,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
   @override
   void dispose() {
     timer?.cancel();
-    cancel(); // ✅ sms_autofill listener cancel
+    cancel();
     SmsAutoFill().unregisterListener();
     for (var c in controllers) {
       c.dispose();
@@ -106,14 +108,12 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
 
   Future<void> verifyOtp() async {
     if (otp.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.error,
-          content: Text(
-            "Please enter complete OTP",
-            style: AppTextStyles.body.copyWith(color: Colors.white),
-          ),
-        ),
+      Get.snackbar(
+        "Incomplete Code",
+        "Please enter the complete 6-digit OTP",
+        backgroundColor: AppColors.error,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
       );
       return;
     }
@@ -121,34 +121,51 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
     setState(() => isLoading = true);
 
     try {
-      await Future.delayed(const Duration(seconds: 2));
+      // 🛡️ Validate with stored OTP and 5-minute expiry
+      final verificationResult = await SecureStorage().verifyEmailOtp(
+        email: widget.email,
+        enteredOtp: otp,
+      );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.success,
-          content: Text(
-            "Email verified successfully",
-            style: AppTextStyles.body.copyWith(color: Colors.white),
+      if (verificationResult["success"] == true) {
+        Get.snackbar(
+          "Verified!",
+          "Email verified successfully! Proceeding to setup your profile...",
+          backgroundColor: const Color(0xFF1E293B),
+          colorText: Colors.white,
+          icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF00E676)),
+          duration: const Duration(seconds: 3),
+          snackPosition: SnackPosition.TOP,
+        );
+
+        await Future.delayed(const Duration(milliseconds: 600));
+
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CompleteProfileScreen(email: widget.email),
           ),
-        ),
-      );
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => CompleteProfileScreen(email: widget.email),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        );
+      } else {
+        Get.snackbar(
+          "Verification Failed",
+          verificationResult["message"] ?? "Invalid OTP code",
           backgroundColor: AppColors.error,
-          content: Text(
-            "Something went wrong",
-            style: AppTextStyles.body.copyWith(color: Colors.white),
-          ),
-        ),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 4),
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Verification failed. Please try again.",
+        backgroundColor: AppColors.error,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -158,36 +175,52 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
   // ================= RESEND OTP =================
 
   Future<void> resendOtp() async {
-    if (seconds != 0) return;
+    if (seconds != 0 || isResending) return;
 
     setState(() => isResending = true);
 
     try {
-      await Future.delayed(const Duration(seconds: 2));
+      // 1. Generate new 6-digit OTP
+      final newOtp = (100000 + Random().nextInt(900000)).toString();
+      debugPrint("🚀 [Resend OTP] Generated: $newOtp for ${widget.email}");
+
+      // 2. Call SendEmailOTP SOAP API
+      await RegisterService().sendEmailOTP(
+        email: widget.email,
+        otp: newOtp,
+      );
+
+      // 3. Save updated OTP in SecureStorage with fresh 5-minute expiry
+      await SecureStorage().saveEmailOtp(email: widget.email, otp: newOtp);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.success,
-          content: Text(
-            "OTP sent successfully",
-            style: AppTextStyles.body.copyWith(color: Colors.white),
-          ),
-        ),
+      // Clear input boxes
+      for (var c in controllers) {
+        c.clear();
+      }
+      FocusScope.of(context).requestFocus(focusNodes[0]);
+
+      Get.snackbar(
+        "New Code Sent!",
+        "A fresh OTP has been sent to ${widget.email}. (Please check your Inbox / Spam folder)",
+        backgroundColor: const Color(0xFF1E293B),
+        colorText: Colors.white,
+        icon: const Icon(Icons.mark_email_read_rounded, color: Color(0xFF00E676)),
+        duration: const Duration(seconds: 5),
+        snackPosition: SnackPosition.TOP,
+        margin: EdgeInsets.all(12.w),
       );
 
       startTimer();
-      _startSmsListening(); // ✅ Resend ke baad dobara listen karo
+      _startSmsListening();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.error,
-          content: Text(
-            "Failed to resend OTP",
-            style: AppTextStyles.body.copyWith(color: Colors.white),
-          ),
-        ),
+      Get.snackbar(
+        "Failed to resend",
+        "Unable to send new OTP. Please check your network and try again.",
+        backgroundColor: AppColors.error,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
       if (mounted) setState(() => isResending = false);
@@ -231,13 +264,13 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                 ),
               ),
 
-              SizedBox(height: AppSize.h(45)),
+              SizedBox(height: AppSize.h(30)),
 
               // ================= ICON =================
               Center(
                 child: Container(
-                  width: isTablet ? AppSize.w(150) : AppSize.w(120),
-                  height: isTablet ? AppSize.h(150) : AppSize.h(120),
+                  width: isTablet ? AppSize.w(140) : AppSize.w(110),
+                  height: isTablet ? AppSize.h(140) : AppSize.h(110),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
@@ -253,24 +286,25 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                   child: Icon(
                     Icons.mark_email_read_rounded,
                     color: AppColors.accent,
-                    size: isTablet ? 60.sp : 48.sp,
+                    size: isTablet ? 56.sp : 44.sp,
                   ),
                 ),
               ),
 
-              SizedBox(height: AppSize.h(45)),
+              SizedBox(height: AppSize.h(30)),
 
               // ================= TITLE =================
               Center(
                 child: Text(
                   "Email Verification",
                   style: AppTextStyles.heading.copyWith(
-                    fontSize: isTablet ? 36.sp : 30.sp,
+                    fontSize: isTablet ? 34.sp : 26.sp,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
 
-              SizedBox(height: AppSize.h(14)),
+              SizedBox(height: AppSize.h(10)),
 
               // ================= SUBTITLE =================
               Center(
@@ -278,13 +312,52 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                   "Enter the 6-digit code sent to\n${widget.email}",
                   textAlign: TextAlign.center,
                   style: AppTextStyles.body.copyWith(
-                    height: 1.7,
-                    fontSize: isTablet ? 16.sp : 14.sp,
+                    height: 1.5,
+                    fontSize: isTablet ? 15.sp : 13.sp,
+                    color: Colors.white70,
                   ),
                 ),
               ),
 
-              SizedBox(height: AppSize.h(50)),
+              SizedBox(height: AppSize.h(16)),
+
+              // ================= 💡 SPAM FOLDER & EXPIRY NOTICE =================
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 14.w,
+                  vertical: 10.h,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(14.r),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.accent,
+                      size: 18.sp,
+                    ),
+                    SizedBox(width: 10.w),
+                    Expanded(
+                      child: Text(
+                        "Note: If you don't find the email in your inbox, please check your Spam / Junk folder. Code is valid for 5 minutes.",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 11.5.sp,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: AppSize.h(30)),
 
               // ================= OTP BOXES =================
               Row(
@@ -293,31 +366,25 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                   final isFilled = controllers[index].text.isNotEmpty;
 
                   return AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    width: isTablet ? AppSize.w(82) : AppSize.w(48),
-                    height: isTablet ? AppSize.h(90) : AppSize.h(58),
+                    duration: const Duration(milliseconds: 200),
+                    width: isTablet ? AppSize.w(80) : AppSize.w(46),
+                    height: isTablet ? AppSize.h(86) : AppSize.h(56),
                     decoration: BoxDecoration(
                       color: AppColors.cardBg,
-                      borderRadius: BorderRadius.circular(20.r),
-
-                      // ✅ Border hamesha white — filled ho to bright, empty ho to soft white
+                      borderRadius: BorderRadius.circular(16.r),
                       border: Border.all(
                         color: isFilled
-                            ? Colors
-                                  .white // filled → pure white
-                            : Colors.white.withValues(
-                                alpha: 0.35,
-                              ), // empty → soft white
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.35),
                         width: isFilled ? 1.8 : 1.2,
                       ),
-
                       boxShadow: [
                         BoxShadow(
                           color: isFilled
                               ? Colors.white.withValues(alpha: 0.12)
                               : Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
                         ),
                       ],
                     ),
@@ -329,7 +396,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                           color: Colors.white,
-                          fontSize: isTablet ? 32.sp : 24.sp,
+                          fontSize: isTablet ? 30.sp : 22.sp,
                           fontWeight: FontWeight.w700,
                         ),
                         inputFormatters: [
@@ -339,14 +406,10 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                         onChanged: (value) {
                           setState(() {});
                           if (value.isNotEmpty && index < 5) {
-                            FocusScope.of(
-                              context,
-                            ).requestFocus(focusNodes[index + 1]);
+                            FocusScope.of(context).requestFocus(focusNodes[index + 1]);
                           }
                           if (value.isEmpty && index > 0) {
-                            FocusScope.of(
-                              context,
-                            ).requestFocus(focusNodes[index - 1]);
+                            FocusScope.of(context).requestFocus(focusNodes[index - 1]);
                           }
                         },
                         decoration: const InputDecoration(
@@ -359,7 +422,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                 }),
               ),
 
-              SizedBox(height: AppSize.h(35)),
+              SizedBox(height: AppSize.h(28)),
 
               // ================= TIMER =================
               Center(
@@ -380,12 +443,12 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                 ),
               ),
 
-              SizedBox(height: AppSize.h(18)),
+              SizedBox(height: AppSize.h(14)),
 
               // ================= RESEND =================
               Center(
                 child: GestureDetector(
-                  onTap: isResending ? null : resendOtp,
+                  onTap: seconds == 0 && !isResending ? resendOtp : null,
                   child: Text(
                     isResending ? "Sending..." : "Resend OTP",
                     style: AppTextStyles.body.copyWith(
@@ -397,7 +460,7 @@ class _EmailOtpScreenState extends State<EmailOtpScreen> with CodeAutoFill {
                 ),
               ),
 
-              SizedBox(height: AppSize.h(60)),
+              SizedBox(height: AppSize.h(40)),
 
               // ================= BUTTON =================
               PrimaryButton(
