@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:boomboom/backend/secure_storage.dart';
+import 'package:boomboom/backend/registerservice.dart';
+import 'package:xml/xml.dart' as xml;
 import 'package:get/get.dart';
 import '../../../controller/user_controller.dart';
 import '../../../constant/appsize.dart';
@@ -17,7 +19,12 @@ class UpdatePersonInfoUI extends StatefulWidget {
   State<UpdatePersonInfoUI> createState() => _UpdatePersonInfoUIState();
 }
 
+class UpdatePersonInfoImageStore {
+  static File? get selectedImage => _UpdatePersonInfoUIState.activeState?.profileImage;
+}
+
 class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
+  static _UpdatePersonInfoUIState? activeState;
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final UserController userController = Get.put(UserController());
@@ -25,6 +32,7 @@ class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
   @override
   void initState() {
     super.initState();
+    activeState = this;
     _loadProfileData();
   }
 
@@ -63,6 +71,40 @@ class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
     } catch (e) {
       debugPrint("Error loading profile in UpdatePersonInfoUI: $e");
     }
+
+    await _loadProfileFromApi();
+  }
+
+  Future<void> _loadProfileFromApi() async {
+    try {
+      final email = await SecureStorage().getUserEmail();
+      if (email == null || email.trim().isEmpty) return;
+
+      final response = await RegisterService().showProfile(email: email.trim());
+      final nodes = xml.XmlDocument.parse(response.body)
+          .findAllElements('ShowProfileResult');
+      if (nodes.isEmpty) return;
+
+      final decoded = jsonDecode(nodes.first.innerText);
+      final data = decoded['Data'];
+      if (data is! List || data.isEmpty || data.first is! Map || !mounted) return;
+
+      final profile = Map<String, dynamic>.from(data.first);
+      var media = profile['Media']?.toString();
+      if (media != null && media.isNotEmpty && !media.startsWith('http')) {
+        media = 'https://boomboomdate.com/$media';
+      }
+
+      setState(() {
+        profileImageUrl = media;
+        nameController.text = profile['FullName']?.toString() ?? nameController.text;
+        emailController.text = profile['EmailAddress']?.toString() ?? emailController.text;
+        userController.fullName.value = nameController.text;
+        userController.emailAddress.value = emailController.text;
+      });
+    } catch (e) {
+      debugPrint('Error loading ShowProfile in edit profile: $e');
+    }
   }
 
   // String selectedGender = "Male";
@@ -72,11 +114,17 @@ class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
   int age = 0;
 
   File? profileImage;
+  String? profileImageUrl;
 
   final ImagePicker _picker = ImagePicker();
 
   Future<void> pickFromGallery() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 1080,
+      maxHeight: 1080,
+    );
 
     if (pickedFile != null) {
       setState(() {
@@ -86,7 +134,12 @@ class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
   }
 
   Future<void> pickFromCamera() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.camera);
+    final pickedFile = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 70,
+      maxWidth: 1080,
+      maxHeight: 1080,
+    );
 
     if (pickedFile != null) {
       setState(() {
@@ -254,8 +307,11 @@ class _UpdatePersonInfoUIState extends State<UpdatePersonInfoUI> {
                     backgroundColor: AppColors.secondary,
                     backgroundImage: profileImage != null
                         ? FileImage(profileImage!)
-                        : null,
-                    child: profileImage == null
+                        : (profileImageUrl != null && profileImageUrl!.isNotEmpty
+                            ? NetworkImage(profileImageUrl!)
+                            : null),
+                    child: profileImage == null &&
+                            (profileImageUrl == null || profileImageUrl!.isEmpty)
                         ? Icon(Icons.person, size: 40.sp)
                         : null,
                   ),

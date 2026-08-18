@@ -146,6 +146,7 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
 
                   children: [
                     /// 🔥 SORT BY
+                    /* Date category temporarily hidden.
                     title("Date category"),
 
                     SizedBox(height: 10.h),
@@ -173,6 +174,7 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
                     SizedBox(height: 15.h),
 
                     /// 🔥 NATIONALITY
+                    */
                     title("Nationality"),
 
                     SizedBox(height: 14.h),
@@ -428,6 +430,7 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
                     SizedBox(height: 18.h),
 
                     /// 🔥 DATE RANGE
+                    /* Date range temporarily hidden.
                     title("Date Range"),
 
                     SizedBox(height: 10.h),
@@ -501,8 +504,9 @@ class _TravelFilterScreenState extends State<TravelFilterScreen> {
                     ),
 
                     SizedBox(height: 20.h),
+                    */
 
-                    /// 🔥 BUTTONS
+                    /// BUTTONS
                     Row(
                       children: [
                         Expanded(

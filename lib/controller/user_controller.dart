@@ -6,6 +6,7 @@ import '../backend/registerservice.dart';
 import '../backend/secure_storage.dart';
 import '../authentication/welcomscreens.dart';
 import '../authentication/registerscreen/imagesselection.dart';
+import '../screens/profile/updateprofile/updatepersona.dart';
 import '../widget/snakbar.dart';
 
 import 'auth_controller.dart';
@@ -70,6 +71,14 @@ class UserController extends GetxController {
       uploadStatus.value = "Saving profile information...";
       uploadProgress.value = 0.1;
 
+      String profileImageBase64 = '';
+      final profileImage = UpdatePersonInfoImageStore.selectedImage;
+      if (profileImage != null) {
+        uploadStatus.value = "Preparing profile image...";
+        uploadProgress.value = 0.05;
+        profileImageBase64 = base64Encode(await profileImage.readAsBytes());
+      }
+
       final response = await _registerService.updateProfile(
         email: email,
         fullName: fullName.value.trim(),
@@ -83,6 +92,12 @@ class UserController extends GetxController {
         bodyType: bodyType.value.trim(),
         drinkingHabits: drinkingHabits.value.trim(),
         workout: workout.value.trim(),
+        profileImage: profileImageBase64,
+        onSendProgress: (sent, total) {
+          if (total > 0) {
+            uploadProgress.value = 0.1 + (sent / total) * 0.7;
+          }
+        },
       );
 
       if (response.statusCode == 200) {

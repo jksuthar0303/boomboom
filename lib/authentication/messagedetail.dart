@@ -774,7 +774,8 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
           Expanded(child: _chatArea()),
           _inputBar(name),
           if (_showEmojiPicker) _emojiPickerPanel(),
-          SizedBox(height: MediaQuery.of(context).padding.bottom),
+          if (!_showEmojiPicker)
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
     );

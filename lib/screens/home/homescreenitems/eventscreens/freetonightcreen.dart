@@ -150,16 +150,6 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                   },
                 ),
                 categoryChip(
-                  title: "💬 Chat, Meet-up",
-                  selected: selectedCategory == "💬 Chat, Meet-up",
-                  onTap: () {
-                    if (selectedCategory != "💬 Chat, Meet-up") {
-                      setState(() => selectedCategory = "💬 Chat, Meet-up");
-                      _fetchTonightData();
-                    }
-                  },
-                ),
-                categoryChip(
                   title: "Drinks Tonight",
                   selected: selectedCategory == "Drinks Tonight",
                   onTap: () {
@@ -190,11 +180,11 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                   },
                 ),
                 categoryChip(
-                  title: "Night Out",
-                  selected: selectedCategory == "Night Out",
+                  title: "Nightout",
+                  selected: selectedCategory == "Nightout",
                   onTap: () {
-                    if (selectedCategory != "Night Out") {
-                      setState(() => selectedCategory = "Night Out");
+                    if (selectedCategory != "Nightout") {
+                      setState(() => selectedCategory = "Nightout");
                       _fetchTonightData();
                     }
                   },

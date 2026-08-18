@@ -842,35 +842,63 @@ class _TopBar extends StatelessWidget {
 }
 
 // ─── Profile Card ─────────────────────────────────────────────────────────────
+Future<Map<String, dynamic>> _loadOwnProfileCardData() async {
+  Map<String, dynamic> cached = {};
+  try {
+    final jsonStr = await SecureStorage().getProfileJson();
+    if (jsonStr != null && jsonStr.isNotEmpty) {
+      final decoded = jsonDecode(jsonStr);
+      final data = decoded['Data'];
+      if (data is List && data.isNotEmpty && data.first is Map) {
+        cached = Map<String, dynamic>.from(data.first);
+      }
+    }
+  } catch (e) {
+    debugPrint('Error parsing cached profile card: $e');
+  }
+
+  try {
+    final email = await SecureStorage().getUserEmail();
+    if (email != null && email.trim().isNotEmpty) {
+      final response = await RegisterService().showProfile(email: email.trim());
+      final nodes = xml.XmlDocument.parse(response.body)
+          .findAllElements('ShowProfileResult');
+      if (nodes.isNotEmpty) {
+        final decoded = jsonDecode(nodes.first.innerText);
+        final data = decoded['Data'];
+        if (data is List && data.isNotEmpty && data.first is Map) {
+          return Map<String, dynamic>.from(data.first);
+        }
+      }
+    }
+  } catch (e) {
+    debugPrint('Error loading ShowProfile for card: $e');
+  }
+  return cached;
+}
+
 class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     _R.isTablet(context);
 
-    return FutureBuilder<String?>(
-      future: SecureStorage().getProfileJson(),
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _loadOwnProfileCardData(),
       builder: (context, snapshot) {
         String name = "Sid";
         String email = "rocker971155@gmail.com";
         String initialLetter = "S";
+        String? mediaUrl;
 
-        if (snapshot.hasData &&
-            snapshot.data != null &&
-            snapshot.data!.isNotEmpty) {
-          try {
-            final decoded = jsonDecode(snapshot.data!);
-            final List? dataList = decoded["Data"];
-            if (dataList != null && dataList.isNotEmpty) {
-              final data = dataList.first;
-              name = data["FullName"] ?? name;
-              email = data["EmailAddress"] ?? email;
-              if (name.isNotEmpty) {
-                initialLetter = name[0].toUpperCase();
-              }
-            }
-          } catch (e) {
-            debugPrint("Error parsing profile in _ProfileCard: $e");
+        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          final data = snapshot.data!;
+          name = data["FullName"]?.toString() ?? name;
+          email = data["EmailAddress"]?.toString() ?? email;
+          mediaUrl = data["Media"]?.toString();
+          if (mediaUrl != null && mediaUrl.isNotEmpty && !mediaUrl.startsWith('http')) {
+            mediaUrl = 'https://boomboomdate.com/$mediaUrl';
           }
+          if (name.isNotEmpty) initialLetter = name[0].toUpperCase();
         }
 
         return Padding(
@@ -942,16 +970,35 @@ class _ProfileCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Text(
-                            initialLetter,
-                            style: GoogleFonts.nunito(
-                              fontSize: 34.sp,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFFFFC107),
-                            ),
-                          ),
-                        ),
+                        child: mediaUrl != null && mediaUrl.isNotEmpty
+                            ? ClipOval(
+                                child: Image.network(
+                                  mediaUrl,
+                                  width: 86.w,
+                                  height: 86.w,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                      initialLetter,
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 34.sp,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFFFFC107),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  initialLetter,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 34.sp,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFFFFC107),
+                                  ),
+                                ),
+                              ),
                       ),
                       Positioned(
                         bottom: 0,

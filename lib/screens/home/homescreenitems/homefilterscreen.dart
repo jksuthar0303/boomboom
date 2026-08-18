@@ -234,7 +234,10 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
 
   double _minAge = 18;
   double _maxAge = 100;
-  double _distance = 50;
+  double _distance = 150;
+  bool _distance150Plus = false;
+  bool _distanceFilterActive = false;
+  bool _heightFilterActive = false;
   String? _selectedNationality;
   String _cityCountry = '';
 
@@ -253,6 +256,8 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _minAge = _filterCtrl.minAge.value;
     _maxAge = _filterCtrl.maxAge.value;
     _distance = _filterCtrl.maxDistance.value;
+    _distance150Plus = _filterCtrl.distance150Plus.value;
+    _distanceFilterActive = _filterCtrl.distanceFilterActive.value;
     _selectedNationality = _filterCtrl.selectedNationality.value;
     _cityCountry = _filterCtrl.cityCountry.value;
     _selectedGenders.addAll(_filterCtrl.selectedGenders);
@@ -261,6 +266,8 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _selectedHeights.addAll(_filterCtrl.selectedHeights);
     _selectedDrinking.addAll(_filterCtrl.selectedDrinking);
     _selectedWorkout.addAll(_filterCtrl.selectedWorkout);
+    _heightCm = _filterCtrl.selectedHeightCm.value;
+    _heightFilterActive = _filterCtrl.heightFilterActive.value;
     _selectedInterests.addAll(_filterCtrl.selectedInterests);
   }
 
@@ -269,7 +276,9 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     setState(() {
       _minAge = 18;
       _maxAge = 100;
-      _distance = 50;
+      _distance = 150;
+      _distance150Plus = false;
+      _distanceFilterActive = false;
       _cityCountry = '';
       _selectedNationality = null;
       _selectedGenders.clear();
@@ -279,6 +288,8 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
       _selectedDrinking.clear();
       _selectedWorkout.clear();
       _selectedRelationship.clear();
+      _heightCm = 175;
+      _heightFilterActive = false;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -298,6 +309,8 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _filterCtrl.minAge.value = _minAge;
     _filterCtrl.maxAge.value = _maxAge;
     _filterCtrl.maxDistance.value = _distance;
+    _filterCtrl.distance150Plus.value = _distance150Plus;
+    _filterCtrl.distanceFilterActive.value = _distanceFilterActive;
     _filterCtrl.selectedNationality.value = _selectedNationality;
     _filterCtrl.cityCountry.value = _cityCountry;
     _filterCtrl.selectedGenders.assignAll(_selectedGenders);
@@ -307,6 +320,8 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _filterCtrl.selectedDrinking.assignAll(_selectedDrinking);
     _filterCtrl.selectedWorkout.assignAll(_selectedWorkout);
     _filterCtrl.selectedInterests.assignAll(_selectedInterests);
+    _filterCtrl.selectedHeightCm.value = _heightCm;
+    _filterCtrl.heightFilterActive.value = _heightFilterActive;
 
     _filterCtrl.notifyFilterApplied();
 
@@ -502,9 +517,21 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
         SizedBox(height: AppSize.h(16)),
 
         // Distance
-        _label('Maximum Distance: ${_distance.toInt()} km', context),
+        _label(
+          'Maximum Distance: ${_distance150Plus ? '150+' : _distance.toInt()} km',
+          context,
+        ),
 
-        _buildSlider(_distance, 1, 150, (v) => setState(() => _distance = v)),
+        _buildSlider(
+          _distance,
+          1,
+          150,
+          (v) => setState(() {
+            _distance = v;
+            _distance150Plus = v >= 150;
+            _distanceFilterActive = true;
+          }),
+        ),
 
         SizedBox(height: AppSize.h(16)),
 
@@ -694,6 +721,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
               onChanged: (v) {
                 setState(() {
                   _heightCm = v;
+                  _heightFilterActive = true;
                 });
               },
             ),

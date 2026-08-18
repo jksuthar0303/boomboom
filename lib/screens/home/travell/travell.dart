@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:geocoding/geocoding.dart' as geo;
+import 'package:geolocator/geolocator.dart';
 import 'package:boomboom/screens/home/travell/filterscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -7,7 +11,9 @@ import 'package:intl/intl.dart';
 import '../../../authentication/userdetails.dart';
 import '../../../backend/routesmatch.dart';
 import '../../../backend/secure_storage.dart';
+import '../../../backend/registerservice.dart';
 import '../../../backend/travel_service.dart';
+import 'package:xml/xml.dart' as xml;
 import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../constant/colors.dart';
@@ -62,7 +68,12 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
     }
 
     try {
-      final list = await _travelService.showUpcomingTrips();
+      final email = await SecureStorage().getUserEmail() ?? '';
+      final country = await _loadMyCountry(email);
+      final list = await _travelService.showUpcomingTrips(
+        myEmail: email.trim(),
+        myCountry: country,
+      );
       if (mounted) {
         setState(() {
           _upcomingTrips = list;
@@ -78,6 +89,56 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
         });
       }
     }
+  }
+
+  Future<String> _loadMyCountry(String email) async {
+    if (email.trim().isEmpty) return '';
+
+    try {
+      final response = await RegisterService().showProfile(email: email.trim());
+      final nodes = xml.XmlDocument.parse(response.body)
+          .findAllElements('ShowProfileResult');
+      if (nodes.isEmpty) return '';
+
+      final decoded = jsonDecode(nodes.first.innerText.trim());
+      final data = decoded['Data'];
+      if (data is List && data.isNotEmpty && data.first is Map) {
+        final profile = Map<String, dynamic>.from(data.first);
+        final profileCountry = (profile['Country'] ??
+                profile['CountryName'] ??
+                profile['country'] ??
+                profile['Nationality'] ??
+                '')
+            .toString()
+            .trim();
+        if (profileCountry.isNotEmpty) return profileCountry;
+
+        final lat = double.tryParse((profile['Lat'] ?? '').toString());
+        final lon = double.tryParse((profile['Lon'] ?? '').toString());
+        if (lat != null && lon != null) {
+          final geocoder = geo.Geocoding();
+          final places = await geocoder.placemarkFromCoordinates(lat, lon);
+          if (places.isNotEmpty) {
+            return (places.first.country ?? '').trim();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user country for travel API: $e');
+    }
+
+    // Last fallback: use the device's current country when profile data has
+    // no country field.
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      final geocoder = geo.Geocoding();
+      final places = await geocoder.placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      if (places.isNotEmpty) return (places.first.country ?? '').trim();
+    } catch (_) {}
+    return '';
   }
 
   Future<void> _fetchMyJourneys() async {

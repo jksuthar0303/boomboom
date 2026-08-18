@@ -141,11 +141,18 @@ class TravelService {
   }
 
   /// SOAP ShowTravelUpcoming request
-  Future<List<Map<String, dynamic>>> showUpcomingTrips() async {
+  Future<List<Map<String, dynamic>>> showUpcomingTrips({
+    required String myEmail,
+    required String myCountry,
+  }) async {
     final String xmlBody = '''<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ShowTravelUpcoming xmlns="$namespace" />
+    <ShowTravelUpcoming xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <MyEmail>${_escapeXml(myEmail)}</MyEmail>
+      <MyCountry>${_escapeXml(myCountry)}</MyCountry>
+    </ShowTravelUpcoming>
   </soap:Body>
 </soap:Envelope>'''.trim();
 

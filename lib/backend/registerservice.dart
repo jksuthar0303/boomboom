@@ -552,6 +552,8 @@ class RegisterService {
     required String bodyType,
     required String drinkingHabits,
     required String workout,
+    String profileImage = '',
+    ProgressCallback? onSendProgress,
   }) async {
     final String cleanBodyType = AppConstants.cleanEmoji(bodyType);
     final String cleanDrinkingHabits = AppConstants.cleanEmoji(drinkingHabits);
@@ -575,6 +577,7 @@ class RegisterService {
       <BodyType>$cleanBodyType</BodyType>
       <DrinkingHabits>$cleanDrinkingHabits</DrinkingHabits>
       <Workout>$cleanWorkout</Workout>
+      <ProfileImage>$profileImage</ProfileImage>
     </UpdateProfile>
   </soap:Body>
 </soap:Envelope>'''
@@ -583,6 +586,7 @@ class RegisterService {
     return await _client.postXml(
       endpoint: AppConstants.apiEndpoint,
       xmlBody: xmlBody,
+      onSendProgress: onSendProgress,
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         'SOAPAction': '"http://tempuri.org/UpdateProfile"',

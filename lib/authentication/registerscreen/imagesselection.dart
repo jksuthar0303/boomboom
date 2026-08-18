@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player/video_player.dart';
+import 'package:video_compress/video_compress.dart';
 import 'package:xml/xml.dart' as xml;
 
 import '../../constant/apptextstyle.dart';
@@ -25,7 +27,11 @@ class UploadPhotosScreen extends StatefulWidget {
   }
 
   static List<File> getNewSelectedVideos() {
-    return _UploadPhotosScreenState.activeState?.videos ?? [];
+    final state = _UploadPhotosScreenState.activeState;
+    if (state == null) return [];
+    return state.videos
+        .where((file) => !state._uploadedVideoPaths.contains(file.path))
+        .toList();
   }
 
   @override
@@ -46,6 +52,9 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
   List<String> videoUrls = [];
   List<String> videoIds = [];
   List<VideoPlayerController> networkVideoControllers = [];
+  final Set<String> _uploadedVideoPaths = {};
+  final Map<int, double> _videoUploadProgress = {};
+  final Set<int> _uploadingVideoIndexes = {};
 
   int get selectedCount {
     int count = 0;
@@ -113,7 +122,6 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
                     setState(() {});
                   });
                   controller.setLooping(true);
-                  controller.play();
                   networkVideoControllers.add(controller);
                 }
               }
@@ -295,21 +303,104 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
       final controller = VideoPlayerController.file(file);
       await controller.initialize();
       controller.setLooping(true);
-      controller.play();
 
       setState(() {
+        final localIndex = videos.length;
         videos.add(file);
         videoControllers.add(controller);
+        _videoUploadProgress[localIndex] = 0.0;
+        _uploadingVideoIndexes.add(localIndex);
       });
+
+      unawaited(_uploadVideo(file, videos.length - 1));
+    }
+  }
+
+  Future<void> _uploadVideo(File file, int index) async {
+    try {
+      final email = await SecureStorage().getUserEmail() ?? '';
+      if (email.trim().isEmpty) throw Exception('User email not found');
+
+      if (mounted) setState(() => _videoUploadProgress[index] = 0.05);
+
+      // Compress before Base64 encoding to keep the SOAP request manageable.
+      final compressed = await VideoCompress.compressVideo(
+        file.path,
+        quality: VideoQuality.MediumQuality,
+        deleteOrigin: false,
+        includeAudio: true,
+      );
+      final uploadFile = compressed?.file ?? file;
+      if (mounted) setState(() => _videoUploadProgress[index] = 0.25);
+
+      final base64Video = base64Encode(await uploadFile.readAsBytes());
+      final response = await RegisterService().mediaInsert(
+        email: email.trim(),
+        mediaBase64: base64Video,
+        type: 'video',
+        onSendProgress: (sent, total) {
+          if (!mounted || total <= 0) return;
+          setState(() {
+            _videoUploadProgress[index] = 0.25 + (sent / total) * 0.75;
+          });
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Upload failed (${response.statusCode})');
+      }
+
+      final resultNodes = xml.XmlDocument.parse(response.body)
+          .findAllElements('MediaInsertResult');
+      if (resultNodes.isNotEmpty) {
+        final result = jsonDecode(resultNodes.first.innerText);
+        if (result is Map && result['Status'].toString() != '1') {
+          throw Exception(result['Message'] ?? 'Video upload failed');
+        }
+      }
+
+      _uploadedVideoPaths.add(file.path);
+      if (!mounted) return;
+      setState(() {
+        _videoUploadProgress[index] = 1.0;
+        _uploadingVideoIndexes.remove(index);
+      });
+    } catch (e) {
+      debugPrint('[VideoUpload] $e');
+      if (!mounted) return;
+      if (index < videoControllers.length) videoControllers[index].dispose();
+      if (index < videos.length) videos.removeAt(index);
+      if (index < videoControllers.length) videoControllers.removeAt(index);
+      setState(() {
+        _videoUploadProgress.remove(index);
+        _uploadingVideoIndexes.remove(index);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video upload failed. Please try again.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      await VideoCompress.deleteAllCache();
     }
   }
 
   /// ❌ REMOVE VIDEO
   void removeVideo(int i) {
+    if (_uploadingVideoIndexes.contains(i)) return;
     videoControllers[i].dispose();
     videoControllers.removeAt(i);
     videos.removeAt(i);
+    _videoUploadProgress.remove(i);
     setState(() {});
+  }
+
+  void _toggleVideo(VideoPlayerController controller) {
+    if (!controller.value.isInitialized) return;
+    setState(() {
+      controller.value.isPlaying ? controller.pause() : controller.play();
+    });
   }
 
   @override
@@ -394,14 +485,16 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
                 ),
               ),
 
+              SizedBox(height: 18.h),
+
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: 6,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: isTablet ? 3 : 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 14.w,
+                  mainAxisSpacing: 14.h,
                 ),
                 itemBuilder: (context, i) {
                   final hasLocalImage = images[i] != null;
@@ -485,7 +578,9 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
               ),
 
               /// 🔥 LIVE VIDEOS TITLE
-              Align(
+              Padding(
+                padding: EdgeInsets.only(top: 28.h),
+                child: Align(
                 alignment: Alignment.centerLeft,
 
                 child: Text(
@@ -493,14 +588,26 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
 
                   style: AppTextStyles.subHeading.copyWith(color: Colors.white),
                 ),
+                ),
               ),
 
-              SizedBox(height: 15.h),
+              SizedBox(height: 14.h),
 
               /// 🔥 LIVE VIDEO UI
-              SizedBox(
-                height: 160.h,
-                child: ListView.separated(
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.w),
+                child: Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.32),
+                    borderRadius: BorderRadius.circular(18.r),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.06),
+                    ),
+                  ),
+                  child: SizedBox(
+                    height: 160.h,
+                    child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: (videos.length + videoUrls.length) < 2
                       ? (videos.length + videoUrls.length) + 1
@@ -553,20 +660,77 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
 
                     /// 🔥 VIDEO CARD
                     final isNetworkVideo = i < videoUrls.length;
+                    final localVideoIndex = i - videoUrls.length;
                     final VideoPlayerController controller = isNetworkVideo
                         ? networkVideoControllers[i]
-                        : videoControllers[i - videoUrls.length];
+                        : videoControllers[localVideoIndex];
 
                     return Stack(
                       children: [
+                        if (!isNetworkVideo &&
+                            _uploadingVideoIndexes.contains(localVideoIndex))
+                          Positioned.fill(
+                            child: Container(
+                              color: Colors.black54,
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 42.w,
+                                      height: 42.w,
+                                      child: CircularProgressIndicator(
+                                        value: _videoUploadProgress[localVideoIndex],
+                                        color: Colors.orange,
+                                        strokeWidth: 3,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8.h),
+                                    Text(
+                                      '${((_videoUploadProgress[localVideoIndex] ?? 0) * 100).round()}%',
+                                      style: TextStyle(color: Colors.white, fontSize: 12.sp),
+                                    ),
+                                    Text(
+                                      'Uploading video...',
+                                      style: TextStyle(color: Colors.white70, fontSize: 10.sp),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(16.r),
                           child: SizedBox(
                             width: 150.w,
-                            child: controller.value.isInitialized
+                            child: (!isNetworkVideo &&
+                                    _uploadingVideoIndexes.contains(localVideoIndex))
+                                ? Container(
+                                    color: Colors.black54,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          CircularProgressIndicator(
+                                            value: _videoUploadProgress[localVideoIndex],
+                                            color: Colors.orange,
+                                          ),
+                                          SizedBox(height: 8.h),
+                                          Text(
+                                            '${((_videoUploadProgress[localVideoIndex] ?? 0) * 100).round()}%',
+                                            style: TextStyle(color: Colors.white, fontSize: 12.sp),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : controller.value.isInitialized
                                 ? AspectRatio(
                                     aspectRatio: controller.value.aspectRatio,
-                                    child: VideoPlayer(controller),
+                                    child: GestureDetector(
+                                      onTap: () => _toggleVideo(controller),
+                                      child: VideoPlayer(controller),
+                                    ),
                                   )
                                 : const Center(
                                     child: CircularProgressIndicator(
@@ -582,6 +746,10 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
                           right: 6,
                           child: GestureDetector(
                             onTap: () async {
+                              if (!isNetworkVideo &&
+                                  _uploadingVideoIndexes.contains(localVideoIndex)) {
+                                return;
+                              }
                               final confirm = await showDialog<bool>(
                                 context: context,
                                 builder: (ctx) => AlertDialog(
@@ -700,9 +868,11 @@ class _UploadPhotosScreenState extends State<UploadPhotosScreen> {
                     );
                   },
                 ),
-              ),
+                    ),
+                  ),
+                ),
 
-              SizedBox(height: 20.h),
+              SizedBox(height: 24.h),
 
               /// NEXT BUTTON
               if (widget.isRegister) ...[

@@ -79,7 +79,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       "color": AppColors.purple,
     },
     {
-      "title": "Nightlife Out",
+      "title": "Nightout",
       "subtitle": "Explore the city like a local.",
       "icon": Icons.location_on_outlined,
       "color": AppColors.accent,

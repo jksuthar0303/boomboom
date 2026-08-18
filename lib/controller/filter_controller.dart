@@ -8,7 +8,9 @@ class FilterController extends GetxController {
   // ─── BASIC FILTER ────────────────────────────────────────────────────────
   final RxDouble minAge = 18.0.obs;
   final RxDouble maxAge = 100.0.obs;
-  final RxDouble maxDistance = 50.0.obs;
+  final RxDouble maxDistance = 150.0.obs;
+  final RxBool distance150Plus = false.obs;
+  final RxBool distanceFilterActive = false.obs;
   final RxSet<String> selectedGenders = <String>{}.obs;
   final RxSet<String> selectedRelationship = <String>{}.obs;
 
@@ -18,6 +20,7 @@ class FilterController extends GetxController {
   final RxSet<String> selectedBodyTypes = <String>{}.obs;
   final RxSet<String> selectedHeights = <String>{}.obs;
   final RxDouble selectedHeightCm = 175.0.obs;
+  final RxBool heightFilterActive = false.obs;
   final RxSet<String> selectedDrinking = <String>{}.obs;
   final RxSet<String> selectedWorkout = <String>{}.obs;
   final RxSet<String> selectedInterests = <String>{}.obs;
@@ -28,12 +31,13 @@ class FilterController extends GetxController {
   bool get isFilterActive {
     return minAge.value > 18.0 ||
         maxAge.value < 100.0 ||
-        maxDistance.value < 50.0 ||
+        distanceFilterActive.value ||
         selectedGenders.isNotEmpty ||
         selectedRelationship.isNotEmpty ||
         (selectedNationality.value != null &&
             selectedNationality.value!.isNotEmpty) ||
         cityCountry.value.trim().isNotEmpty ||
+        heightFilterActive.value ||
         selectedBodyTypes.isNotEmpty ||
         selectedHeights.isNotEmpty ||
         selectedDrinking.isNotEmpty ||
@@ -44,7 +48,9 @@ class FilterController extends GetxController {
   void clearFilters() {
     minAge.value = 18.0;
     maxAge.value = 100.0;
-    maxDistance.value = 50.0;
+    maxDistance.value = 150.0;
+    distance150Plus.value = false;
+    distanceFilterActive.value = false;
     selectedGenders.clear();
     selectedRelationship.clear();
     selectedNationality.value = null;
@@ -54,6 +60,8 @@ class FilterController extends GetxController {
     selectedDrinking.clear();
     selectedWorkout.clear();
     selectedInterests.clear();
+    selectedHeightCm.value = 175.0;
+    heightFilterActive.value = false;
     filterVersion.value++;
     debugPrint("🧹 [FilterController] All filters cleared.");
   }
@@ -135,36 +143,59 @@ class FilterController extends GetxController {
             .toString()
             .toLowerCase()
             .trim();
-        if (lookingFor.isNotEmpty) {
-          bool relMatch = false;
-          for (var r in selectedRelationship) {
-            if (lookingFor.contains(r.toLowerCase().trim())) {
-              relMatch = true;
-              break;
-            }
+        if (lookingFor.isEmpty) return false;
+
+        bool relMatch = false;
+        for (var r in selectedRelationship) {
+          final target = r.toLowerCase().trim();
+          if (target.isNotEmpty &&
+              (lookingFor == target || lookingFor.contains(target))) {
+            relMatch = true;
+            break;
           }
-          if (!relMatch) return false;
         }
+        if (!relMatch) return false;
       }
 
       // 4. NATIONALITY / COUNTRY FILTER
       if (selectedNationality.value != null &&
           selectedNationality.value!.trim().isNotEmpty) {
-        final nat = selectedNationality.value!.toLowerCase().trim();
+        final selectedNat = selectedNationality.value!.toLowerCase().trim();
+        const nationalityAliases = <String, String>{
+          'indian': 'india',
+          'afghan': 'afghanistan',
+          'american': 'united states',
+          'british': 'united kingdom',
+          'australian': 'australia',
+          'canadian': 'canada',
+        };
+        final nat = nationalityAliases[selectedNat] ?? selectedNat;
         final userCountry = (user["Country"] ??
                 user["country"] ??
+                user["CountryName"] ??
                 user["Nationality"] ??
                 user["nationality"] ??
+                user["Location"] ??
                 "")
             .toString()
             .toLowerCase()
             .trim();
-        final userCity =
-            (user["City"] ?? user["city"] ?? "").toString().toLowerCase().trim();
-        if (userCountry.isNotEmpty || userCity.isNotEmpty) {
-          if (!userCountry.contains(nat) && !userCity.contains(nat)) {
-            return false;
-          }
+        final userCity = (user["City"] ??
+                user["city"] ??
+                user["CityName"] ??
+                user["District"] ??
+                user["district"] ??
+                user["Address"] ??
+                "")
+            .toString()
+            .toLowerCase()
+            .trim();
+        // Some list APIs do not return location fields. Keep such profiles
+        // visible until the backend supplies a location value.
+        if ((userCountry.isNotEmpty || userCity.isNotEmpty) &&
+            !userCountry.contains(nat) &&
+            !userCity.contains(nat)) {
+          return false;
         }
       }
 
@@ -172,19 +203,56 @@ class FilterController extends GetxController {
       if (cityCountry.value.trim().isNotEmpty) {
         final query = cityCountry.value.toLowerCase().trim();
         final userCity =
-            (user["City"] ?? user["city"] ?? "").toString().toLowerCase().trim();
-        final userCountry = (user["Country"] ?? user["country"] ?? "")
+            (user["City"] ??
+                    user["city"] ??
+                    user["CityName"] ??
+                    user["District"] ??
+                    user["district"] ??
+                    user["Address"] ??
+                    "")
+                .toString()
+                .toLowerCase()
+                .trim();
+        final userCountry = (user["Country"] ??
+                user["country"] ??
+                user["CountryName"] ??
+                user["Nationality"] ??
+                user["Location"] ??
+                "")
             .toString()
             .toLowerCase()
             .trim();
-        if (userCity.isNotEmpty || userCountry.isNotEmpty) {
-          if (!userCity.contains(query) && !userCountry.contains(query)) {
-            return false;
-          }
+        if ((userCity.isNotEmpty || userCountry.isNotEmpty) &&
+            !userCity.contains(query) &&
+            !userCountry.contains(query)) {
+          return false;
         }
       }
 
-      // 6. BODY TYPE FILTER
+      // 6. INTERESTS
+      if (selectedInterests.isNotEmpty) {
+        final interests = (user["Interests"] ??
+                user["Interest"] ??
+                user["interests"] ??
+                user["Hobbies"] ??
+                "")
+            .toString()
+            .toLowerCase()
+            .trim();
+        if (interests.isNotEmpty && !selectedInterests.any(
+          (interest) {
+            final target = interest
+                .toLowerCase()
+                .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+                .trim();
+            return target.isNotEmpty && interests.contains(target);
+          },
+        )) {
+          return false;
+        }
+      }
+
+      // 7. BODY TYPE FILTER
       if (selectedBodyTypes.isNotEmpty) {
         final bodyType = (user["BodyType"] ?? user["body_type"] ?? "")
             .toString()
@@ -193,7 +261,9 @@ class FilterController extends GetxController {
         if (bodyType.isNotEmpty) {
           bool match = false;
           for (var b in selectedBodyTypes) {
-            if (bodyType.contains(b.toLowerCase().trim())) {
+            final target = b.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+            final value = bodyType.replaceAll(RegExp(r'[^a-z0-9]'), '');
+            if (target.isNotEmpty && value.contains(target)) {
               match = true;
               break;
             }
@@ -202,7 +272,7 @@ class FilterController extends GetxController {
         }
       }
 
-      // 7. DRINKING HABITS FILTER
+      // 8. DRINKING HABITS FILTER
       if (selectedDrinking.isNotEmpty) {
         final drinking = (user["DrinkingHabits"] ??
                 user["drinking_habits"] ??
@@ -214,7 +284,9 @@ class FilterController extends GetxController {
         if (drinking.isNotEmpty) {
           bool match = false;
           for (var d in selectedDrinking) {
-            if (drinking.contains(d.toLowerCase().trim())) {
+            final target = d.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+            final value = drinking.replaceAll(RegExp(r'[^a-z0-9]'), '');
+            if (target.isNotEmpty && value.contains(target)) {
               match = true;
               break;
             }
@@ -223,7 +295,7 @@ class FilterController extends GetxController {
         }
       }
 
-      // 8. WORKOUT FILTER
+      // 9. WORKOUT FILTER
       if (selectedWorkout.isNotEmpty) {
         final workout = (user["Workout"] ?? user["workout"] ?? "")
             .toString()
@@ -232,7 +304,9 @@ class FilterController extends GetxController {
         if (workout.isNotEmpty) {
           bool match = false;
           for (var w in selectedWorkout) {
-            if (workout.contains(w.toLowerCase().trim())) {
+            final target = w.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+            final value = workout.replaceAll(RegExp(r'[^a-z0-9]'), '');
+            if (target.isNotEmpty && value.contains(target)) {
               match = true;
               break;
             }
@@ -241,26 +315,61 @@ class FilterController extends GetxController {
         }
       }
 
-      // 9. DISTANCE FILTER (if user GPS available)
+      // 10. HEIGHT FILTER. The slider is a preference, so allow a small
+      // tolerance around the selected centimetre value.
+      if (heightFilterActive.value) {
+        final heightText = (user["Height"] ?? user["height"] ?? "")
+            .toString();
+        final heightMatch = RegExp(r'\d+(?:\.\d+)?').firstMatch(heightText);
+        final userHeight = heightMatch == null
+            ? null
+            : double.tryParse(heightMatch.group(0)!);
+        if (userHeight != null &&
+            (userHeight - selectedHeightCm.value).abs() > 5) {
+          return false;
+        }
+      }
+
+      // 11. DISTANCE FILTER. Prefer GPS coordinates, then use an API-provided
+      // Distance/distance value when location permission is unavailable.
+      double? distKm;
+      final lat = double.tryParse(
+        (user["Latitude"] ?? user["Lat"] ?? user["latitude"] ?? "").toString(),
+      );
+      final lon = double.tryParse(
+        (user["Longitude"] ?? user["Lon"] ?? user["longitude"] ?? "").toString(),
+      );
+
       if (userPosition != null &&
-          user["Latitude"] != null &&
-          user["Longitude"] != null) {
+          lat != null &&
+          lon != null &&
+          (lat != 0 || lon != 0)) {
         try {
-          final lat = double.tryParse(user["Latitude"].toString());
-          final lon = double.tryParse(user["Longitude"].toString());
-          if (lat != null && lon != null && (lat != 0 || lon != 0)) {
-            final distMeters = Geolocator.distanceBetween(
-              userPosition.latitude,
-              userPosition.longitude,
-              lat,
-              lon,
-            );
-            final distKm = distMeters / 1000;
-            if (distKm > maxDistance.value) {
-              return false;
-            }
-          }
+          distKm = Geolocator.distanceBetween(
+                userPosition.latitude,
+                userPosition.longitude,
+                lat,
+                lon,
+              ) /
+              1000;
         } catch (_) {}
+      }
+
+      if (distKm == null) {
+        final rawDistance =
+            user["Distance"] ?? user["distance"] ?? user["DistanceKm"];
+        if (rawDistance != null) {
+          final match = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(rawDistance.toString());
+          distKm = match == null ? null : double.tryParse(match.group(0)!);
+        }
+      }
+
+      if (distanceFilterActive.value && distKm != null) {
+        if (distance150Plus.value) {
+          if (distKm < 150.0) return false;
+        } else if (distKm > maxDistance.value) {
+          return false;
+        }
       }
 
       return true;

@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _profileImageUrl =
       "https://images.unsplash.com/photo-1502685104226-ee32379fefbe";
   String _currentCityName = "Pattaya City";
+  Position? _currentPosition;
 
   int _currentPage = 0;
   Timer? _autoSlideTimer;
@@ -341,6 +342,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      if (mounted) {
+        setState(() => _currentPosition = position);
+      }
       debugPrint(
         "Current Position: ${position.latitude}, ${position.longitude}",
       );
@@ -567,6 +571,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               accuracy: LocationAccuracy.high,
             ),
           );
+          if (mounted) {
+            setState(() => _currentPosition = position);
+          }
           _updateCityFromCoordinates(position.latitude, position.longitude);
         }
       } catch (e) {
@@ -757,7 +764,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       backgroundColor: AppColors.primary,
       body: SafeArea(
         bottom: false,
-        child: ListView(
+        child: Obx(() {
+          // Rebuild the profile sections whenever Apply Filters changes the
+          // shared in-memory filter controller.
+          // ignore: unused_local_variable
+          final filterVersion = FilterController.instance.filterVersion.value;
+          return ListView(
           children: [
             // ── TOP BAR ──────────────────────────────────
             Padding(
@@ -1070,6 +1082,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 // Filter profiles in frontend memory
                 final filtered = FilterController.instance.applyFilterToUsers(
                   rawList,
+                  userPosition: _currentPosition,
                 );
                 final displayUsers = filtered.take(5).toList();
 
@@ -1219,6 +1232,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 // Filter profiles in frontend memory
                 final filtered = FilterController.instance.applyFilterToUsers(
                   _everyoneUsers,
+                  userPosition: _currentPosition,
                 );
                 // First 11 filtered users from API, 12th is "See All"
                 final displayUsers = filtered.take(11).toList();
@@ -1287,7 +1301,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
             SizedBox(height: 100.h),
           ],
-        ),
+          );
+        }),
       ),
     );
   }

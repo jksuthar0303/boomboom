@@ -51,6 +51,11 @@ class _ActiveuserState extends State<Activeuser> {
     try {
       try {
         _currentPosition = await Geolocator.getLastKnownPosition();
+        _currentPosition ??= await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
       } catch (_) {}
 
       final String myEmail = await SecureStorage().getUserEmail() ?? "";
@@ -108,7 +113,11 @@ class _ActiveuserState extends State<Activeuser> {
         setState(() {
           activeUsers = parsedActive;
           verifiedUsers = parsedVerified;
-          filteredUsers = selectedTab == 0 ? activeUsers : verifiedUsers;
+          final currentList = selectedTab == 0 ? activeUsers : verifiedUsers;
+          filteredUsers = FilterController.instance.applyFilterToUsers(
+            currentList,
+            userPosition: _currentPosition,
+          );
           _isLoading = false;
         });
       }
@@ -363,7 +372,11 @@ class _ActiveuserState extends State<Activeuser> {
                         setState(() {
                           selectedTab = 0;
                           searchController.clear();
-                          filteredUsers = activeUsers;
+                          filteredUsers = FilterController.instance
+                              .applyFilterToUsers(
+                                activeUsers,
+                                userPosition: _currentPosition,
+                              );
                         });
                       },
                       child: Container(
@@ -409,7 +422,11 @@ class _ActiveuserState extends State<Activeuser> {
                         setState(() {
                           selectedTab = 1;
                           searchController.clear();
-                          filteredUsers = verifiedUsers;
+                          filteredUsers = FilterController.instance
+                              .applyFilterToUsers(
+                                verifiedUsers,
+                                userPosition: _currentPosition,
+                              );
                         });
                       },
                       child: Container(
