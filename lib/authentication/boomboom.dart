@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:geocoding/geocoding.dart' as geo;
 import 'package:boomboom/backend/registerservice.dart';
 import 'package:boomboom/backend/home_service.dart';
 import 'package:boomboom/backend/secure_storage.dart';
@@ -75,6 +76,7 @@ class ProfileModel {
       age,
       job,
       city,
+      country,
       distance,
       height,
       lookingFor,
@@ -93,6 +95,7 @@ class ProfileModel {
     required this.age,
     required this.job,
     required this.city,
+    this.country = '',
     required this.distance,
     required this.height,
     required this.lookingFor,
@@ -107,6 +110,27 @@ class ProfileModel {
     this.seenAgo = '5 min ago',
     this.telegramUsername,
   });
+
+  ProfileModel copyWith({String? country}) => ProfileModel(
+    name: name,
+    age: age,
+    job: job,
+    city: city,
+    country: country ?? this.country,
+    distance: distance,
+    height: height,
+    lookingFor: lookingFor,
+    gender: gender,
+    nature: nature,
+    about: about,
+    interests: interests,
+    lifestyle: lifestyle,
+    media: media,
+    completionPercent: completionPercent,
+    isVerified: isVerified,
+    seenAgo: seenAgo,
+    telegramUsername: telegramUsername,
+  );
 }
 
 final List<ProfileModel> sampleProfiles = [
@@ -768,6 +792,20 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           data["isVerified"]?.toString().toLowerCase() == "true";
       final String city =
           (data["City"] ?? data["city"] ?? data["Country"] ?? "").toString();
+      final double? latitude = double.tryParse(data['Lat']?.toString() ?? '');
+      final double? longitude = double.tryParse(data['Lon']?.toString() ?? '');
+      final String apiCountry =
+          (data['Country'] ?? data['country'] ?? '').toString().trim();
+      final String resolvedCountry = apiCountry.isNotEmpty
+          ? apiCountry
+          : (latitude != null &&
+                    longitude != null &&
+                    latitude >= 6.0 &&
+                    latitude <= 37.5 &&
+                    longitude >= 68.0 &&
+                    longitude <= 98.0
+                ? 'India'
+                : '');
       final String distance = (data["Distance"] ?? data["distance"] ?? "")
           .toString();
 
@@ -907,6 +945,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         age: calculatedAge,
         job: job,
         city: city,
+        country: resolvedCountry,
         distance: distance,
         height: height,
         lookingFor: lookingFor,
@@ -938,6 +977,55 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           ownProfile = p;
         }
       });
+
+      final lat = double.tryParse(data['Lat']?.toString() ?? '');
+      final lon = double.tryParse(data['Lon']?.toString() ?? '');
+      if (lat != null && lon != null && (lat != 0 || lon != 0)) {
+        _resolveCountry(p, lat, lon);
+      }
+    }
+  }
+
+  Future<void> _resolveCountry(
+    ProfileModel profile,
+    double lat,
+    double lon,
+  ) async {
+    try {
+      // Fast offline fallback for Indian coordinates. This also keeps the
+      // country visible when the platform geocoder returns no placemark.
+      if (lat >= 6.0 && lat <= 37.5 && lon >= 68.0 && lon <= 98.0) {
+        if (mounted) {
+          setState(() {
+            final updated = profile.copyWith(country: 'India');
+            if (widget.isOwnProfile && ownProfile == profile) {
+              ownProfile = updated;
+            }
+            if (otherProfile == profile) {
+              otherProfile = updated;
+            }
+          });
+        }
+        return;
+      }
+
+      final geocoder = geo.Geocoding();
+      final placemarks = await geocoder.placemarkFromCoordinates(lat, lon);
+      final country = placemarks.isNotEmpty
+          ? (placemarks.first.country ?? '').trim()
+          : '';
+      if (!mounted || country.isEmpty) return;
+      setState(() {
+        final updated = profile.copyWith(country: country);
+        if (widget.isOwnProfile && ownProfile == profile) {
+          ownProfile = updated;
+        }
+        if (otherProfile == profile) {
+          otherProfile = updated;
+        }
+      });
+    } catch (e) {
+      debugPrint('[BoomProfileScreen] Country lookup failed: $e');
     }
   }
 
@@ -1808,10 +1896,14 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   }
 
   Widget _heroBadgeRow(ProfileModel p, bool isTablet) {
+    final displayCountry = p.country.isNotEmpty ? p.country : p.city;
+    final resolvedFlag = displayCountry.toLowerCase().contains('india')
+        ? countryFlag('IN')
+        : flagForCity(displayCountry);
     final badges = [
       '🕐 ${p.seenAgo}',
       '📍 ${p.distance}',
-      '${flagForCity(p.city)}  ${p.city}',
+      '$resolvedFlag  $displayCountry',
       '🎯 ${p.lookingFor}',
       '📏 ${p.height}',
     ];

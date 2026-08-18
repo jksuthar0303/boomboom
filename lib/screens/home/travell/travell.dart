@@ -5,9 +5,12 @@ import 'package:get/get.dart';
 
 import '../../../authentication/userdetails.dart';
 import '../../../backend/routesmatch.dart';
+import '../../../backend/secure_storage.dart';
+import '../../../backend/travel_service.dart';
 import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../constant/colors.dart';
+import '../../../widget/snakbar.dart';
 import 'createtravel.dart';
 
 class TravelAlertScreen extends StatefulWidget {
@@ -30,6 +33,187 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
   ];
 
   final TravelAlertController controller = Get.put(TravelAlertController());
+  final TravelService _travelService = TravelService();
+
+  List<Map<String, dynamic>> _myJourneys = [];
+  bool _isLoadingJourneys = false;
+  String? _journeyError;
+
+  List<Map<String, dynamic>> _upcomingTrips = [];
+  bool _isLoadingUpcoming = false;
+  String? _upcomingError;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUpcomingTrips();
+    _fetchMyJourneys();
+  }
+
+  Future<void> _fetchUpcomingTrips() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingUpcoming = true;
+        _upcomingError = null;
+      });
+    }
+
+    try {
+      final list = await _travelService.showUpcomingTrips();
+      if (mounted) {
+        setState(() {
+          _upcomingTrips = list;
+          _isLoadingUpcoming = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching upcoming trips: $e");
+      if (mounted) {
+        setState(() {
+          _upcomingError = e.toString().replaceAll("Exception:", "").trim();
+          _isLoadingUpcoming = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchMyJourneys() async {
+    final email = await SecureStorage().getUserEmail();
+    if (email == null || email.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _journeyError = "User not logged in";
+          _isLoadingJourneys = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingJourneys = true;
+        _journeyError = null;
+      });
+    }
+
+    try {
+      final list = await _travelService.showTravelByEmail(email: email.trim());
+      if (mounted) {
+        setState(() {
+          _myJourneys = list;
+          _isLoadingJourneys = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching my journeys: $e");
+      if (mounted) {
+        setState(() {
+          _journeyError = e.toString().replaceAll("Exception:", "").trim();
+          _isLoadingJourneys = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteJourney(int id) async {
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: const Color(0xFF141B2D),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.redAccent,
+                size: 22.sp,
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Text(
+              "Delete Journey",
+              style: AppTextStyles.heading.copyWith(fontSize: 18.sp),
+            ),
+          ],
+        ),
+        content: Text(
+          "Are you sure you want to delete this journey? This action cannot be undone.",
+          style: AppTextStyles.small.copyWith(
+            color: Colors.white70,
+            fontSize: 13.sp,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text(
+              "Cancel",
+              style: TextStyle(color: Colors.white54, fontSize: 13.sp),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 10.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+            ),
+            onPressed: () => Get.back(result: true),
+            child: Text(
+              "Delete",
+              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _executeDeleteJourney(id);
+    }
+  }
+
+  Future<void> _executeDeleteJourney(int id) async {
+    final email = await SecureStorage().getUserEmail();
+    if (email == null || email.trim().isEmpty) return;
+
+    Get.dialog(
+      const Center(
+        child: CircularProgressIndicator(color: Color(0xFF8E2DE2)),
+      ),
+      barrierDismissible: false,
+    );
+
+    try {
+      final response = await _travelService.deleteTravel(
+        id: id,
+        email: email.trim(),
+      );
+      Get.back(); // close loading dialog
+
+      if (response.statusCode == 200) {
+        NeuSnackbar.success("Journey deleted successfully!");
+        _fetchMyJourneys();
+      } else {
+        NeuSnackbar.error("Failed to delete journey: Server error ${response.statusCode}");
+      }
+    } catch (e) {
+      Get.back(); // close loading dialog
+      debugPrint("Delete travel error: $e");
+      NeuSnackbar.error("Error deleting journey: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,13 +269,17 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                     children: [
                       _iconBox(
                         Icons.add,
-
-                        onTap: () {
-                          Get.to(
-                            () => CreateJourneyScreen(),
-
+                        onTap: () async {
+                          final result = await Get.to(
+                            () => const CreateJourneyScreen(),
                             transition: Transition.rightToLeft,
                           );
+                          if (result == true) {
+                            if (mounted) {
+                              setState(() => selectedTab = 1);
+                              _fetchMyJourneys();
+                            }
+                          }
                         },
                       ),
 
@@ -147,6 +335,9 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                           setState(() {
                             selectedTab = index;
                           });
+                          if (index == 1) {
+                            _fetchMyJourneys();
+                          }
                         },
 
                         child: AnimatedContainer(
@@ -201,97 +392,731 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                 ),
               ),
 
-              SizedBox(height: 30.h),
+              SizedBox(height: 25.h),
 
               Expanded(
                 child: selectedTab == 0
-                    ? CustomScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        slivers: [
-                          SliverToBoxAdapter(
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Divider(color: Colors.white24),
-                                    ),
-
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 14.w,
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.flight_land_rounded,
-                                                color: Colors.white70,
-                                                size: 14.sp,
-                                              ),
-                                              SizedBox(width: 6.w),
-
-                                              Text(
-                                                "UPCOMING ARRIVALS",
-                                                style: AppTextStyles.subHeading
-                                                    .copyWith(letterSpacing: 1),
-                                              ),
-                                            ],
-                                          ),
-
-                                          SizedBox(height: 2.h),
-
-                                          Text(
-                                            "WHO ARRIVING IN YOUR COUNTRY",
-                                            style: AppTextStyles.small.copyWith(
-                                              fontSize: 10.sp,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    Expanded(
-                                      child: Divider(color: Colors.white24),
-                                    ),
-                                  ],
-                                ),
-
-                                SizedBox(height: 20.h),
-                              ],
-                            ),
-                          ),
-
-                          SliverGrid(
-                            delegate: SliverChildBuilderDelegate((
-                              context,
-                              index,
-                            ) {
-                              final user = controller.users[index];
-                              return _userCard(user, index);
-                            }, childCount: controller.users.length),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: isTablet ? 3 : 2,
-                                  crossAxisSpacing: 8,
-                                  mainAxisSpacing: 8,
-                                  childAspectRatio: 0.62,
-                                ),
-                          ),
-                        ],
-                      )
-                    : Center(
-                        child: Text(
-                          "MY JOURNEYS",
-                          style: AppTextStyles.subHeading,
-                        ),
-                      ),
+                    ? _upcomingArrivalsView(isTablet)
+                    : _myJourneysView(),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 🔥 UPCOMING ARRIVALS VIEW (ShowUpcomingTrips)
+  Widget _upcomingArrivalsView(bool isTablet) {
+    if (_isLoadingUpcoming) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF8E2DE2),
+        ),
+      );
+    }
+
+    if (_upcomingError != null) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(20.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: Colors.redAccent,
+                size: 40.sp,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                _upcomingError!,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body.copyWith(color: Colors.white70),
+              ),
+              SizedBox(height: 16.h),
+              ElevatedButton.icon(
+                onPressed: _fetchUpcomingTrips,
+                icon: const Icon(Icons.refresh),
+                label: const Text("Retry"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6A5AE0),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20.r),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_upcomingTrips.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _fetchUpcomingTrips,
+        color: const Color(0xFF8E2DE2),
+        backgroundColor: AppColors.secondary,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          children: [
+            SizedBox(height: 70.h),
+            Center(
+              child: Container(
+                width: 86.w,
+                height: 86.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF8E2DE2).withValues(alpha: 0.25),
+                      const Color(0xFF4A00E0).withValues(alpha: 0.1),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF8E2DE2).withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.flight_takeoff_rounded,
+                  size: 40.sp,
+                  color: const Color(0xFFB08FFF),
+                ),
+              ),
+            ),
+            SizedBox(height: 22.h),
+            Center(
+              child: Text(
+                "No Upcoming Travels Found",
+                style: AppTextStyles.heading.copyWith(fontSize: 18.sp),
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 36.w),
+              child: Text(
+                "There are currently no upcoming travels found.\nPull down to refresh.",
+                textAlign: TextAlign.center,
+                style: AppTextStyles.small.copyWith(
+                  color: Colors.white54,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchUpcomingTrips,
+      color: const Color(0xFF8E2DE2),
+      backgroundColor: AppColors.secondary,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: Colors.white24)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 14.w),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.flight_land_rounded,
+                                color: Colors.white70,
+                                size: 14.sp,
+                              ),
+                              SizedBox(width: 6.w),
+                              Text(
+                                "UPCOMING ARRIVALS",
+                                style: AppTextStyles.subHeading
+                                    .copyWith(letterSpacing: 1),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 2.h),
+                          Text(
+                            "WHO ARRIVING IN YOUR COUNTRY",
+                            style: AppTextStyles.small.copyWith(
+                              fontSize: 10.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: Colors.white24)),
+                  ],
+                ),
+                SizedBox(height: 20.h),
+              ],
+            ),
+          ),
+          SliverGrid(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final user = _upcomingTrips[index];
+              return _userCard(user, index);
+            }, childCount: _upcomingTrips.length),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isTablet ? 3 : 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 0.62,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 🔥 MY JOURNEYS VIEW
+  Widget _myJourneysView() {
+    if (_isLoadingJourneys) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF8E2DE2),
+        ),
+      );
+    }
+
+    if (_journeyError != null) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(20.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: Colors.redAccent,
+                size: 40.sp,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                _journeyError!,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body.copyWith(color: Colors.white70),
+              ),
+              SizedBox(height: 16.h),
+              ElevatedButton.icon(
+                onPressed: _fetchMyJourneys,
+                icon: const Icon(Icons.refresh),
+                label: const Text("Retry"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6A5AE0),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20.r),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_myJourneys.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _fetchMyJourneys,
+        color: const Color(0xFF8E2DE2),
+        backgroundColor: AppColors.secondary,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          children: [
+            SizedBox(height: 70.h),
+            Center(
+              child: Container(
+                width: 80.w,
+                height: 80.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF8E2DE2).withValues(alpha: 0.2),
+                      const Color(0xFF4A00E0).withValues(alpha: 0.1),
+                    ],
+                  ),
+                ),
+                child: Icon(
+                  Icons.luggage_outlined,
+                  size: 38.sp,
+                  color: const Color(0xFFB08FFF),
+                ),
+              ),
+            ),
+            SizedBox(height: 20.h),
+            Center(
+              child: Text(
+                "No Journeys Created Yet",
+                style: AppTextStyles.heading.copyWith(fontSize: 18.sp),
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32.w),
+              child: Text(
+                "Plan your next travel journey to connect with fellow travelers.",
+                textAlign: TextAlign.center,
+                style: AppTextStyles.small.copyWith(
+                  color: Colors.white54,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            SizedBox(height: 24.h),
+            Center(
+              child: GestureDetector(
+                onTap: () async {
+                  final res = await Get.to(
+                    () => const CreateJourneyScreen(),
+                    transition: Transition.rightToLeft,
+                  );
+                  if (res == true) {
+                    _fetchMyJourneys();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 22.w,
+                    vertical: 12.h,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+                    ),
+                    borderRadius: BorderRadius.circular(25.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8E2DE2).withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add, color: Colors.white),
+                      SizedBox(width: 6.w),
+                      Text(
+                        "Create Your Journey",
+                        style: AppTextStyles.button.copyWith(fontSize: 14.sp),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchMyJourneys,
+      color: const Color(0xFF8E2DE2),
+      backgroundColor: AppColors.secondary,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: EdgeInsets.only(bottom: 24.h, top: 4.h),
+        itemCount: _myJourneys.length,
+        separatorBuilder: (_, __) => SizedBox(height: 14.h),
+        itemBuilder: (context, index) {
+          final item = _myJourneys[index];
+          return _myJourneyCard(item);
+        },
+      ),
+    );
+  }
+
+  /// 🔥 MY JOURNEY CARD
+  Widget _myJourneyCard(Map<String, dynamic> item) {
+    final fromCity = (item["FromCity"] ?? "").toString().trim();
+    final fromCountry = (item["FromCountry"] ?? "").toString().trim();
+    final toCity = (item["ToCity"] ?? "").toString().trim();
+    final toCountry = (item["ToCountry"] ?? "").toString().trim();
+    final fromDate = (item["FromDate"] ?? "").toString().trim();
+    final toDate = (item["ToDate"] ?? "").toString().trim();
+    final journeyType = (item["JourneyType"] ?? "Trip").toString().trim();
+    final travelStyle = (item["TravelStyle"] ?? "").toString().trim();
+    final travelCompanion = (item["TravelCompanion"] ?? "").toString().trim();
+    final isHide = item["ishide"]?.toString().toLowerCase() == "true" ||
+        item["ishide"]?.toString() == "1";
+    final description = (item["Description"] ?? "").toString().trim();
+
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141B2D),
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.06),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          /// TOP ROW (Tags on left in responsive Wrap, Actions on right)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left: Chips in a responsive Wrap
+              Expanded(
+                child: Wrap(
+                  spacing: 6.w,
+                  runSpacing: 6.h,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    // Journey Type
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 9.w,
+                        vertical: 4.h,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF8E2DE2), Color(0xFF6A5AE0)],
+                        ),
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      child: Text(
+                        journeyType,
+                        style: AppTextStyles.small.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11.sp,
+                        ),
+                      ),
+                    ),
+
+                    // Travel Style
+                    if (travelStyle.isNotEmpty)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 9.w,
+                          vertical: 4.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Text(
+                          travelStyle,
+                          style: AppTextStyles.small.copyWith(
+                            color: Colors.white70,
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                      ),
+
+                    // Companion
+                    if (travelCompanion.isNotEmpty)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 9.w,
+                          vertical: 4.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB14DFF).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Text(
+                          travelCompanion,
+                          style: AppTextStyles.small.copyWith(
+                            color: const Color(0xFFD4A5FF),
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              SizedBox(width: 8.w),
+
+              // Right: Hidden Badge & Delete Button
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isHide) ...[
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 7.w,
+                        vertical: 4.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFB800).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(
+                          color: const Color(0xFFFFB800),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.visibility_off_rounded,
+                            color: const Color(0xFFFFB800),
+                            size: 11.sp,
+                          ),
+                          SizedBox(width: 3.w),
+                          Text(
+                            "Hidden",
+                            style: AppTextStyles.small.copyWith(
+                              color: const Color(0xFFFFB800),
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 6.w),
+                  ],
+
+                  /// 🗑️ DELETE BUTTON
+                  GestureDetector(
+                    onTap: () {
+                      final id = int.tryParse(
+                        (item["id"] ?? item["Id"] ?? "").toString(),
+                      );
+                      if (id != null) {
+                        _confirmDeleteJourney(id);
+                      }
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(5.w),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(
+                          color: Colors.redAccent.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        color: Colors.redAccent,
+                        size: 15.sp,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          SizedBox(height: 14.h),
+
+          /// ROUTE DISPLAY: Departure -> Destination
+          Container(
+            padding: EdgeInsets.all(12.w),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F1524),
+              borderRadius: BorderRadius.circular(14.r),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.flight_takeoff_rounded,
+                            color: const Color(0xFF8E2DE2),
+                            size: 14.sp,
+                          ),
+                          SizedBox(width: 4.w),
+                          Text(
+                            "FROM",
+                            style: AppTextStyles.small.copyWith(
+                              fontSize: 10.sp,
+                              color: Colors.white38,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        fromCity.isNotEmpty ? fromCity : "Any City",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.subHeading.copyWith(
+                          fontSize: 15.sp,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        fromCountry,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.small.copyWith(
+                          fontSize: 12.sp,
+                          color: Colors.white60,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        color: const Color(0xFFB14DFF),
+                        size: 20.sp,
+                      ),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            "TO",
+                            style: AppTextStyles.small.copyWith(
+                              fontSize: 10.sp,
+                              color: Colors.white38,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          SizedBox(width: 4.w),
+                          Icon(
+                            Icons.flight_land_rounded,
+                            color: const Color(0xFFB14DFF),
+                            size: 14.sp,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        toCity.isNotEmpty ? toCity : "Any City",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: AppTextStyles.subHeading.copyWith(
+                          fontSize: 15.sp,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        toCountry,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: AppTextStyles.small.copyWith(
+                          fontSize: 12.sp,
+                          color: Colors.white60,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          SizedBox(height: 12.h),
+
+          /// DATES ROW
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today_rounded,
+                color: const Color(0xFF6A5AE0),
+                size: 14.sp,
+              ),
+              SizedBox(width: 6.w),
+              Text(
+                "$fromDate  ➔  $toDate",
+                style: AppTextStyles.small.copyWith(
+                  color: Colors.white70,
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+
+          /// DESCRIPTION
+          if (description.isNotEmpty) ...[
+            SizedBox(height: 10.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(10.w),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(10.r),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.format_quote_rounded,
+                    color: Colors.white30,
+                    size: 16.sp,
+                  ),
+                  SizedBox(width: 6.w),
+                  Expanded(
+                    child: Text(
+                      description,
+                      style: AppTextStyles.small.copyWith(
+                        color: Colors.white70,
+                        fontStyle: FontStyle.italic,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -520,41 +1345,60 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
   Widget _userCard(Map<String, dynamic> user, int index) {
     final bool isLiked = _likedIndexes.contains(index);
 
+    final String name = (user["FullName"] ?? user["name"] ?? user["Name"] ?? "Traveler").toString().trim();
+    final String age = (user["Age"] ?? user["age"] ?? "").toString().trim();
+    final String nameDisplay = age.isNotEmpty ? "$name, $age" : name;
+    final String image = (user["ProfileImage"] ?? user["image"] ?? user["Media"] ?? user["profileImage"] ?? "").toString().trim();
+    final String fromLoc = (user["FromCity"] != null && user["FromCity"].toString().trim().isNotEmpty)
+        ? user["FromCity"].toString().trim()
+        : (user["FromCountry"] ?? user["from"] ?? "").toString().trim();
+    final String toLoc = (user["ToCity"] != null && user["ToCity"].toString().trim().isNotEmpty)
+        ? user["ToCity"].toString().trim()
+        : (user["ToCountry"] ?? user["to"] ?? "").toString().trim();
+    final String routeDisplay = (fromLoc.isNotEmpty || toLoc.isNotEmpty)
+        ? "$fromLoc ➜ $toLoc"
+        : (user["route"] ?? "Upcoming Trip").toString();
+    final String tag = (user["JourneyType"] ?? user["tag"] ?? user["TravelStyle"] ?? "Travel").toString().trim();
+    final String status = (user["status"] ?? user["FromDate"] ?? "Upcoming").toString().trim();
+    final String flag = (user["flag"] ?? "✈️").toString();
+
     return GestureDetector(
       onTap: () {
         Get.to(
           () => UserDetailScreen(user: user),
-
           transition: Transition.rightToLeft,
         );
       },
-
       child: Container(
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(24.r)),
-
         child: Stack(
           children: [
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24.r),
-
-                child: Image.network(
-                  user["image"],
-
-                  fit: BoxFit.cover,
-
-                  errorBuilder: (_, _, _) {
-                    return Container(
-                      color: Colors.grey.shade900,
-
-                      child: Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 40.sp,
+                child: image.isNotEmpty && image.startsWith("http")
+                    ? Image.network(
+                        image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) {
+                          return Container(
+                            color: const Color(0xFF1B2339),
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.white38,
+                              size: 40.sp,
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: const Color(0xFF1B2339),
+                        child: Icon(
+                          Icons.person,
+                          color: Colors.white38,
+                          size: 40.sp,
+                        ),
                       ),
-                    );
-                  },
-                ),
               ),
             ),
 
@@ -562,12 +1406,9 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24.r),
-
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
-
                     end: Alignment.bottomCenter,
-
                     colors: [
                       Colors.transparent,
                       Colors.black.withValues(alpha: 0.85),
@@ -578,32 +1419,28 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
             ),
 
             /// STATUS BADGE — top left
-            Positioned(
-              top: 7.h,
-              left: 4.w,
-
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
-
-                decoration: BoxDecoration(
-                  color: Colors.green,
-
-                  borderRadius: BorderRadius.circular(30.r),
-                ),
-
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white, size: 12.sp),
-
-                    SizedBox(width: 4.w),
-
-                    Text(user["status"] ?? "", style: AppTextStyles.cardBadge),
-                  ],
+            if (status.isNotEmpty)
+              Positioned(
+                top: 7.h,
+                left: 4.w,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade600,
+                    borderRadius: BorderRadius.circular(30.r),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white, size: 10.sp),
+                      SizedBox(width: 4.w),
+                      Text(status, style: AppTextStyles.cardBadge),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
-            /// 🔥 HEART ICON — top right (image jaisa)
+            /// 🔥 HEART ICON — top right
             Positioned(
               top: 10.h,
               right: 10.w,
@@ -627,7 +1464,7 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                         : Icons.favorite_border_rounded,
                     key: ValueKey(isLiked),
                     color: isLiked ? Colors.red : Colors.white,
-                    size: 26.sp,
+                    size: 24.sp,
                     shadows: const [
                       Shadow(color: Colors.black54, blurRadius: 6),
                     ],
@@ -639,61 +1476,33 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
             /// BOTTOM INFO
             Positioned(
               left: 10.w,
-              right: 14.w,
+              right: 10.w,
               bottom: 8.h,
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   /// NAME + FLAG
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              "${user["name"]}, ${user["age"]}",
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.cardName,
-                            ),
-                          ),
-
-                          SizedBox(width: 4.w),
-
-                          Text(
-                            user["flag"] ?? "🏳️",
-                            style: TextStyle(fontSize: 16.sp),
-                          ),
-                        ],
+                      Expanded(
+                        child: Text(
+                          nameDisplay,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.cardName,
+                        ),
                       ),
+                      if (flag.isNotEmpty) ...[
+                        SizedBox(width: 4.w),
+                        Text(
+                          flag,
+                          style: TextStyle(fontSize: 14.sp),
+                        ),
+                      ],
                     ],
                   ),
 
-                  SizedBox(height: 4.h),
-
-                  /// HEIGHT ROW
-                  // Row(
-                  //   children: [
-                  //     Icon(
-                  //       Icons.height,
-                  //       color: Colors.white54,
-                  //       size: 13.sp,
-                  //     ),
-                  //     SizedBox(width: 3.w),
-                  //     Text(
-                  //       user["height"] ?? "",
-                  //       style: AppTextStyles.small.copyWith(
-                  //         color: Colors.white54,
-                  //         fontWeight: FontWeight.w500,
-                  //       ),
-                  //     ),
-                  //   ],
-                  // ),
-
-                  //SizedBox(height: 6.h),
+                  SizedBox(height: 3.h),
 
                   /// FROM → TO
                   Row(
@@ -701,16 +1510,16 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                       Icon(
                         Icons.location_on_outlined,
                         color: Colors.white70,
-                        size: 8.sp,
+                        size: 10.sp,
                       ),
-
-                      SizedBox(width: 1.w),
-
+                      SizedBox(width: 2.w),
                       Expanded(
                         child: Text(
-                          "${user["from"]} ➜ ${user["to"]}",
+                          routeDisplay,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.cardDistance.copyWith(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             fontSize: 9.sp,
                             color: Colors.white,
                           ),
@@ -719,47 +1528,39 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                     ],
                   ),
 
-                  SizedBox(height: 6.h),
+                  SizedBox(height: 5.h),
 
                   /// TAG BUTTON
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8.w,
-                      vertical: 4.h,
-                    ),
-
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-
-                      borderRadius: BorderRadius.circular(30.r),
-                    ),
-
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-
-                      children: [
-                        Icon(
-                          Icons.local_offer_outlined,
-
-                          size: 14.sp,
-
-                          color: Colors.black,
-                        ),
-
-                        SizedBox(width: 5.w),
-
-                        Text(
-                          user["tag"] ?? "",
-
-                          style: AppTextStyles.small.copyWith(
+                  if (tag.isNotEmpty)
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 7.w,
+                        vertical: 3.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30.r),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_offer_outlined,
+                            size: 12.sp,
                             color: Colors.black,
-
-                            fontWeight: FontWeight.w500,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 4.w),
+                          Text(
+                            tag,
+                            style: AppTextStyles.small.copyWith(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10.sp,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

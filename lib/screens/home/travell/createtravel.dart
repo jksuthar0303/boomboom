@@ -1,12 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:xml/xml.dart' as xml;
 
 import '../../../backend/countryapi.dart';
+import '../../../backend/secure_storage.dart';
+import '../../../backend/travel_service.dart';
 import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../constant/colors.dart';
+import '../../../widget/snakbar.dart';
 
 class CreateJourneyScreen extends StatefulWidget {
   const CreateJourneyScreen({super.key});
@@ -17,6 +23,8 @@ class CreateJourneyScreen extends StatefulWidget {
 
 class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
   final LocationController controller = Get.put(LocationController());
+  final TravelService _travelService = TravelService();
+  final TextEditingController _descController = TextEditingController();
 
   int journeyIndex = 0;
   int styleIndex = 0;
@@ -27,20 +35,25 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
 
   String selectedField = "";
 
+  DateTime? fromDate;
+  DateTime? toDate;
+
+  bool isSubmitting = false;
+
   final journeyList = [
-    "Vocation",
+    "Vacation",
     "Business",
     "Nightlife & Parties",
     "Travel Companion",
     "Tour Guide",
     "Massage & Spa",
-    "Island"
+    "Island",
   ];
   final styleList = ["Solo", "Group", "Backpacker", "Couple"];
   final genderList = [
     {"label": "Any Gender", "icon": Icons.transgender},
     {"label": "Male", "icon": Icons.male},
-    {"label": "female", "icon": Icons.female},
+    {"label": "Female", "icon": Icons.female},
   ];
 
   /// 🔥 Gender icon helper
@@ -61,6 +74,192 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
   void initState() {
     super.initState();
     controller.fetchCountries();
+    fromDate = DateTime.now();
+    toDate = DateTime.now().add(const Duration(days: 7));
+  }
+
+  @override
+  void dispose() {
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate({required bool isFromDate}) async {
+    final initial = isFromDate ? (fromDate ?? DateTime.now()) : (toDate ?? DateTime.now());
+    final firstDate = isFromDate
+        ? DateTime.now().subtract(const Duration(days: 1))
+        : (fromDate ?? DateTime.now());
+    final lastDate = DateTime.now().add(const Duration(days: 365 * 5));
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(firstDate) ? firstDate : initial,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF8E2DE2),
+              onPrimary: Colors.white,
+              surface: Color(0xFF141B2D),
+              onSurface: Colors.white,
+            ),
+            dialogBackgroundColor: const Color(0xFF141B2D),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isFromDate) {
+          fromDate = picked;
+          if (toDate != null && toDate!.isBefore(picked)) {
+            toDate = picked.add(const Duration(days: 1));
+          }
+        } else {
+          toDate = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _publishJourney() async {
+    FocusScope.of(context).unfocus();
+
+    final fromCountry = controller.fromCountry.value.trim();
+    final fromCity = controller.fromCity.value.trim();
+    final toCountry = controller.destinationCountry.value.trim();
+    final toCity = controller.destinationCity.value.trim();
+
+    if (fromCountry.isEmpty) {
+      NeuSnackbar.warning("Please select departure country (From Country)");
+      return;
+    }
+    if (fromCity.isEmpty) {
+      NeuSnackbar.warning("Please select departure city (From City)");
+      return;
+    }
+    if (toCountry.isEmpty) {
+      NeuSnackbar.warning("Please select destination country (To Country)");
+      return;
+    }
+    if (toCity.isEmpty) {
+      NeuSnackbar.warning("Please select destination city (To City)");
+      return;
+    }
+    if (fromDate == null || toDate == null) {
+      NeuSnackbar.warning("Please select travel dates");
+      return;
+    }
+    if (toDate!.isBefore(fromDate!)) {
+      NeuSnackbar.warning("Return date cannot be earlier than departure date");
+      return;
+    }
+
+    final email = await SecureStorage().getUserEmail();
+    if (email == null || email.trim().isEmpty) {
+      NeuSnackbar.error("User email not found. Please log in again.");
+      return;
+    }
+
+    setState(() => isSubmitting = true);
+
+    try {
+      final journeyType = journeyList[journeyIndex];
+      final travelStyle = styleList[styleIndex];
+      final travelCompanion = genderList[genderIndex]["label"]?.toString() ?? "Any Gender";
+      final isHide = hideFromCountry ? "true" : "false";
+      final fromDateStr = DateFormat("yyyy-MM-dd").format(fromDate!);
+      final toDateStr = DateFormat("yyyy-MM-dd").format(toDate!);
+      final description = _descController.text.trim();
+
+      final response = await _travelService.insertTravel(
+        journeyType: journeyType,
+        travelStyle: travelStyle,
+        travelCompanion: travelCompanion,
+        isHide: isHide,
+        fromCountry: fromCountry,
+        fromCity: fromCity,
+        toCountry: toCountry,
+        toCity: toCity,
+        fromDate: fromDateStr,
+        toDate: toDateStr,
+        description: description,
+        email: email.trim(),
+      );
+
+      if (response.statusCode == 200) {
+        final bodyStr = response.body.trim();
+        String message = "Journey created successfully!";
+        bool isSuccess = true;
+
+        // Extract JSON portion: {"Status":1,"Message":"Journey inserted successfully","TravelId":1}
+        try {
+          final jsonMatch = RegExp(r'\{.*?\}').firstMatch(bodyStr);
+          if (jsonMatch != null) {
+            final jsonStr = jsonMatch.group(0)!;
+            final decoded = jsonDecode(jsonStr);
+            if (decoded is Map) {
+              final status = decoded["Status"];
+              final msg = decoded["Message"]?.toString();
+              if (msg != null && msg.isNotEmpty) {
+                message = msg;
+              }
+              if (status != null) {
+                isSuccess = (status == 1 || status == "1" || status == true);
+              }
+            }
+          } else if (bodyStr.contains("<")) {
+            final doc = xml.XmlDocument.parse(bodyStr);
+            final resultElements = doc.findAllElements('InsertTravelResult');
+            if (resultElements.isNotEmpty) {
+              final resultText = resultElements.first.innerText.trim();
+              if (resultText.toLowerCase().contains("error") || resultText == "-1") {
+                isSuccess = false;
+                message = resultText;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint("Response parse note: $e");
+        }
+
+        if (!isSuccess) {
+          throw Exception(message);
+        }
+
+        NeuSnackbar.success(message);
+
+        // Reset location fields
+        controller.fromCountry.value = "";
+        controller.fromCity.value = "";
+        controller.destinationCountry.value = "";
+        controller.destinationCity.value = "";
+        _descController.clear();
+
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        } else {
+          Get.back(result: true);
+        }
+      } else {
+        throw Exception("Server returned status code: ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("InsertTravel Error: $e");
+      NeuSnackbar.error(
+        e.toString().replaceAll("Exception:", "").trim(),
+        title: "Failed to Add Travel",
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -73,25 +272,53 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
-              /// 🔥 TITLE
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      "Create Your Journey",
-                      style: AppTextStyles.heading.copyWith(
-                        fontSize: AppSize.sp(20),
+              /// 🔥 HEADER WITH BACK BUTTON
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Get.back(),
+                    child: Container(
+                      padding: EdgeInsets.all(10.w),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary,
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16.sp,
                       ),
                     ),
-                    SizedBox(height: 5.h),
-                    Text(
-                      "Plan your perfect trip and connect with fellow travelers",
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.small,
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 36.w),
+                        child: Column(
+                          children: [
+                            Text(
+                              "Create Your Journey",
+                              style: AppTextStyles.heading.copyWith(
+                                fontSize: AppSize.sp(20),
+                              ),
+                            ),
+                            SizedBox(height: 4.h),
+                            Text(
+                              "Plan your perfect trip and connect with fellow travelers",
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.small.copyWith(
+                                fontSize: 11.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
 
               SizedBox(height: 25.h),
@@ -116,15 +343,12 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
 
               SizedBox(height: 22.h),
 
-              SizedBox(height: 24.h),
-
               // ─────────────────────────────────────────
               // 🔥 HIDE FROM COUNTRY ROW
               // ─────────────────────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-
                   /// ICON
                   Icon(
                     CupertinoIcons.eye_slash,
@@ -139,7 +363,6 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         Text(
                           "Hide from My Country",
                           style: AppTextStyles.subHeading.copyWith(
@@ -293,9 +516,21 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
               _title("Travel Dates"),
               Row(
                 children: [
-                  Expanded(child: _dateBox("Mar 23, 2026")),
-                  SizedBox(width: 10.w),
-                  Expanded(child: _dateBox("Mar 23, 2026")),
+                  Expanded(
+                    child: _dateBox(
+                      label: "Departure Date",
+                      date: fromDate,
+                      onTap: () => _pickDate(isFromDate: true),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: _dateBox(
+                      label: "Return Date",
+                      date: toDate,
+                      onTap: () => _pickDate(isFromDate: false),
+                    ),
+                  ),
                 ],
               ),
 
@@ -310,9 +545,13 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.04),
+                  ),
                 ),
                 child: TextField(
-                  maxLines: 5,
+                  controller: _descController,
+                  maxLines: 4,
                   style: AppTextStyles.body.copyWith(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: "Write something about your journey...",
@@ -324,24 +563,64 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
                 ),
               ),
 
-              SizedBox(height: 25.h),
+              SizedBox(height: 30.h),
 
-              /// 🔥 PUBLISH BUTTON
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: 14.h),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+              /// 🔥 PUBLISH BUTTON WITH LOADING STATE
+              GestureDetector(
+                onTap: isSubmitting ? null : _publishJourney,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: double.infinity,
+                  height: 54.h,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isSubmitting
+                          ? [const Color(0xFF5A1E8E), const Color(0xFF32008E)]
+                          : [const Color(0xFF8E2DE2), const Color(0xFF4A00E0)],
+                    ),
+                    borderRadius: BorderRadius.circular(30.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8E2DE2).withValues(alpha: 0.35),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(30.r),
-                ),
-                child: Center(
-                  child: Text("Publish Journey", style: AppTextStyles.button),
+                  child: Center(
+                    child: isSubmitting
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                height: 20.h,
+                                width: 20.h,
+                                child: const CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              ),
+                              SizedBox(width: 12.w),
+                              Text(
+                                "Publishing Journey...",
+                                style: AppTextStyles.button.copyWith(
+                                  fontSize: 15.sp,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            "Publish Journey",
+                            style: AppTextStyles.button.copyWith(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
                 ),
               ),
 
-              SizedBox(height: 20.h),
+              SizedBox(height: 30.h),
             ],
           ),
         ),
@@ -350,7 +629,7 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
   }
 
   // ─────────────────────────────────────────
-  // 🔥 HIDE BOTTOM SHEET (extracted method)
+  // 🔥 HIDE BOTTOM SHEET
   // ─────────────────────────────────────────
   void _openHideBottomSheet() {
     Get.bottomSheet(
@@ -365,7 +644,6 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-
             /// HANDLE
             Container(
               width: 40.w,
@@ -423,10 +701,10 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
   // 🔥 CHIP ROW
   // ─────────────────────────────────────────
   Widget _chipRow(
-      List list,
-      int selected,
-      Function(int) onTap,
-      ) {
+    List list,
+    int selected,
+    Function(int) onTap,
+  ) {
     return SizedBox(
       height: 48.h,
       child: ListView.separated(
@@ -463,34 +741,34 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
               child: Center(
                 child: list[i] is Map
                     ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      list[i]["icon"],
-                      size: 18,
-                      color: selected == i
-                          ? Colors.white
-                          : AppColors.textSecondary,
-                    ),
-                    SizedBox(width: 6.w),
-                    Text(
-                      list[i]["label"],
-                      style: AppTextStyles.small.copyWith(
-                        color: selected == i
-                            ? Colors.white
-                            : AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                )
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            list[i]["icon"],
+                            size: 18,
+                            color: selected == i
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                          ),
+                          SizedBox(width: 6.w),
+                          Text(
+                            list[i]["label"],
+                            style: AppTextStyles.small.copyWith(
+                              color: selected == i
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      )
                     : Text(
-                  list[i].toString(),
-                  style: AppTextStyles.small.copyWith(
-                    color: selected == i
-                        ? Colors.white
-                        : AppColors.textSecondary,
-                  ),
-                ),
+                        list[i].toString(),
+                        style: AppTextStyles.small.copyWith(
+                          color: selected == i
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                        ),
+                      ),
               ),
             ),
           );
@@ -503,10 +781,10 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
   // 🔥 DROPDOWN
   // ─────────────────────────────────────────
   Widget _dropdown(
-      String selectedValue,
-      String title,
-      IconData icon,
-      ) {
+    String selectedValue,
+    String title,
+    IconData icon,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -527,14 +805,13 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
         SizedBox(height: 8.h),
         GestureDetector(
           onTap: () {
-            // 🔥 City fields require a country to be picked first
             if (title == "From City" && controller.fromCountry.value.isEmpty) {
-              _showSnack("Please select From Country first");
+              NeuSnackbar.warning("Please select departure country first");
               return;
             }
             if (title == "Destination City" &&
                 controller.destinationCountry.value.isEmpty) {
-              _showSnack("Please select Destination Country first");
+              NeuSnackbar.warning("Please select destination country first");
               return;
             }
 
@@ -543,7 +820,6 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
             if (title == "From Country" || title == "Destination Country") {
               _openCountryBottomSheet();
             } else {
-              // From City / Destination City -> use cities fetched for the chosen country
               final country = title == "From City"
                   ? controller.fromCountry.value
                   : controller.destinationCountry.value;
@@ -597,16 +873,6 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  void _showSnack(String msg) {
-    Get.snackbar(
-      "",
-      msg,
-      backgroundColor: AppColors.secondary,
-      colorText: Colors.white,
-      snackPosition: SnackPosition.BOTTOM,
     );
   }
 
@@ -667,24 +933,83 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
   // ─────────────────────────────────────────
   // 🔥 DATE BOX
   // ─────────────────────────────────────────
-  Widget _dateBox(String text) {
-    return Container(
-      padding: EdgeInsets.all(14.w),
-      decoration: BoxDecoration(
-        color: AppColors.secondary,
-        borderRadius: BorderRadius.circular(12.r),
-      ),
-      child: Center(
-        child: Text(text, style: AppTextStyles.body),
-      ),
+  Widget _dateBox({
+    required String label,
+    required DateTime? date,
+    required VoidCallback onTap,
+  }) {
+    final formatted = date != null ? DateFormat("MMM dd, yyyy").format(date) : "Select Date";
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.calendar_today_rounded, size: 14.sp, color: const Color(0xFFB14DFF)),
+            SizedBox(width: 5.w),
+            Text(
+              label,
+              style: AppTextStyles.small.copyWith(
+                fontSize: 11.sp,
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8.h),
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 58.h,
+            padding: EdgeInsets.symmetric(horizontal: 14.w),
+            decoration: BoxDecoration(
+              color: const Color(0xFF141B2D),
+              borderRadius: BorderRadius.circular(14.r),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  blurRadius: 14,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.02),
+                  blurRadius: 2,
+                  offset: const Offset(0, -1),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    formatted,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body.copyWith(
+                      color: Colors.white,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.event_available_rounded,
+                  color: const Color(0xFF8E2DE2),
+                  size: 20.sp,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   // ─────────────────────────────────────────
-  // 🔥 COUNTRY BOTTOM SHEET (uses controller.filteredCountries)
+  // 🔥 COUNTRY BOTTOM SHEET
   // ─────────────────────────────────────────
   void _openCountryBottomSheet() {
-    // reset search + list every time the sheet opens
     controller.filterCountries("");
 
     Get.bottomSheet(
@@ -699,7 +1024,7 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
         ),
         child: Column(
           children: [
-            /// SEARCH — fires on every letter typed
+            /// SEARCH
             TextField(
               autofocus: false,
               onChanged: (value) {
@@ -724,14 +1049,12 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
             /// COUNTRY LIST
             Expanded(
               child: Obx(() {
-                // 🔥 still loading the first time
                 if (controller.isLoadingCountries.value) {
                   return const Center(
                     child: CircularProgressIndicator(color: Colors.white),
                   );
                 }
 
-                // 🔥 nothing matched the search, or API returned empty
                 if (controller.filteredCountries.isEmpty) {
                   return Center(
                     child: Text(
@@ -748,13 +1071,13 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
                     return ListTile(
                       leading: country["flag"] != null
                           ? Image.network(
-                        country["flag"],
-                        width: 30,
-                        height: 20,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                        const Icon(Icons.flag, color: Colors.white38),
-                      )
+                              country["flag"],
+                              width: 30,
+                              height: 20,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) =>
+                                  const Icon(Icons.flag, color: Colors.white38),
+                            )
                           : const Icon(Icons.flag, color: Colors.white38),
                       title: Text(
                         country["name"],
@@ -763,10 +1086,10 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
                       onTap: () {
                         if (selectedField == "From Country") {
                           controller.fromCountry.value = country["name"];
-                          controller.fromCity.value = ""; // 🔥 reset dependent city
+                          controller.fromCity.value = "";
                         } else if (selectedField == "Destination Country") {
                           controller.destinationCountry.value = country["name"];
-                          controller.destinationCity.value = ""; // 🔥 reset dependent city
+                          controller.destinationCity.value = "";
                         }
                         Get.back();
                       },
@@ -782,12 +1105,14 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
   }
 
   // ─────────────────────────────────────────
-  // 🔥 CITY BOTTOM SHEET (uses controller.cities, fetched for chosen country)
+  // 🔥 CITY BOTTOM SHEET (Search + Fallback + Custom input)
   // ─────────────────────────────────────────
   void _openCityBottomSheet() {
+    controller.filterCities("");
+
     Get.bottomSheet(
       Container(
-        height: 500.h,
+        height: 520.h,
         padding: EdgeInsets.all(16.w),
         decoration: BoxDecoration(
           color: AppColors.primary,
@@ -806,7 +1131,30 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
                 color: Colors.white,
               ),
             ),
-            SizedBox(height: 15.h),
+            SizedBox(height: 12.h),
+
+            /// 🔥 CITY SEARCH FIELD
+            TextField(
+              autofocus: false,
+              onChanged: (value) {
+                controller.filterCities(value);
+              },
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: "Search city or type custom...",
+                hintStyle: const TextStyle(color: Colors.grey),
+                filled: true,
+                fillColor: AppColors.secondary,
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+
+            SizedBox(height: 12.h),
+
             Expanded(
               child: Obx(() {
                 if (controller.isLoadingCities.value) {
@@ -815,35 +1163,86 @@ class _CreateJourneyScreenState extends State<CreateJourneyScreen> {
                   );
                 }
 
-                if (controller.cities.isEmpty) {
+                final hasTypedCustom = controller.searchCityText.value.trim().isNotEmpty;
+                final customQuery = controller.searchCityText.value.trim();
+                final citiesList = controller.filteredCities;
+
+                if (citiesList.isEmpty && !hasTypedCustom) {
                   return Center(
                     child: Text(
-                      "No cities found",
+                      "No cities found. Type above to enter custom city.",
+                      textAlign: TextAlign.center,
                       style: AppTextStyles.small.copyWith(color: Colors.white38),
                     ),
                   );
                 }
 
-                return ListView.builder(
-                  itemCount: controller.cities.length,
-                  itemBuilder: (_, i) {
-                    final city = controller.cities[i];
-                    return ListTile(
-                      leading: const Icon(Icons.location_city, color: Colors.white38),
-                      title: Text(
-                        city,
-                        style: AppTextStyles.body.copyWith(color: Colors.white),
+                return ListView(
+                  children: [
+                    // 🔥 If user typed a search term, allow selecting it directly as custom city
+                    if (hasTypedCustom) ...[
+                      ListTile(
+                        leading: Container(
+                          padding: EdgeInsets.all(6.w),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6A5AE0).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: const Icon(
+                            Icons.add_location_alt_rounded,
+                            color: Color(0xFFB08FFF),
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          "Use \"$customQuery\"",
+                          style: AppTextStyles.body.copyWith(
+                            color: const Color(0xFFB08FFF),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          "Tap to select this custom city",
+                          style: AppTextStyles.small.copyWith(
+                            color: Colors.white38,
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                        onTap: () {
+                          if (selectedField == "From City") {
+                            controller.fromCity.value = customQuery;
+                          } else if (selectedField == "Destination City") {
+                            controller.destinationCity.value = customQuery;
+                          }
+                          Get.back();
+                        },
                       ),
-                      onTap: () {
-                        if (selectedField == "From City") {
-                          controller.fromCity.value = city;
-                        } else if (selectedField == "Destination City") {
-                          controller.destinationCity.value = city;
-                        }
-                        Get.back();
-                      },
-                    );
-                  },
+                      const Divider(color: Colors.white12),
+                    ],
+
+                    ...citiesList.map((city) {
+                      return ListTile(
+                        leading: const Icon(
+                          Icons.location_city,
+                          color: Colors.white38,
+                        ),
+                        title: Text(
+                          city.toString(),
+                          style: AppTextStyles.body.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
+                        onTap: () {
+                          if (selectedField == "From City") {
+                            controller.fromCity.value = city.toString();
+                          } else if (selectedField == "Destination City") {
+                            controller.destinationCity.value = city.toString();
+                          }
+                          Get.back();
+                        },
+                      );
+                    }),
+                  ],
                 );
               }),
             ),

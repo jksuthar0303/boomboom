@@ -42,6 +42,7 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
 
   bool _isLoading = false;
   bool _isSuccessSubmitted = false;
+  String _verificationStatus = '';
   File? _capturedImage;
   final ImagePicker _picker = ImagePicker();
   final RegisterService _registerService = RegisterService();
@@ -60,6 +61,47 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
 
     // Retrieve lost data on Android if MainActivity was recreated after Camera intent
     _checkLostData();
+    _loadVerificationStatus();
+  }
+
+  Future<void> _loadVerificationStatus() async {
+    try {
+      final email = await SecureStorage().getUserEmail();
+      if (email == null || email.trim().isEmpty) return;
+      final response = await _registerService.showCompleteProfile(
+        email: email.trim(),
+      );
+      if (response.statusCode != 200 || !mounted) return;
+
+      final doc = xml.XmlDocument.parse(response.body);
+      final nodes = doc.findAllElements('ShowCompleteProfileResult');
+      if (nodes.isEmpty) return;
+      final decoded = jsonDecode(nodes.first.innerText);
+      Map<String, dynamic>? profile;
+      final sets = decoded['ResultSets'];
+      if (sets is List) {
+        for (final set in sets) {
+          if (set is List && set.isNotEmpty && set.first is Map) {
+            final item = Map<String, dynamic>.from(set.first);
+            if (item.containsKey('EmailAddress') ||
+                item.containsKey('IsVerified')) {
+              profile = item;
+              break;
+            }
+          }
+        }
+      }
+      if (profile == null && decoded['Data'] is List &&
+          (decoded['Data'] as List).isNotEmpty) {
+        profile = Map<String, dynamic>.from(decoded['Data'].first);
+      }
+      final value = profile?['IsVerified']?.toString().trim() ?? '';
+      if (value.isNotEmpty && mounted) {
+        setState(() => _verificationStatus = value);
+      }
+    } catch (e) {
+      debugPrint('Error loading verification status: $e');
+    }
   }
 
   Future<void> _checkLostData() async {
@@ -177,7 +219,7 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
         email: userEmail.trim(),
         mediaBase64: base64Image,
         type: 'verify',
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (!mounted) return;
 
@@ -204,12 +246,56 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
           isSuccess = true;
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: isSuccess ? Colors.green : Colors.red,
-          ),
-        );
+        if (isSuccess) {
+          try {
+            final verificationResponse = await _registerService
+                .updateVerification(
+                  email: userEmail.trim(),
+                  isVerified: 'Pending',
+                )
+                .timeout(const Duration(seconds: 15));
+            if (verificationResponse.statusCode < 200 ||
+                verificationResponse.statusCode >= 300) {
+              throw Exception('HTTP ${verificationResponse.statusCode}');
+            }
+
+            try {
+              final verificationDoc = xml.XmlDocument.parse(
+                verificationResponse.body,
+              );
+              final result = verificationDoc.findAllElements(
+                'UpdateVerificationResult',
+              );
+              if (result.isNotEmpty) {
+                final resultJson = jsonDecode(result.first.innerText);
+                if ((resultJson['Status'] ?? 1) != 1) {
+                  throw Exception(
+                    resultJson['Message'] ?? 'Verification update failed',
+                  );
+                }
+              }
+            } catch (e) {
+              if (e is FormatException) {
+                // Some SOAP responses contain no JSON result body.
+              } else {
+                rethrow;
+              }
+            }
+            message = 'Your profile verification is under review.';
+          } catch (e) {
+            isSuccess = false;
+            message = 'Verification status update failed: $e';
+          }
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: isSuccess ? Colors.green : Colors.red,
+            ),
+          );
+        }
 
         if (isSuccess) {
           setState(() {
@@ -220,12 +306,14 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
           });
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Server Error: ${response.statusCode}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Server Error: ${response.statusCode}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -300,6 +388,30 @@ class _SelfieVerificationScreenState extends State<SelfieVerificationScreen>
                       height: 1.6,
                     ),
                   ),
+
+                  if (_verificationStatus.toLowerCase() == 'pending') ...[
+                    SizedBox(height: 14.h),
+                    Text(
+                      'Your profile verification is under review.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.amberAccent,
+                      ),
+                    ),
+                  ] else if (_verificationStatus.toLowerCase() == 'true') ...[
+                    SizedBox(height: 14.h),
+                    Text(
+                      'You are verified.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.greenAccent,
+                      ),
+                    ),
+                  ],
 
                   SizedBox(height: 28.h),
 

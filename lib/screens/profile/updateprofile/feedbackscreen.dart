@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../constant/colors.dart';
+import '../../../backend/registerservice.dart';
+import '../../../backend/secure_storage.dart';
+import 'package:xml/xml.dart' as xml;
 
 enum FeedbackTopic { bugReport, suggestion, compliment, other }
 
@@ -17,6 +22,8 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
   FeedbackTopic? _selectedTopic = FeedbackTopic.suggestion; // default selected
   final TextEditingController _messageController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  bool _isSubmitting = false;
+  final RegisterService _registerService = RegisterService();
 
   @override
   void dispose() {
@@ -25,7 +32,7 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
     super.dispose();
   }
 
-  void _onSubmit() {
+  Future<void> _onSubmit() async {
     if (_selectedTopic == null) {
       ScaffoldMessenger.of(
         context,
@@ -38,9 +45,66 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Feedback submitted! Thank you.')),
-    );
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final email = await SecureStorage().getUserEmail();
+      if (email == null || email.trim().isEmpty) {
+        throw Exception('User email not found. Please log in again.');
+      }
+
+      final response = await _registerService
+          .feedbackInsert(
+            type: _selectedTopic == FeedbackTopic.bugReport
+                ? 'Bug Report'
+                : _selectedTopic == FeedbackTopic.suggestion
+                ? 'Suggestion'
+                : _selectedTopic == FeedbackTopic.compliment
+                ? 'Compliment'
+                : 'Other',
+            description: _messageController.text.trim(),
+            email: email.trim(),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      String message = 'Feedback submitted successfully. Thank you!';
+      bool success = response.statusCode >= 200 && response.statusCode < 300;
+      try {
+        final doc = xml.XmlDocument.parse(response.body);
+        final nodes = doc.findAllElements('Feedback_InsertResult');
+        if (nodes.isNotEmpty) {
+          final result = jsonDecode(nodes.first.innerText);
+          message = result['Message']?.toString() ?? message;
+          success = success && (result['Status'] ?? 0) == 1;
+        }
+      } catch (_) {
+        // Keep HTTP success if the SOAP response has no JSON result node.
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+      if (success) {
+        _messageController.clear();
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+        if (mounted) Navigator.maybePop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Feedback submit nahi ho saka: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -202,7 +266,10 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
                 ),
 
                 // ── Submit button (pinned bottom) ──────────────────────────
-                _SubmitButton(isTablet: isTablet, onTap: _onSubmit),
+                _SubmitButton(
+                  isTablet: isTablet,
+                  onTap: _isSubmitting ? () {} : _onSubmit,
+                ),
               ],
             ),
           ),

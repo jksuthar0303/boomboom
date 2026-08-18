@@ -6,6 +6,7 @@ import 'package:boomboom/screens/profile/updateprofile/privacyscreen.dart';
 import 'package:boomboom/screens/profile/updateprofile/termsscreen.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:boomboom/backend/secure_storage.dart';
+import 'package:boomboom/backend/registerservice.dart';
 import 'package:boomboom/authentication/welcomscreens.dart';
 import 'package:boomboom/screens/profile/updateprofile/selfieverification.dart';
 import 'package:boomboom/screens/profile/updateprofile/subscriptionplan.dart';
@@ -14,6 +15,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:xml/xml.dart' as xml;
+import 'package:share_plus/share_plus.dart';
 import '../../../controller/appsetting.dart';
 
 import '../../authentication/boomboom.dart';
@@ -93,6 +96,72 @@ BoxDecoration neuDeco({Color color = _C.surface, double radius = 16}) {
       BoxShadow(color: _C.shadowLight, offset: Offset(-2, -2), blurRadius: 6),
     ],
   );
+}
+
+Future<void> _openVerificationFlow(BuildContext context) async {
+  final email = await SecureStorage().getUserEmail();
+  if (email == null || email.trim().isEmpty) return;
+  if (!context.mounted) return;
+
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(child: CircularProgressIndicator()),
+  );
+
+  String status = '';
+  try {
+    final response = await RegisterService()
+        .showCompleteProfile(email: email.trim())
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode == 200) {
+      final doc = xml.XmlDocument.parse(response.body);
+      final nodes = doc.findAllElements('ShowCompleteProfileResult');
+      if (nodes.isNotEmpty) {
+        final decoded = jsonDecode(nodes.first.innerText);
+        final sets = decoded['ResultSets'];
+        if (sets is List) {
+          for (final set in sets) {
+            if (set is List && set.isNotEmpty && set.first is Map) {
+              final item = Map<String, dynamic>.from(set.first);
+              if (item.containsKey('IsVerified')) {
+                status = item['IsVerified']?.toString() ?? '';
+                break;
+              }
+            }
+          }
+        }
+        if (status.isEmpty &&
+            decoded['Data'] is List &&
+            (decoded['Data'] as List).isNotEmpty) {
+          status = (decoded['Data'].first['IsVerified'] ?? '').toString();
+        }
+      }
+    }
+  } catch (e) {
+    debugPrint('Error checking verification status: $e');
+  } finally {
+    if (context.mounted &&
+        Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  if (!context.mounted) return;
+  final normalized = status.trim().toLowerCase();
+  if (normalized == 'pending') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Your profile verification is under review.'),
+      ),
+    );
+  } else if (normalized == 'true') {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('You are verified.')));
+  } else {
+    Get.to(() => const SelfieVerificationScreen());
+  }
 }
 
 // ─── Settings Screen ──────────────────────────────────────────────────────────
@@ -279,10 +348,7 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       emoji: Text('✅', style: TextStyle(fontSize: 18.sp)),
       label: 'Verify Profile',
       subtitle: "Verify your account",
-      onTap: () {
-        // Navigate to Selfie Verification Screen when tapped
-        Get.to(() => SelfieVerificationScreen());
-      },
+      onTap: () => _openVerificationFlow(context),
     ),
     // _TileData(iconBg: _C.blue, iconBorder: Color(0xFF162240),emoji: Text(
     // '✏️',
@@ -349,8 +415,20 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       emoji: Text('⭐', style: TextStyle(fontSize: 18.sp)),
       label: 'Rate Us',
       subtitle: "Rate Our App",
-      onTap: () {
-        // Navigate Screen
+      onTap: () async {
+        const playStoreUrl =
+            'https://play.google.com/store/apps/details?id=com.boomboom.dating&pcampaignid=web_share';
+        final uri = Uri.parse(playStoreUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          final marketUri = Uri.parse(
+            'market://details?id=com.boomboom.dating',
+          );
+          if (await canLaunchUrl(marketUri)) {
+            await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+          }
+        }
       },
     ),
     _TileData(
@@ -439,27 +517,16 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       iconBg: _C.green,
       iconBorder: _C.greenBorder,
       emoji: Text('🔗', style: TextStyle(fontSize: 18.sp)),
-      label: 'Share Profile',
-      subtitle: "Share your profile with friends",
+      label: 'Share App',
+      subtitle: "Invite friends to BoomBoom",
       labelColor: _C.greenText,
       onTap: () async {
-        const profileLink =
-            "https://boomboom.app/profile/sid"; // apna link yahan
-
-        // Native share sheet (WhatsApp, Instagram, sab)
-        final uri = Uri.parse(
-          "https://wa.me/?text=${Uri.encodeComponent('Hey! Check out my BoomBoom profile: $profileLink')}",
+        await SharePlus.instance.share(
+          ShareParams(
+            text:
+                'We found a great dating app called BoomBoom! Meet genuine people, discover meaningful connections, and find your perfect match. Download it here: https://play.google.com/store/apps/details?id=com.boomboom.dating',
+          ),
         );
-
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          // Fallback: generic share (Android/iOS share sheet)
-          final shareUri = Uri.parse(
-            "https://wa.me/?text=${Uri.encodeComponent(profileLink)}",
-          );
-          await launchUrl(shareUri, mode: LaunchMode.externalApplication);
-        }
       },
     ),
     _TileData(
@@ -544,6 +611,19 @@ class _TileGroupWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = _R.tileGroupRadius(context);
     final hm = noMargin ? 0.0 : _R.cardHMargin(context);
+    final visibleTiles = tiles
+        .where(
+          (tile) =>
+              tile.label != 'Ghost Mode' &&
+              tile.label != 'Exclude Message Profile',
+        )
+        .toList();
+    visibleTiles.sort((a, b) {
+      if (a.label == 'Share App') return -1;
+      if (b.label == 'Share App') return 1;
+      return 0;
+    });
+    if (visibleTiles.isEmpty) return const SizedBox.shrink();
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: hm),
@@ -551,8 +631,8 @@ class _TileGroupWidget extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(r),
         child: Column(
-          children: tiles.asMap().entries.map((e) {
-            final isLast = e.key == tiles.length - 1;
+          children: visibleTiles.asMap().entries.map((e) {
+            final isLast = e.key == visibleTiles.length - 1;
             return Column(
               children: [
                 _TileRow(data: e.value),

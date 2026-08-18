@@ -324,6 +324,64 @@ class RegisterService {
     );
   }
 
+  /// SOAP UpdateVerification request
+  Future<XmlResponse> updateVerification({
+    required String email,
+    required String isVerified,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <UpdateVerification xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <EmailAddress>$email</EmailAddress>
+      <IsVerified>$isVerified</IsVerified>
+    </UpdateVerification>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/UpdateVerification"',
+      },
+    );
+  }
+
+  /// SOAP Feedback_Insert request
+  Future<XmlResponse> feedbackInsert({
+    required String type,
+    required String description,
+    required String email,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <Feedback_Insert xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <type>$type</type>
+      <description>$description</description>
+      <email>$email</email>
+    </Feedback_Insert>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/Feedback_Insert"',
+      },
+    );
+  }
+
   /// SOAP ShowMediaByEmail request
   Future<XmlResponse> showMediaByEmail({
     required String email,

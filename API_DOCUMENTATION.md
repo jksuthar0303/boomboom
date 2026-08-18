@@ -28,6 +28,10 @@ Yeh woh APIs hain jo backend se fully connected hain aur project ke services/con
 | 14 | `ShowLifestyleByEmail` | POST (SOAP XML) | User lifestyle details fetch karna | [`lib/backend/registerservice.dart`](file:///g:/boomboom/lib/backend/registerservice.dart#L270-L288) |
 | 15 | `ShowMediaByEmail` | POST (SOAP XML) | Uploaded media list fetch karna by Email and Type | [`lib/backend/registerservice.dart`](file:///g:/boomboom/lib/backend/registerservice.dart#L291-L313) |
 | 16 | `UpdateLatLon` | POST (SOAP XML) | User ki current live GPS Location (Latitude/Longitude) update karna | [`lib/backend/registerservice.dart`](file:///g:/boomboom/lib/backend/registerservice.dart#L316-L343) |
+| 17 | `InsertTravel` | POST (SOAP XML) | User ki Travel/Journey create karna (JourneyType, TravelStyle, TravelCompanion, ishide, FromLocation, Destination, Dates, Description, Email) | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
+| 18 | `ShowTravelByEmail` | POST (SOAP XML) | Logged-in user ke sabhi created journeys fetch karna by Email | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
+| 19 | `DeleteTravel` | POST (SOAP XML) | User ki created travel journey delete karna by ID and Email | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
+| 20 | `ShowUpcomingTrips` | POST (SOAP XML) | Sabhi travelers ki upcoming trips fetch karna (Arrivals tab ke liye) | [`lib/backend/travel_service.dart`](file:///g:/boomboom/lib/backend/travel_service.dart) |
 
 ---
 
