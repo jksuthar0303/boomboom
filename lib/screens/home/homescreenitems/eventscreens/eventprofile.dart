@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -12,10 +13,7 @@ import '../../../../widget/app_image_helper.dart';
 class ProfileDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> data;
 
-  const ProfileDetailsScreen({
-    super.key,
-    this.data = const {},
-  });
+  const ProfileDetailsScreen({super.key, this.data = const {}});
 
   String _calculateAgeFromDob(dynamic dobVal, dynamic ageVal) {
     if (ageVal != null &&
@@ -30,7 +28,8 @@ class ProfileDetailsScreen extends StatelessWidget {
       final dob = DateTime.parse(str);
       final now = DateTime.now();
       int age = now.year - dob.year;
-      if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+      if (now.month < dob.month ||
+          (now.month == dob.month && now.day < dob.day)) {
         age--;
       }
       return age > 0 ? "$age" : "";
@@ -61,68 +60,103 @@ class ProfileDetailsScreen extends StatelessWidget {
     final isTablet = MediaQuery.of(context).size.width > 600;
 
     // 🛡️ Safe field extraction from Tonight API response
-    final String email = (data["EmailAddress"] ??
-            data["TonightEmail"] ??
-            data["Email"] ??
-            data["email"] ??
-            "")
-        .toString()
-        .trim();
+    final String email =
+        (data["EmailAddress"] ??
+                data["TonightEmail"] ??
+                data["Email"] ??
+                data["email"] ??
+                "")
+            .toString()
+            .trim();
 
-    final String rawName = (data["FullName"] ??
-            data["Name"] ??
-            data["name"] ??
-            (email.isNotEmpty ? email.split('@').first : "Traveler"))
-        .toString()
-        .trim();
+    final String rawName =
+        (data["FullName"] ??
+                data["Name"] ??
+                data["name"] ??
+                (email.isNotEmpty ? email.split('@').first : "Traveler"))
+            .toString()
+            .trim();
 
-    final String age = _calculateAgeFromDob(data["Dob"], data["Age"] ?? data["age"]);
+    final String age = _calculateAgeFromDob(
+      data["Dob"],
+      data["Age"] ?? data["age"],
+    );
     final String nameDisplay = age.isNotEmpty ? "$rawName, $age" : rawName;
 
-    final String planning = (data["Planning"] ?? data["tag"] ?? "Dinner").toString().trim();
-
-    final String image = (data["Image"] ??
-            data["ProfileImage"] ??
-            data["image"] ??
-            data["Media"] ??
-            "")
+    final String planning = (data["Planning"] ?? data["tag"] ?? "Dinner")
         .toString()
         .trim();
 
-    final String location = (data["Location"] ??
-            data["FromCity"] ??
-            data["City"] ??
-            data["location"] ??
-            "Nearby")
+    final String image =
+        (data["Image"] ??
+                data["ProfileImage"] ??
+                data["image"] ??
+                data["Media"] ??
+                "")
+            .toString()
+            .trim();
+
+    final String tonightImage =
+        (data["TonightImage"] ?? data["tonightImage"] ?? "").toString().trim();
+
+    final String location =
+        (data["Location"] ??
+                data["FromCity"] ??
+                data["City"] ??
+                data["location"] ??
+                "Nearby")
+            .toString()
+            .trim();
+
+    final String rawDist =
+        (data["DistanceKM"] ??
+                data["Distance"] ??
+                data["distance"] ??
+                data["DistanceKm"] ??
+                "")
+            .toString()
+            .trim();
+    String distance = "Nearby";
+    if (rawDist.isNotEmpty && rawDist.toLowerCase() != "null") {
+      final cleanNum = rawDist.replaceAll(RegExp(r'[^\d.]'), '');
+      final d = double.tryParse(cleanNum);
+      if (d != null) {
+        if (d < 1.0) {
+          distance = "1 km away";
+        } else {
+          distance = "${d.toStringAsFixed(1)} km away";
+        }
+      } else {
+        distance = rawDist.contains("away") ? rawDist : "$rawDist km away";
+      }
+    }
+
+    final String height = (data["Height"] ?? data["height"] ?? "5'4\"")
         .toString()
         .trim();
-
-    final String distanceKM = (data["DistanceKM"] ?? "").toString().trim();
-    final String distance = distanceKM.isNotEmpty && distanceKM != "null"
-        ? "$distanceKM km away"
-        : ((data["Distance"] ?? data["distance"] ?? "1.2 km away").toString());
-
-    final String height = (data["Height"] ?? data["height"] ?? "5'4\"").toString().trim();
 
     final String rawBio = (data["BIO"] ?? data["bio"] ?? "").toString().trim();
     final String bio = rawBio.isNotEmpty
         ? rawBio
         : "Looking to make good memories tonight ✨";
 
-    final String rawLookingFor = (data["TonightDescription"] ??
-            data["Lookingfor"] ??
-            data["Description"] ??
-            "")
-        .toString()
-        .trim();
+    final String rawLookingFor =
+        (data["TonightDescription"] ??
+                data["Lookingfor"] ??
+                data["Description"] ??
+                "")
+            .toString()
+            .trim();
     final String lookingFor = rawLookingFor.isNotEmpty
         ? rawLookingFor
         : "I'm up for good conversations, sharing laughs, and maybe grabbing dinner or exploring the city. Looking for someone who's kind, interesting, and spontaneous.";
 
-    final bool isOnline = data["IsOnline"]?.toString().toLowerCase() == "true" ||
+    final bool isOnline =
+        data["IsOnline"]?.toString().toLowerCase() == "true" ||
         data["isOnline"]?.toString().toLowerCase() == "true";
 
-    final bool isVerified = data["IsVerified"]?.toString().toLowerCase() == "true" ||
+    final bool isVerified =
+        data["IsVerified"]?.toString().toLowerCase() == "true" ||
         data["isVerified"]?.toString().toLowerCase() == "true";
 
     return Scaffold(
@@ -144,7 +178,10 @@ class ProfileDetailsScreen extends StatelessWidget {
                   children: [
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: _circleButton(Icons.arrow_back_ios_new_rounded, isTablet),
+                      child: _circleButton(
+                        Icons.arrow_back_ios_new_rounded,
+                        isTablet,
+                      ),
                     ),
                   ],
                 ),
@@ -195,7 +232,9 @@ class ProfileDetailsScreen extends StatelessWidget {
                             ),
                             child: Text(
                               "🇮🇳",
-                              style: TextStyle(fontSize: isTablet ? 18.sp : 14.sp),
+                              style: TextStyle(
+                                fontSize: isTablet ? 18.sp : 14.sp,
+                              ),
                             ),
                           ),
                         ),
@@ -225,7 +264,9 @@ class ProfileDetailsScreen extends StatelessWidget {
                               ),
                               SizedBox(width: 6.w),
                               Icon(
-                                isVerified ? Icons.verified_rounded : Icons.verified,
+                                isVerified
+                                    ? Icons.verified_rounded
+                                    : Icons.verified,
                                 color: Colors.blue,
                                 size: isTablet ? 22.sp : 18.sp,
                               ),
@@ -302,7 +343,9 @@ class ProfileDetailsScreen extends StatelessWidget {
                                 Text(
                                   "ends in ",
                                   style: GoogleFonts.poppins(
-                                    color: AppColors.white.withValues(alpha: 0.6),
+                                    color: AppColors.white.withValues(
+                                      alpha: 0.6,
+                                    ),
                                     fontSize: isTablet ? 11.sp : 9.sp,
                                   ),
                                 ),
@@ -328,7 +371,9 @@ class ProfileDetailsScreen extends StatelessWidget {
 
               /// 3. 📝 BIO TEXT
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: isTablet ? 24.w : 16.w),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 24.w : 16.w,
+                ),
                 child: Text(
                   bio,
                   style: GoogleFonts.poppins(
@@ -341,79 +386,77 @@ class ProfileDetailsScreen extends StatelessWidget {
 
               SizedBox(height: 14.h),
 
-              /// 4. 📸 MAIN PHOTO with location tag
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: isTablet ? 24.w : 16.w),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20.r),
-                      child: AppNetworkImage(
-                        imageUrl: image,
-                        width: double.infinity,
-                        height: isTablet ? 340.h : 260.h,
-                        fit: BoxFit.cover,
-                        fallbackIcon: Icons.nightlife_rounded,
-                        fallbackIconSize: 64.sp,
-                        backgroundColor: const Color(0xFF161E31),
+              /// 4. 📸 MAIN PHOTO with location tag (Tonight Image only)
+              if (tonightImage.isNotEmpty &&
+                  tonightImage.toLowerCase() != "null") ...[
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 24.w : 16.w,
+                  ),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20.r),
+                        child: _buildMediaImage(tonightImage, isTablet),
                       ),
-                    ),
 
-                    /// Dark Gradient
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20.r),
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            stops: const [0.6, 1.0],
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.85),
-                            ],
+                      /// Dark Gradient
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20.r),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: const [0.6, 1.0],
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.85),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
-                    /// Location overlay
-                    Positioned(
-                      bottom: 12.h,
-                      left: 12.w,
-                      right: 12.w,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_rounded,
-                            color: Colors.pinkAccent,
-                            size: isTablet ? 16.sp : 14.sp,
-                          ),
-                          SizedBox(width: 4.w),
-                          Expanded(
-                            child: Text(
-                              location,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                color: AppColors.white,
-                                fontSize: isTablet ? 13.sp : 11.5.sp,
-                                fontWeight: FontWeight.w600,
+                      /// Location overlay
+                      Positioned(
+                        bottom: 12.h,
+                        left: 12.w,
+                        right: 12.w,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_rounded,
+                              color: Colors.pinkAccent,
+                              size: isTablet ? 16.sp : 14.sp,
+                            ),
+                            SizedBox(width: 4.w),
+                            Expanded(
+                              child: Text(
+                                location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.white,
+                                  fontSize: isTablet ? 13.sp : 11.5.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-
-              SizedBox(height: 14.h),
+                SizedBox(height: 14.h),
+              ],
 
               /// 5. 💖 WHAT I'M LOOKING FOR CARD
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: isTablet ? 24.w : 16.w),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 24.w : 16.w,
+                ),
                 child: Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(isTablet ? 20.w : 16.w),
@@ -473,7 +516,9 @@ class ProfileDetailsScreen extends StatelessWidget {
 
               /// 6. 💬 SAY HELLO CARD
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: isTablet ? 24.w : 16.w),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 24.w : 16.w,
+                ),
                 child: GestureDetector(
                   onTap: () {
                     Get.to(
@@ -574,7 +619,9 @@ class ProfileDetailsScreen extends StatelessWidget {
 
               /// 7. 👤 VIEW PROFILE BUTTON
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: isTablet ? 24.w : 16.w),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 24.w : 16.w,
+                ),
                 child: GestureDetector(
                   onTap: () {
                     Get.to(
@@ -594,10 +641,7 @@ class ProfileDetailsScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18.r),
                       gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF7B2FBE),
-                          Colors.pinkAccent,
-                        ],
+                        colors: [Color(0xFF7B2FBE), Colors.pinkAccent],
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -672,11 +716,51 @@ class ProfileDetailsScreen extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
-      child: Icon(
-        icon,
-        color: AppColors.white,
-        size: isTablet ? 20.sp : 16.sp,
-      ),
+      child: Icon(icon, color: AppColors.white, size: isTablet ? 20.sp : 16.sp),
     );
+  }
+
+  Widget _buildMediaImage(String tonightImg, bool isTablet) {
+    final trimmed = tonightImg.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == "null") {
+      return const SizedBox.shrink();
+    }
+
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return AppNetworkImage(
+        imageUrl: trimmed,
+        width: double.infinity,
+        height: isTablet ? 340.h : 260.h,
+        fit: BoxFit.cover,
+        fallbackIcon: Icons.nightlife_rounded,
+        fallbackIconSize: 64.sp,
+        backgroundColor: const Color(0xFF161E31),
+      );
+    }
+
+    try {
+      final cleanB64 = trimmed.contains(",")
+          ? trimmed.split(",").last.trim()
+          : trimmed;
+      final bytes = base64Decode(cleanB64);
+      return Image.memory(
+        bytes,
+        width: double.infinity,
+        height: isTablet ? 340.h : 260.h,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Container(
+          width: double.infinity,
+          height: isTablet ? 340.h : 260.h,
+          color: const Color(0xFF161E31),
+          child: Icon(
+            Icons.broken_image_rounded,
+            size: 48.sp,
+            color: Colors.white38,
+          ),
+        ),
+      );
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
   }
 }

@@ -349,18 +349,27 @@ class _LikesScreenState extends State<LikesScreen> {
 
   Widget _buildMessage(String message, bool retry) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(message, style: const TextStyle(color: Colors.white60)),
-          if (retry) ...[
-            SizedBox(height: 10.h),
-            OutlinedButton(
-              onPressed: () => _loadUsersForTab(selectedTab),
-              child: const Text('Retry'),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              retry
+                  ? message
+                  : "You're all caught up! New people will appear as they join.",
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white60, height: 1.4),
             ),
+            if (retry) ...[
+              SizedBox(height: 10.h),
+              OutlinedButton(
+                onPressed: () => _loadUsersForTab(selectedTab),
+                child: const Text('Retry'),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -394,6 +403,9 @@ class _LikesScreenState extends State<LikesScreen> {
                 apiUser['EmailAddress']?.toString() ??
                 apiUser['ActionEmail']?.toString(),
             initialUserData: apiUser,
+            isLiked: selectedTab == 0 ||
+                apiUser['Action']?.toString().toLowerCase() == 'like' ||
+                apiUser['action']?.toString().toLowerCase() == 'like',
           ),
         );
       },

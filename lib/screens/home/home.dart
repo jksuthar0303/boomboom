@@ -1219,11 +1219,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                 if (_everyoneUsers.isEmpty) {
                   return Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20.h),
-                    child: const Center(
+                    padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 20.w),
+                    child: Center(
                       child: Text(
-                        "No users found",
-                        style: TextStyle(color: Colors.white54),
+                        "You're all caught up! New people will appear as they join.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: 13.sp,
+                          height: 1.4,
+                        ),
                       ),
                     ),
                   );
@@ -1315,9 +1320,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return SizedBox(
         height: 100.h,
         child: Center(
-          child: Text(
-            isActive ? "No active users online" : "No verified users found",
-            style: const TextStyle(color: Colors.white54),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20.w),
+            child: Text(
+              "You're all caught up! New people will appear as they join.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white54, fontSize: 12.sp),
+            ),
           ),
         ),
       );
@@ -1406,6 +1415,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     user["EmailAddress"]?.toString() ??
                     user["email"]?.toString(),
                 initialUserData: user,
+                showLike: false,
               ),
               transition: Transition.rightToLeft,
             ),

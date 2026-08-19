@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 
@@ -27,6 +28,44 @@ class FilterController extends GetxController {
 
   // Track filter trigger count for reactive listeners
   final RxInt filterVersion = 0.obs;
+  final Map<String, geo.Placemark> _locationCache = {};
+
+  Future<void> enrichLocationFields(
+    Iterable<Map<String, dynamic>> users,
+  ) async {
+    for (final user in users) {
+      final hasLocation = (user["Country"] ??
+              user["country"] ??
+              user["CountryName"] ??
+              user["City"] ??
+              user["city"] ??
+              "")
+          .toString()
+          .trim()
+          .isNotEmpty;
+      if (hasLocation) continue;
+
+      final lat = double.tryParse(
+        (user["Latitude"] ?? user["Lat"] ?? user["latitude"] ?? "")
+            .toString(),
+      );
+      final lon = double.tryParse(
+        (user["Longitude"] ?? user["Lon"] ?? user["longitude"] ?? "")
+            .toString(),
+      );
+      if (lat == null || lon == null || (lat == 0 && lon == 0)) continue;
+
+      final key = '${lat.toStringAsFixed(4)},${lon.toStringAsFixed(4)}';
+      try {
+        final place = _locationCache[key] ??=
+            (await geo.Geocoding().placemarkFromCoordinates(lat, lon)).first;
+        user["Country"] = place.country ?? "";
+        user["City"] = place.locality ?? place.subAdministrativeArea ?? "";
+      } catch (e) {
+        debugPrint('[FilterController] Location lookup failed: $e');
+      }
+    }
+  }
 
   bool get isFilterActive {
     return minAge.value > 18.0 ||
@@ -190,11 +229,10 @@ class FilterController extends GetxController {
             .toString()
             .toLowerCase()
             .trim();
-        // Some list APIs do not return location fields. Keep such profiles
-        // visible until the backend supplies a location value.
-        if ((userCountry.isNotEmpty || userCity.isNotEmpty) &&
-            !userCountry.contains(nat) &&
-            !userCity.contains(nat)) {
+        // A location filter requires a resolved country/city.
+        if ((userCountry.isEmpty && userCity.isEmpty) ||
+            (!userCountry.contains(nat) &&
+                !userCity.contains(nat))) {
           return false;
         }
       }
@@ -222,9 +260,9 @@ class FilterController extends GetxController {
             .toString()
             .toLowerCase()
             .trim();
-        if ((userCity.isNotEmpty || userCountry.isNotEmpty) &&
-            !userCity.contains(query) &&
-            !userCountry.contains(query)) {
+        if ((userCity.isEmpty && userCountry.isEmpty) ||
+            (!userCity.contains(query) &&
+                !userCountry.contains(query))) {
           return false;
         }
       }

@@ -478,11 +478,13 @@ class _ActiveuserState extends State<Activeuser> {
                     )
                   : filteredUsers.isEmpty
                   ? Center(
-                      child: Text(
-                        selectedTab == 0
-                            ? "No active users found"
-                            : "No verified users found",
-                        style: const TextStyle(color: Colors.white60),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20.w),
+                        child: const Text(
+                          "You're all caught up! New people will appear as they join.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white60),
+                        ),
                       ),
                     )
                   : GridView.builder(
@@ -514,6 +516,7 @@ class _ActiveuserState extends State<Activeuser> {
                                       user["EmailAddress"]?.toString() ??
                                       user["email"]?.toString(),
                                   initialUserData: user,
+                                  showLike: false,
                                 ),
                               ),
                             );
@@ -611,26 +614,6 @@ class _ActiveuserState extends State<Activeuser> {
                                             ),
                                           ),
                                         ],
-                                      ),
-                                    ),
-                                  ),
-
-                                  /// TOP RIGHT HEART
-                                  Positioned(
-                                    top: 10.h,
-                                    right: 10.w,
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        toggleLike(index);
-                                      },
-                                      child: Icon(
-                                        user["liked"]
-                                            ? Icons.favorite_rounded
-                                            : Icons.favorite_border_rounded,
-                                        color: user["liked"]
-                                            ? Colors.red
-                                            : Colors.white,
-                                        size: 22.sp,
                                       ),
                                     ),
                                   ),

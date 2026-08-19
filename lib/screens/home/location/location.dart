@@ -1153,12 +1153,15 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                 color: Colors.white38,
                                 size: 44.sp,
                               ),
-                              SizedBox(height: 10.h),
-                              Text(
-                                "No users found in this radius",
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 13.sp,
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                                child: Text(
+                                  "You're all caught up! New people will appear as they join.",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 13.sp,
+                                  ),
                                 ),
                               ),
                               SizedBox(height: 12.h),

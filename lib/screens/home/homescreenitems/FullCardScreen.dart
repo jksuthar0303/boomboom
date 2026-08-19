@@ -156,10 +156,13 @@ class _FullCardScreenState extends State<FullCardScreen> {
                 color: AppColors.grey,
                 size: 36.sp,
               ),
-              SizedBox(height: 8.h),
-              Text(
-                "No profiles match your filter",
-                style: AppTextStyles.body.copyWith(color: AppColors.grey),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: Text(
+                  "You're all caught up! New people will appear as they join.",
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.body.copyWith(color: AppColors.grey),
+                ),
               ),
             ],
           ),

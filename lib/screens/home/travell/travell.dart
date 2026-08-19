@@ -648,11 +648,14 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                         color: Colors.white38,
                         size: 36.sp,
                       ),
-                      SizedBox(height: 8.h),
-                      Text(
-                        "No journeys match your filter",
-                        style: AppTextStyles.body.copyWith(
-                          color: Colors.white60,
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 24.w),
+                        child: Text(
+                          "You're all caught up! New people will appear as they join.",
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.body.copyWith(
+                            color: Colors.white60,
+                          ),
                         ),
                       ),
                     ],

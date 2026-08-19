@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -78,8 +80,6 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _chatScroll = ScrollController();
   final ImagePicker _picker = ImagePicker();
-
-  bool _showSend = false;
   bool _showEmojiPicker = false;
 
   // ─── Popular emojis list ───
@@ -155,14 +155,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {});
   }
 
-  final List<ChatMessage> _chats = [
-    const ChatMessage(
-      text: 'Hi',
-      isMe: true,
-      time: '5:02 PM',
-      status: MessageStatus.read,
-    ),
-  ];
+  final List<ChatMessage> _chats = [];
 
   // ─────────────────────────────────────────
   // 🔥 CHECK RESTRICTED INFO
@@ -563,7 +556,6 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
         ),
       );
       _ctrl.clear();
-      _showSend = false;
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -724,65 +716,65 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
   // ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final name = widget.messageData['name'] ?? 'User';
-    final image = widget.messageData['image'] ?? '';
-    final age = widget.messageData['age'] ?? '38';
-    final city = widget.messageData['city'] ?? 'Ajman';
-    final flag = widget.messageData['flag'] ?? '🇦🇪';
-    final lastSeen = widget.messageData['lastSeen'] ?? '5 min ago';
+    final name = widget.messageData["name"] ?? "User";
+    final image = widget.messageData["image"] ?? "";
+    final age = widget.messageData["age"] ?? "";
+    final city = widget.messageData["city"] ?? "";
+    final flag = widget.messageData["flag"] ?? "";
+    final distance = widget.messageData["distance"] ?? "";
+    final bool isVerified = widget.messageData["isVerified"] == "true" ||
+        widget.messageData["isVerified"] == "1";
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: Column(
-        children: [
-          // ─── DRAG HANDLE ───
-          GestureDetector(
-            onVerticalDragUpdate: widget.sheetScrollController != null
-                ? (details) {}
-                : null,
-            child: Column(
-              children: [
-                SizedBox(height: 10.h),
-                Center(
-                  child: Container(
-                    width: 42.w,
-                    height: 5.h,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(20.r),
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        top: true,
+        bottom: !_showEmojiPicker,
+        child: Column(
+          children: [
+            // Drag handle
+            GestureDetector(
+              onVerticalDragUpdate: widget.sheetScrollController != null
+                  ? (details) {}
+                  : null,
+              child: Column(
+                children: [
+                  SizedBox(height: 8.h),
+                  Center(
+                    child: Container(
+                      width: 40.w,
+                      height: 4.h,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(height: 10.h),
-              ],
+                  SizedBox(height: 6.h),
+                ],
+              ),
             ),
-          ),
 
-          SizedBox(height: 18.h),
+            _ProfileCard(
+              name: name,
+              imageUrl: image,
+              age: age,
+              city: city,
+              flag: flag,
+              distance: distance,
+              isVerified: isVerified,
+            ),
 
-          _ProfileCard(
-            name: name,
-            imageUrl: image,
-            age: age,
-            //gender: gender,
-            city: city,
-            flag: flag,
-            lastSeen: lastSeen,
-            onBack: () => Navigator.pop(context),
-          ),
-
-          Expanded(child: _chatArea()),
-          _inputBar(name),
-          if (_showEmojiPicker) _emojiPickerPanel(),
-          if (!_showEmojiPicker)
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-        ],
+            Expanded(child: _chatArea()),
+            _inputBar(name),
+            if (_showEmojiPicker) _emojiPickerPanel(),
+          ],
+        ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────
-  // 🔥 CHAT AREA
   // ─────────────────────────────────────────
   Widget _chatArea() {
     return ListView.builder(
@@ -944,9 +936,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                   Expanded(
                     child: TextField(
                       controller: _ctrl,
-                      onChanged: (v) {
-                        setState(() => _showSend = v.trim().isNotEmpty);
-                      },
+                      onChanged: (v) {},
                       onTap: () {
                         if (_showEmojiPicker) {
                           setState(() => _showEmojiPicker = false);
@@ -991,26 +981,11 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
           ),
           SizedBox(width: AppSize.w(8)),
 
-          if (!_showSend) ...[
-            _circleBtn(
-              key: const ValueKey('mic'),
-              icon: Icons.mic_rounded,
-              onTap: () {
-                // Voice recording
-              },
-            ),
-
-            SizedBox(width: AppSize.w(8)),
-
-            _gifBtn(),
-          ],
-
-          if (_showSend)
-            _circleBtn(
-              key: const ValueKey('send'),
-              icon: Icons.send_rounded,
-              onTap: _send,
-            ),
+          _circleBtn(
+            key: const ValueKey('send'),
+            icon: Icons.send_rounded,
+            onTap: _send,
+          ),
         ],
       ),
     );
@@ -1021,19 +996,19 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
   // ─────────────────────────────────────────
   Widget _emojiPickerPanel() {
     return Container(
-      height: 240.h,
+      height: 180.h,
       color: AppColors.bg,
       padding: EdgeInsets.symmetric(
         horizontal: AppSize.w(8),
-        vertical: AppSize.h(8),
+        vertical: AppSize.h(4),
       ),
       child: Column(
         children: [
           // Handle
           Container(
             width: 36.w,
-            height: 3.5.h,
-            margin: EdgeInsets.only(bottom: 8.h),
+            height: 3.h,
+            margin: EdgeInsets.only(bottom: 6.h),
             decoration: BoxDecoration(
               color: Colors.white24,
               borderRadius: BorderRadius.circular(20.r),
@@ -1064,7 +1039,6 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                         offset: pos + _emojis[i].length,
                       ),
                     );
-                    setState(() => _showSend = newText.trim().isNotEmpty);
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -1074,7 +1048,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                     child: Center(
                       child: Text(
                         _emojis[i],
-                        style: TextStyle(fontSize: 20.sp),
+                        style: TextStyle(fontSize: 18.sp),
                       ),
                     ),
                   ),
@@ -1086,6 +1060,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
       ),
     );
   }
+
 
   Widget _circleBtn({
     Key? key,
@@ -1106,31 +1081,6 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
       ),
     );
   }
-
-  Widget _gifBtn({Key? key}) {
-    return GestureDetector(
-      key: key,
-      onTap: () {},
-      child: Container(
-        width: AppSize.w(46),
-        height: AppSize.h(46),
-        decoration: BoxDecoration(
-          color: AppColors.blue,
-          borderRadius: BorderRadius.circular(10.r),
-        ),
-        child: Center(
-          child: Text(
-            'GIF',
-            style: GoogleFonts.poppins(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ═══════════════════════════════════════════
@@ -1141,20 +1091,18 @@ class _ProfileCard extends StatelessWidget {
     required this.name,
     required this.imageUrl,
     required this.age,
-    //required this.gender,
     required this.city,
     required this.flag,
-    required this.lastSeen,
-    required this.onBack,
+    this.distance = "",
+    this.isVerified = false,
   });
 
-  final String name, imageUrl, age, city, flag, lastSeen;
-  final VoidCallback onBack;
+  final String name, imageUrl, age, city, flag, distance;
+  final bool isVerified;
 
   static const _cardBg = Color(0xFF0F1017);
   static const _cardBorder = Color(0xFF1C1D2A);
   static const _blue = Color(0xFF2B5CE6);
-  static const _green = Color(0xFF2ECC71);
   static const _grey = Color(0xFFAAAAAA);
 
   @override
@@ -1162,13 +1110,13 @@ class _ProfileCard extends StatelessWidget {
     return Container(
       margin: EdgeInsets.fromLTRB(
         AppSize.w(12),
-        AppSize.h(0),
+        AppSize.h(6),
         AppSize.w(12),
-        AppSize.h(4),
+        AppSize.h(6),
       ),
       padding: EdgeInsets.symmetric(
         horizontal: AppSize.w(12),
-        vertical: AppSize.h(12),
+        vertical: AppSize.h(10),
       ),
       decoration: BoxDecoration(
         color: _cardBg,
@@ -1185,28 +1133,14 @@ class _ProfileCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // ─── BACK BUTTON ───
-          GestureDetector(
-            onTap: onBack,
-            child: Padding(
-              padding: EdgeInsets.all(AppSize.w(6)),
-              child: Icon(
-                Icons.arrow_back_rounded,
-                color: Colors.white,
-                size: 22.sp,
-              ),
-            ),
-          ),
-          SizedBox(width: AppSize.w(6)),
-
-          // ─── PHOTO ───
+          // Photo
           _photo(),
           SizedBox(width: AppSize.w(12)),
 
-          // ─── INFO ───
+          // Info
           Expanded(child: _info()),
 
-          // ─── 3 DOT MENU ───
+          // 3 dot menu
           GestureDetector(
             onTap: () => _showMoreMenu(context),
             child: Container(
@@ -1228,9 +1162,6 @@ class _ProfileCard extends StatelessWidget {
     );
   }
 
-  // ─────────────────────────────────────────
-  // 🔥 3 DOT → BLOCK / REPORT MENU
-  // ─────────────────────────────────────────
   void _showMoreMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1249,7 +1180,6 @@ class _ProfileCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(height: 12.h),
-                // Handle
                 Container(
                   width: 38.w,
                   height: 4.h,
@@ -1260,19 +1190,18 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 SizedBox(height: 16.h),
 
-                // ─── BLOCK ───
                 _menuItem(
                   context: context,
                   icon: Icons.block_rounded,
-                  label: 'Block $name',
+                  label: "Block $name",
                   color: Colors.orangeAccent,
                   onTap: () {
                     Navigator.pop(context);
                     _confirmAction(
                       context,
-                      title: 'Block $name?',
-                      subtitle: 'They won\'t be able to message you anymore.',
-                      actionLabel: 'Block',
+                      title: "Block $name?",
+                      subtitle: "They won't be able to message you anymore.",
+                      actionLabel: "Block",
                       color: Colors.orangeAccent,
                     );
                   },
@@ -1285,19 +1214,18 @@ class _ProfileCard extends StatelessWidget {
                   endIndent: 16.w,
                 ),
 
-                // ─── REPORT ───
                 _menuItem(
                   context: context,
                   icon: Icons.flag_rounded,
-                  label: 'Report $name',
+                  label: "Report $name",
                   color: Colors.redAccent,
                   onTap: () {
                     Navigator.pop(context);
                     _confirmAction(
                       context,
-                      title: 'Report $name?',
-                      subtitle: 'We\'ll review this profile and take action.',
-                      actionLabel: 'Report',
+                      title: "Report $name?",
+                      subtitle: "We'll review this profile and take action.",
+                      actionLabel: "Report",
                       color: Colors.redAccent,
                     );
                   },
@@ -1305,7 +1233,6 @@ class _ProfileCard extends StatelessWidget {
 
                 SizedBox(height: 8.h),
 
-                // ─── CANCEL ───
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
                   child: Container(
@@ -1318,7 +1245,7 @@ class _ProfileCard extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        'Cancel',
+                        "Cancel",
                         style: GoogleFonts.poppins(
                           color: Colors.white70,
                           fontSize: 14.sp,
@@ -1336,7 +1263,6 @@ class _ProfileCard extends StatelessWidget {
     );
   }
 
-  // ─── Menu Item Widget ───
   Widget _menuItem({
     required BuildContext context,
     required IconData icon,
@@ -1366,7 +1292,6 @@ class _ProfileCard extends StatelessWidget {
     );
   }
 
-  // ─── Confirm Dialog ───
   void _confirmAction(
     BuildContext context, {
     required String title,
@@ -1424,7 +1349,7 @@ class _ProfileCard extends StatelessWidget {
                         ),
                         child: Center(
                           child: Text(
-                            'Cancel',
+                            "Cancel",
                             style: GoogleFonts.poppins(
                               color: Colors.white70,
                               fontSize: 13.sp,
@@ -1471,9 +1396,34 @@ class _ProfileCard extends StatelessWidget {
   }
 
   Widget _photo() {
+    Uint8List? imageBytes;
+    bool hasHttp = false;
+
+    if (imageUrl.isNotEmpty) {
+      final trimmed = imageUrl.trim();
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        hasHttp = true;
+      } else {
+        try {
+          final cleanB64 = trimmed.contains(",")
+              ? trimmed.split(",").last.trim()
+              : trimmed;
+          imageBytes = base64Decode(cleanB64);
+        } catch (_) {}
+      }
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14.r),
-      child: imageUrl.isNotEmpty
+      child: imageBytes != null
+          ? Image.memory(
+              imageBytes,
+              width: AppSize.w(74),
+              height: AppSize.h(84),
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _fallback(),
+            )
+          : hasHttp
           ? Image.network(
               imageUrl,
               width: AppSize.w(74),
@@ -1492,7 +1442,7 @@ class _ProfileCard extends StatelessWidget {
       color: const Color(0xFF181924),
       child: Center(
         child: Text(
-          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          name.isNotEmpty ? name[0].toUpperCase() : "?",
           style: GoogleFonts.poppins(
             fontSize: 28.sp,
             fontWeight: FontWeight.bold,
@@ -1507,8 +1457,8 @@ class _ProfileCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ─── NAME + VERIFIED ───
-        SizedBox(height: AppSize.h(7)),
+        // Name + Verified
+        SizedBox(height: AppSize.h(4)),
         Row(
           children: [
             Flexible(
@@ -1522,109 +1472,90 @@ class _ProfileCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            SizedBox(width: AppSize.w(6)),
-            Icon(Icons.verified_rounded, color: _blue, size: 18.sp),
+            if (isVerified) ...[
+              SizedBox(width: AppSize.w(6)),
+              Icon(Icons.verified_rounded, color: _blue, size: 18.sp),
+            ],
           ],
         ),
         SizedBox(height: AppSize.h(4)),
 
-        // ─── AGE / GENDER / CITY / FLAG ───
-        Row(
-          children: [
-            _meta(age),
-            _sep(),
-            //_meta(gender),
-            _sep(),
-            _meta(city),
-            SizedBox(width: AppSize.w(4)),
-            Text(flag, style: TextStyle(fontSize: 15.sp)),
-          ],
-        ),
-        SizedBox(height: AppSize.h(6)),
-
-        Row(
-          children: [
-            // 📍 Distance Badge
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppSize.w(10),
-                vertical: AppSize.h(5),
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.orangeAccent, width: 0.5),
-                borderRadius: BorderRadius.circular(20.r),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.location_on,
+        // Age / City / Flag
+        if (age.isNotEmpty || city.isNotEmpty || flag.isNotEmpty)
+          Row(
+            children: [
+              if (age.isNotEmpty) ...[
+                _meta(age),
+                if (city.isNotEmpty) SizedBox(width: AppSize.w(6)),
+              ],
+              if (city.isNotEmpty)
+                Flexible(
+                  child: Text(
+                    city,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11.sp,
+                      color: _grey,
+                    ),
+                  ),
+                ),
+              if (flag.isNotEmpty) ...[
+                if (city.isNotEmpty || age.isNotEmpty)
+                  SizedBox(width: AppSize.w(6)),
+                Text(flag, style: TextStyle(fontSize: 15.sp)),
+              ],
+            ],
+          ),
+        if (distance.isNotEmpty) ...[
+          SizedBox(height: AppSize.h(6)),
+          // Distance Badge
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSize.w(10),
+              vertical: AppSize.h(5),
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.orangeAccent, width: 0.5),
+              borderRadius: BorderRadius.circular(20.r),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.location_on,
+                  color: Colors.orangeAccent,
+                  size: 10.sp,
+                ),
+                SizedBox(width: AppSize.w(4)),
+                Text(
+                  () {
+                    final cleanNum =
+                        distance.replaceAll(RegExp(r'[^\d.]'), '');
+                    final d = double.tryParse(cleanNum);
+                    if (d != null && d < 1.0) {
+                      return "1 km away";
+                    }
+                    return distance.toLowerCase().contains("km")
+                        ? distance
+                        : "$distance km away";
+                  }(),
+                  style: GoogleFonts.poppins(
+                    fontSize: 8.sp,
+                    fontWeight: FontWeight.w500,
                     color: Colors.orangeAccent,
-                    size: 10.sp,
                   ),
-                  SizedBox(width: AppSize.w(4)),
-                  Text(
-                    '12 km',
-                    style: GoogleFonts.poppins(
-                      fontSize: 8.sp,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.orangeAccent,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-
-            SizedBox(width: AppSize.w(4)), // dono ke beech gap
-            // 🟢 Online Badge
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppSize.w(12),
-                vertical: AppSize.h(5),
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(color: _green, width: 1.0),
-                borderRadius: BorderRadius.circular(20.r),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: AppSize.w(3),
-                    height: AppSize.h(5),
-                    decoration: const BoxDecoration(
-                      color: _green,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  SizedBox(width: AppSize.w(3)),
-                  Text(
-                    lastSeen,
-                    style: GoogleFonts.poppins(
-                      fontSize: 8.sp,
-                      fontWeight: FontWeight.w700,
-                      color: _green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ],
     );
   }
 
   Widget _meta(String t) => Text(
     t,
-    style: GoogleFonts.poppins(fontSize: 10.sp, color: _grey),
-  );
-
-  Widget _sep() => Padding(
-    padding: EdgeInsets.symmetric(horizontal: AppSize.w(4)),
-    child: Text(
-      '•',
-      style: TextStyle(fontSize: 10.sp, color: _grey),
-    ),
+    style: GoogleFonts.poppins(fontSize: 11.sp, color: _grey),
   );
 }

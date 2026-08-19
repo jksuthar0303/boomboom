@@ -19,16 +19,74 @@ import 'messagedetail.dart';
 // ────────────────────────────────────────
 //  Helpers
 // ────────────────────────────────────────
-String countryFlag(String isoCode) => isoCode
-    .toUpperCase()
-    .characters
-    .map((c) => String.fromCharCode(c.codeUnitAt(0) + 127397))
-    .join();
+String countryFlag(String input) {
+  if (input.isEmpty) return '🌍';
+  if (input.runes.any((r) => r > 127)) {
+    return input;
+  }
+
+  final trimmed = input.trim().toUpperCase();
+  const countryToIso = {
+    'INDIA': 'IN',
+    'UNITED STATES': 'US',
+    'USA': 'US',
+    'UNITED KINGDOM': 'GB',
+    'UK': 'GB',
+    'UNITED ARAB EMIRATES': 'AE',
+    'UAE': 'AE',
+    'CANADA': 'CA',
+    'AUSTRALIA': 'AU',
+    'GERMANY': 'DE',
+    'FRANCE': 'FR',
+    'SINGAPORE': 'SG',
+    'JAPAN': 'JP',
+    'RUSSIA': 'RU',
+    'CHINA': 'CN',
+    'BRAZIL': 'BR',
+    'INDONESIA': 'ID',
+    'PAKISTAN': 'PK',
+    'BANGLADESH': 'BD',
+    'NEPAL': 'NP',
+    'SRI LANKA': 'LK',
+    'SPAIN': 'ES',
+    'ITALY': 'IT',
+    'THAILAND': 'TH',
+    'MALAYSIA': 'MY',
+    'PHILIPPINES': 'PH',
+    'VIETNAM': 'VN',
+    'TURKEY': 'TR',
+    'EGYPT': 'EG',
+    'SOUTH AFRICA': 'ZA',
+    'NEW ZEALAND': 'NZ',
+  };
+
+  String iso = countryToIso[trimmed] ?? (trimmed.length == 2 ? trimmed : '');
+  if (iso.isEmpty) {
+    for (final e in countryToIso.entries) {
+      if (trimmed.contains(e.key)) {
+        iso = e.value;
+        break;
+      }
+    }
+  }
+
+  if (iso.length == 2) {
+    return iso
+        .toUpperCase()
+        .characters
+        .map((c) => String.fromCharCode(c.codeUnitAt(0) + 127397))
+        .join();
+  }
+
+  return '🌍';
+}
 
 const Map<String, String> _cityCountryCode = {
   'New Delhi': 'IN',
+  'Delhi': 'IN',
   'Mumbai': 'IN',
   'Bangalore': 'IN',
+  'Bengaluru': 'IN',
   'Hyderabad': 'IN',
   'Chennai': 'IN',
   'Kolkata': 'IN',
@@ -44,9 +102,11 @@ const Map<String, String> _cityCountryCode = {
 
 String flagForCity(String city) {
   for (final e in _cityCountryCode.entries) {
-    if (city.contains(e.key)) return countryFlag(e.value);
+    if (city.toLowerCase().contains(e.key.toLowerCase())) {
+      return countryFlag(e.value);
+    }
   }
-  return '🌍';
+  return countryFlag(city);
 }
 
 // ────────────────────────────────────────
@@ -111,7 +171,7 @@ class ProfileModel {
     this.telegramUsername,
   });
 
-  ProfileModel copyWith({String? country}) => ProfileModel(
+  ProfileModel copyWith({String? country, List<MediaItem>? media}) => ProfileModel(
     name: name,
     age: age,
     job: job,
@@ -125,7 +185,7 @@ class ProfileModel {
     about: about,
     interests: interests,
     lifestyle: lifestyle,
-    media: media,
+    media: media ?? this.media,
     completionPercent: completionPercent,
     isVerified: isVerified,
     seenAgo: seenAgo,
@@ -509,7 +569,9 @@ class BoomProfileScreen extends StatefulWidget {
   final bool showStar;
   final bool showMore;
   final bool showTelegram;
+  final bool showLike;
   final bool isOwnProfile;
+  final bool? isLiked;
   final String? userEmail;
   final Map<String, dynamic>? initialUserData;
 
@@ -518,7 +580,9 @@ class BoomProfileScreen extends StatefulWidget {
     this.showStar = true,
     this.showMore = true,
     this.showTelegram = true,
+    this.showLike = true,
     this.isOwnProfile = false,
+    this.isLiked,
     this.userEmail,
     this.initialUserData,
   });
@@ -536,6 +600,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   late bool showStar;
   late bool showMore;
   late bool showTelegram;
+  bool _isDirectProfileLiked = false;
   final Set<int> _favourites = {};
 
   late AnimationController _snapCtrl;
@@ -544,6 +609,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
   final ScrollController _scrollCtrl = ScrollController();
 
+  static final Set<String> _swipedEmails = {};
   ProfileModel? ownProfile;
   ProfileModel? otherProfile;
   List<ProfileModel> _liveProfiles = [];
@@ -560,12 +626,16 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       return otherProfile!;
     }
     if (_liveProfiles.isNotEmpty) {
-      return _liveProfiles[_currentIndex % _liveProfiles.length];
+      final safeIndex = _currentIndex.clamp(0, _liveProfiles.length - 1);
+      return _liveProfiles[safeIndex];
     }
     return sampleProfiles[_currentIndex % sampleProfiles.length];
   }
 
   bool get _isFavourited {
+    if (widget.userEmail != null || widget.initialUserData != null) {
+      return _isDirectProfileLiked;
+    }
     final int len = _liveProfiles.isNotEmpty
         ? _liveProfiles.length
         : sampleProfiles.length;
@@ -587,9 +657,16 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     }
   }
 
-  Future<void> _loadLiveFeedProfiles() async {
+  Future<void> _loadLiveFeedProfiles({bool isManualRefresh = false}) async {
     if (!mounted) return;
-    setState(() => _isLoadingLiveFeed = true);
+    if (isManualRefresh) {
+      _swipedEmails.clear();
+    }
+    setState(() {
+      _isLoadingLiveFeed = true;
+      _profileNotFound = false;
+      _currentIndex = 0;
+    });
 
     try {
       final String myEmail = await SecureStorage().getUserEmail() ?? "";
@@ -611,23 +688,36 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
             for (var item in rawList) {
               if (item is Map) {
+                final email = (item["EmailAddress"] ??
+                        item["email"] ??
+                        item["ActionEmail"])
+                    ?.toString()
+                    .trim();
+                if (!isManualRefresh &&
+                    email != null &&
+                    email.isNotEmpty &&
+                    _swipedEmails.contains(email)) {
+                  continue;
+                }
                 final p = _buildProfileFromMap(Map<String, dynamic>.from(item));
                 if (p != null) {
                   parsedList.add(p);
-                  profileEmails.add(
-                    (item["EmailAddress"] ??
-                            item["email"] ??
-                            item["ActionEmail"])
-                        ?.toString(),
-                  );
+                  profileEmails.add(email);
                 }
               }
             }
 
-            if (mounted && parsedList.isNotEmpty) {
+            // Await media enrichment for all profiles before turning off loading state
+            await _enrichProfilesWithMedia(parsedList, profileEmails);
+
+            if (mounted) {
               setState(() {
                 _liveProfiles = parsedList;
                 _liveProfileEmails = profileEmails;
+                if (parsedList.isNotEmpty) {
+                  _profileNotFound = false;
+                  _currentIndex = 0;
+                }
               });
             }
           }
@@ -645,6 +735,79 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         });
       }
     }
+  }
+
+  Future<List<MediaItem>> _fetchMediaForEmail(String email) async {
+    if (email.trim().isEmpty) return [];
+    try {
+      final response = await RegisterService().showMediaByEmail(
+        email: email.trim(),
+        type: "image",
+      );
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowMediaByEmailResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            final List rawMedia = jsonResult["Data"];
+            final List<MediaItem> items = [];
+            for (var m in rawMedia) {
+              if (m is Map) {
+                final mediaUrl = (m["Media"] ?? m["Url"] ?? m["url"] ?? "")
+                    .toString()
+                    .trim();
+                final mediaTypeStr =
+                    (m["Type"] ?? "").toString().toLowerCase();
+                if (mediaUrl.isNotEmpty) {
+                  final isVideo = mediaTypeStr.contains("video") ||
+                      mediaUrl.endsWith(".mp4") ||
+                      mediaUrl.endsWith(".mov");
+                  final fullUrl = mediaUrl.startsWith("http")
+                      ? mediaUrl
+                      : "https://boomboomdate.com$mediaUrl";
+                  items.add(
+                    MediaItem(
+                      type: isVideo ? MediaType.video : MediaType.image,
+                      url: fullUrl,
+                    ),
+                  );
+                }
+              }
+            }
+            return items;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[BoomProfileScreen] Error fetching ShowMediaByEmail for $email: $e");
+    }
+    return [];
+  }
+
+  Future<void> _enrichProfilesWithMedia(
+    List<ProfileModel> profiles,
+    List<String?> emails,
+  ) async {
+    await Future.wait(
+      List.generate(profiles.length, (i) async {
+        final email = i < emails.length ? emails[i] : null;
+        if (email == null || email.trim().isEmpty) return;
+        final extraMedia = await _fetchMediaForEmail(email);
+        if (extraMedia.isNotEmpty) {
+          final existing = profiles[i].media;
+          final List<MediaItem> merged = [...extraMedia];
+          for (var em in existing) {
+            if (!merged.any((m) => m.url.isNotEmpty && m.url == em.url)) {
+              merged.add(em);
+            }
+          }
+          profiles[i] = profiles[i].copyWith(media: merged);
+        }
+      }),
+    );
   }
 
   Future<void> _loadOtherUserProfile(String email) async {
@@ -729,6 +892,20 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                 rawMedia,
                 rawLifestyle,
               );
+
+              final extraMedia = await _fetchMediaForEmail(email);
+              if (extraMedia.isNotEmpty && mounted && otherProfile != null) {
+                setState(() {
+                  final existing = otherProfile!.media;
+                  final List<MediaItem> combined = [...extraMedia];
+                  for (var em in existing) {
+                    if (!combined.any((m) => m.url.isNotEmpty && m.url == em.url)) {
+                      combined.add(em);
+                    }
+                  }
+                  otherProfile = otherProfile!.copyWith(media: combined);
+                });
+              }
               return;
             }
 
@@ -1173,6 +1350,18 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+
+    if (widget.isLiked != null) {
+      _isDirectProfileLiked = widget.isLiked!;
+    } else if (widget.initialUserData != null) {
+      final action = widget.initialUserData!['Action']?.toString().toLowerCase() ??
+          widget.initialUserData!['action']?.toString().toLowerCase();
+      final isLiked = widget.initialUserData!['isLiked'];
+      if (action == 'like' || isLiked == true || isLiked?.toString().toLowerCase() == 'true') {
+        _isDirectProfileLiked = true;
+      }
+    }
+
     if (widget.isOwnProfile) {
       _loadOwnProfile();
     } else if (widget.userEmail != null || widget.initialUserData != null) {
@@ -1195,11 +1384,47 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       }
       if (email.isNotEmpty) {
         _loadOtherUserProfile(email);
+        if (widget.isLiked == null) {
+          _checkIfUserIsLiked(email);
+        }
       }
     } else {
       // ── Load live profiles from ShowAllExceptMe for swipe feed ──
       _loadLiveFeedProfiles();
     }
+  }
+
+  Future<void> _checkIfUserIsLiked(String actionEmail) async {
+    try {
+      final myEmail = await SecureStorage().getUserEmail() ?? '';
+      if (myEmail.trim().isEmpty || actionEmail.trim().isEmpty) return;
+      final response = await HomeService().favoriteLikeViewShowByMyEmail(
+        myEmail: myEmail.trim(),
+        action: 'like',
+      );
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('FavoriteLikeView_ShowByMyEmailResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(res.first.innerText);
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            final List data = jsonResult["Data"];
+            final isLiked = data.any((u) {
+              if (u is Map) {
+                final e = (u["EmailAddress"] ?? u["email"] ?? u["ActionEmail"])?.toString().trim();
+                return e != null && e.toLowerCase() == actionEmail.trim().toLowerCase();
+              }
+              return false;
+            });
+            if (mounted && isLiked) {
+              setState(() {
+                _isDirectProfileLiked = true;
+              });
+            }
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -1291,26 +1516,34 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
   Future<void> _swipeOut({required bool toLike}) async {
     if (_isSwiping) return;
+
+    final bool isSwipeFeed =
+        !widget.isOwnProfile &&
+        widget.userEmail == null &&
+        widget.initialUserData == null;
+
     final int profileCount = _liveProfiles.isNotEmpty
         ? _liveProfiles.length
         : sampleProfiles.length;
-    final int currentProfileIndex = _currentIndex % profileCount;
+    final int currentProfileIndex = _currentIndex.clamp(0, profileCount - 1);
     final String? actionEmail =
         _liveProfiles.isNotEmpty &&
             currentProfileIndex < _liveProfileEmails.length
         ? _liveProfileEmails[currentProfileIndex]
-        : null;
+        : (otherProfile != null ? widget.userEmail : null);
 
-    if (toLike && actionEmail != null && actionEmail.trim().isNotEmpty) {
+    // Call API for both Like and Dislike
+    if (actionEmail != null && actionEmail.trim().isNotEmpty) {
+      _swipedEmails.add(actionEmail.trim());
       try {
         final myEmail = await SecureStorage().getUserEmail() ?? '';
         await HomeService().favoriteLikeViewInsert(
           myEmail: myEmail.trim(),
           actionEmail: actionEmail.trim(),
-          action: 'like',
+          action: toLike ? 'like' : 'dislike',
         );
       } catch (e) {
-        debugPrint('[BoomProfileScreen] Error saving swipe like: $e');
+        debugPrint('[BoomProfileScreen] Error saving swipe action ($toLike): $e');
       }
     }
 
@@ -1324,18 +1557,37 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     await Future.delayed(const Duration(milliseconds: 330));
     if (!mounted) return;
     _disposeAllVideoControllers();
+
     setState(() {
-      _currentIndex++;
+      if (isSwipeFeed && _liveProfiles.isNotEmpty) {
+        if (currentProfileIndex < _liveProfiles.length) {
+          _liveProfiles.removeAt(currentProfileIndex);
+        }
+        if (currentProfileIndex < _liveProfileEmails.length) {
+          _liveProfileEmails.removeAt(currentProfileIndex);
+        }
+        if (_currentIndex >= _liveProfiles.length && _liveProfiles.isNotEmpty) {
+          _currentIndex = 0;
+        }
+      } else {
+        _currentIndex++;
+      }
       _dragX = 0;
       _dragY = 0;
       _mediaIndex = 0;
       _isSwiping = false;
     });
+
     if (_scrollCtrl.hasClients) _scrollCtrl.jumpTo(0);
     _showSnack(
       toLike ? 'Liked ❤️' : 'Nope 👋',
       toLike ? AppColors.green : AppColors.error,
     );
+
+    // If remaining live profiles list is empty or running low, refresh from API
+    if (isSwipeFeed && _liveProfiles.length <= 2) {
+      _loadLiveFeedProfiles();
+    }
   }
 
   void _showSnack(String msg, Color color) {
@@ -1376,7 +1628,16 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   }
 
   // ── Open custom Telegram page ──
-  void _openTelegramPage(String? username) {
+  void _openTelegramPage(ProfileModel p) {
+    String imageStr = '';
+    if (p.media.isNotEmpty) {
+      final first = p.media.first;
+      if (first.url.isNotEmpty) {
+        imageStr = first.url;
+      } else if (first.bytes != null) {
+        imageStr = base64Encode(first.bytes!);
+      }
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1395,14 +1656,18 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
               borderRadius: BorderRadius.vertical(top: Radius.circular(28.r)),
               child: MessageDetailPage(
                 index: 0,
-                messageData: const {
-                  "name": "Taniya Agarwal",
-                  "image":
-                      "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-                  "age": "32",
-                  "gender": "F",
-                  "city": "New Delhi",
-                  "flag": "🇮🇳",
+                messageData: {
+                  "name": p.name,
+                  "image": imageStr,
+                  "age": p.age,
+                  "gender": p.gender,
+                  "city": p.city,
+                  "flag": p.country.isNotEmpty
+                      ? countryFlag(p.country)
+                      : flagForCity(p.city),
+                  "distance": p.distance,
+                  "lastSeen": p.seenAgo,
+                  "isVerified": p.isVerified ? "true" : "false",
                 },
                 sheetScrollController: sheetScrollController,
               ),
@@ -1420,27 +1685,55 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         widget.userEmail == null &&
         widget.initialUserData == null;
 
-    if (_profileNotFound) {
-      return const Scaffold(
-        backgroundColor: AppColors.bg,
-        body: Center(
-          child: Text(
-            'No data found',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
-          ),
-        ),
-      );
-    }
-
     if ((widget.isOwnProfile && ownProfile == null) ||
         _isLoadingOtherProfile ||
-        (isSwipeFeed && _isLoadingLiveFeed && _liveProfiles.isEmpty)) {
+        (isSwipeFeed && _isLoadingLiveFeed)) {
       return const Scaffold(
         backgroundColor: AppColors.bg,
         body: Center(
           child: CircularProgressIndicator(
             color: Color(0xFF9B59B6),
             strokeWidth: 2.5,
+          ),
+        ),
+      );
+    }
+
+    if (_profileNotFound || (isSwipeFeed && _liveProfiles.isEmpty)) {
+      return Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.favorite_border_rounded,
+                  color: Colors.white38,
+                  size: 48.sp,
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  "You're all caught up! New people will appear as they join.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14.sp,
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                TextButton.icon(
+                  onPressed: () => _loadLiveFeedProfiles(isManualRefresh: true),
+                  icon: const Icon(Icons.refresh, color: Colors.cyanAccent),
+                  label: const Text(
+                    "Refresh",
+                    style: TextStyle(color: Colors.cyanAccent),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -1775,20 +2068,24 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (!widget.isOwnProfile)
+                      if (!widget.isOwnProfile && widget.showLike)
                         GestureDetector(
                           onTap: () async {
-                            final profileCount = _liveProfiles.isNotEmpty
-                                ? _liveProfiles.length
-                                : sampleProfiles.length;
-                            final idx = _currentIndex % profileCount;
-                            final bool nextLiked = !_favourites.contains(idx);
+                            final bool isSwipeFeed =
+                                !widget.isOwnProfile &&
+                                widget.userEmail == null &&
+                                widget.initialUserData == null;
+                            if (isSwipeFeed) {
+                              await _swipeOut(toLike: true);
+                              return;
+                            }
+
+                            final bool nextLiked = !_isDirectProfileLiked;
                             setState(() {
+                              _isDirectProfileLiked = nextLiked;
                               if (!nextLiked) {
-                                _favourites.remove(idx);
                                 _showSnack('Unliked 🤍', AppColors.grey);
                               } else {
-                                _favourites.add(idx);
                                 _showSnack('Liked ❤️', const Color(0xFFFF5E62));
                               }
                             });
@@ -1818,11 +2115,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                             } catch (_) {
                               if (mounted) {
                                 setState(() {
-                                  if (nextLiked) {
-                                    _favourites.remove(idx);
-                                  } else {
-                                    _favourites.add(idx);
-                                  }
+                                  _isDirectProfileLiked = !nextLiked;
                                 });
                                 _showSnack(
                                   'Like save nahi ho saka.',
@@ -1878,7 +2171,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
                       if (showTelegram)
                         GestureDetector(
-                          onTap: () => _openTelegramPage(p.telegramUsername),
+                          onTap: () => _openTelegramPage(p),
                           child: ClipOval(
                             child: Image.asset(
                               "assets/arroriconimage.png",

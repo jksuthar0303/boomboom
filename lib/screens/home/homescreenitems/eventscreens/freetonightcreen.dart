@@ -396,13 +396,16 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                 ),
               ),
               SizedBox(height: 8.h),
-              Text(
-                "No one in your area is free tonight for this vibe yet.\nBe the first to create one!",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 12.5.sp,
-                  height: 1.5,
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: Text(
+                  "You're all caught up! New people will appear as they join.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12.5.sp,
+                    height: 1.5,
+                  ),
                 ),
               ),
               SizedBox(height: 20.h),
@@ -522,7 +525,8 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
     final age = _calculateAgeFromDob(item["Dob"], item["Age"] ?? item["age"]);
     final nameDisplay = age.isNotEmpty ? "$name, $age" : name;
 
-    final image =
+    (item["TonightImage"] ?? item["tonightImage"] ?? "").toString().trim();
+    final profileImg =
         (item["Image"] ??
                 item["ProfileImage"] ??
                 item["image"] ??
@@ -543,6 +547,31 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
         .toString()
         .trim();
 
+    final String rawDistanceKM =
+        (item["DistanceKM"] ??
+                item["Distance"] ??
+                item["distance"] ??
+                item["DistanceKm"] ??
+                "")
+            .toString()
+            .trim();
+    String distanceText = "Nearby";
+    if (rawDistanceKM.isNotEmpty && rawDistanceKM.toLowerCase() != "null") {
+      final cleanNum = rawDistanceKM.replaceAll(RegExp(r'[^\d.]'), '');
+      final d = double.tryParse(cleanNum);
+      if (d != null) {
+        if (d < 1.0) {
+          distanceText = "1 km away";
+        } else {
+          distanceText = "${d.toStringAsFixed(1)} km away";
+        }
+      } else {
+        distanceText = rawDistanceKM.contains("away")
+            ? rawDistanceKM
+            : "$rawDistanceKM km away";
+      }
+    }
+
     return GestureDetector(
       onTap: () {
         Get.to(
@@ -558,7 +587,7 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
           children: [
             /// 📸 IMAGE VIA GLOBAL HELPER
             AppNetworkImage(
-              imageUrl: image,
+              imageUrl: profileImg,
               fit: BoxFit.cover,
               fallbackIcon: Icons.person,
               fallbackIconSize: 48.sp,
@@ -698,10 +727,7 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
                       Row(
                         children: [
                           Flexible(
-                            child: profileBadge(
-                              "${_distanceRange.end.toInt()} km away",
-                              Icons.near_me,
-                            ),
+                            child: profileBadge(distanceText, Icons.near_me),
                           ),
                           SizedBox(width: 3.w),
                           Flexible(

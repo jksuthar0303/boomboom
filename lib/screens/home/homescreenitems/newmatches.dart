@@ -637,7 +637,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                 ),
                                 SizedBox(height: 8.h),
                                 const Text(
-                                  "No users found matching filters",
+                                  "You're all caught up! New people will appear as they join.",
+                                  textAlign: TextAlign.center,
                                   style: TextStyle(color: Colors.white60),
                                 ),
                               ],
