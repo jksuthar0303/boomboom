@@ -33,12 +33,25 @@ class AuthController extends GetxController {
           if (status == 1 && profileJson["ResultSets"] is List) {
             final List resultSets = profileJson["ResultSets"];
             if (resultSets.length >= 2) {
-              // ResultSet 1: Profile details
-              final List profileList = resultSets[1];
-              if (profileList.isNotEmpty) {
-                final Map<String, dynamic> data = Map<String, dynamic>.from(
-                  profileList.first,
-                );
+                // ResultSet 1: Profile details
+                final List profileList = resultSets[1];
+                if (profileList.isNotEmpty) {
+                  final Map<String, dynamic> data = Map<String, dynamic>.from(
+                    profileList.first,
+                  );
+
+                  // Ensure IsVerified is preserved even if it is in another result set
+                  if (!data.containsKey("IsVerified") || data["IsVerified"] == null) {
+                    for (final set in resultSets) {
+                      if (set is List && set.isNotEmpty && set.first is Map) {
+                        final item = Map<String, dynamic>.from(set.first);
+                        if (item.containsKey("IsVerified")) {
+                          data["IsVerified"] = item["IsVerified"];
+                          break;
+                        }
+                      }
+                    }
+                  }
 
                 // ResultSet 2: Media
                 if (resultSets.length > 2 && resultSets[2] is List) {

@@ -7,15 +7,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:get/get.dart';
 
 import 'package:xml/xml.dart' as xml;
 
 import '../backend/registerservice.dart';
 import '../backend/secure_storage.dart';
+import '../constant/appconstants.dart';
 import '../constant/appsize.dart';
 import '../constant/colors.dart';
 import '../model/messagedetails.dart';
+import 'package:video_compress/video_compress.dart';
 
 // ═══════════════════════════════════════════
 // 🔥 STATIC METHOD TO OPEN AS DRAGGABLE SHEET
@@ -99,6 +103,10 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   final FocusNode _focusNode = FocusNode();
   final ScrollController _chatScroll = ScrollController();
   final ImagePicker _picker = ImagePicker();
+  final stt.SpeechToText _speechToText = stt.SpeechToText();
+  bool _speechEnabled = false;
+  bool _isListening = false;
+  String _wordsSpokenBeforeListening = '';
   bool _showEmojiPicker = false;
 
   // ─── Popular emojis list ───
@@ -183,6 +191,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _initSpeech();
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         if (_showEmojiPicker) {
@@ -370,7 +379,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     try {
       final myEmail = await SecureStorage().getUserEmail() ?? "";
 
-      // 🔥 If opened from profile with chatListId == 0, check if chat already exists in ShowChatList!
+      // 1️⃣ Agar chatListId 0 hai, pehle ShowChatList se is user ki ChatListId dhoondo
       if (chatListId <= 0 && otherEmail.isNotEmpty && myEmail.isNotEmpty) {
         try {
           final listRes = await RegisterService().showChatList(
@@ -395,7 +404,18 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                           .toString()
                           .trim()
                           .toLowerCase();
-                  if (cOther == otherEmail.toLowerCase()) {
+                  final cSender = (c["Sender"] ?? c["SenderEmail"] ?? "")
+                      .toString()
+                      .trim()
+                      .toLowerCase();
+                  final cReciever = (c["Reciever"] ?? c["RecieverEmail"] ?? "")
+                      .toString()
+                      .trim()
+                      .toLowerCase();
+
+                  if (cOther == otherEmail.toLowerCase() ||
+                      cSender == otherEmail.toLowerCase() ||
+                      cReciever == otherEmail.toLowerCase()) {
                     final foundId =
                         int.tryParse(
                           (c["ChatListId"] ?? c["Id"] ?? c["id"] ?? "0")
@@ -415,21 +435,20 @@ class _MessageDetailPageState extends State<MessageDetailPage>
         } catch (_) {}
       }
 
-      // If still new conversation, allow typing directly
+      // 2️⃣ Agar abhi bhi chatListId 0 hai (naye user se pehli conversation), toh screen khol do
       if (chatListId <= 0) {
-        if (mounted) {
+        if (mounted && _isLoadingMessages) {
           setState(() {
             _isLoadingMessages = false;
-            _blockMessage = null;
           });
         }
         _isPollingInProgress = false;
         return;
       }
 
+      // 3️⃣ ChatListId milne ke baad ShowChatMessages call karo taaki messages load ho sakein
       final response = await RegisterService().showChatMessages(
         chatListId: chatListId,
-        // ShowChatMessages expects the logged-in user's email.
         email: myEmail.trim(),
       );
 
@@ -447,36 +466,25 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                         (jsonResult["Data"] is Map
                             ? jsonResult["Data"]["Message"]
                             : null) ??
-                        "")
+                        "Your chat request is pending. Please wait for the user to accept.")
                     .toString()
                     .trim();
 
-            final bool isBlocked = rawApiMsg.toLowerCase().contains("block");
-
-            final sender =
-                (widget.messageData["Sender"] ??
-                        widget.messageData["SenderEmail"] ??
-                        widget.messageData["sender"] ??
-                        "")
-                    .toString()
-                    .trim();
-            final bool isMeSender = sender.isNotEmpty
-                ? sender.toLowerCase() == myEmail.toLowerCase()
-                : (widget.messageData["isSender"] == "true");
-
-            final String msg;
-            if (rawApiMsg.isNotEmpty && rawApiMsg.toLowerCase() != "null") {
-              msg = rawApiMsg;
-            } else if (isMeSender) {
-              msg = "Waiting for user to accept your chat request";
-            } else {
-              msg = "Please accept the chat request first.";
+            if (jsonResult["Data"] is Map &&
+                jsonResult["Data"]["ChatListId"] != null) {
+              final idVal = int.tryParse(
+                jsonResult["Data"]["ChatListId"].toString(),
+              );
+              if (idVal != null && idVal > 0) {
+                _resolvedChatListId = idVal;
+              }
             }
 
-            if (mounted && (_blockMessage != msg || _isLoadingMessages)) {
+            if (mounted) {
               setState(() {
-                _blockMessage = msg;
-                _isSenderPending = !isBlocked && isMeSender;
+                if (rawApiMsg.isNotEmpty) {
+                  _blockMessage = rawApiMsg;
+                }
                 _isLoadingMessages = false;
               });
             }
@@ -529,6 +537,17 @@ class _MessageDetailPageState extends State<MessageDetailPage>
 
             final List<ChatMessage> loadedChats = [];
             for (var item in list) {
+              final itemChatListId =
+                  int.tryParse(
+                    (item["ChatListId"] ?? item["chatListId"] ?? "0")
+                        .toString(),
+                  ) ??
+                  0;
+              if (itemChatListId > 0 &&
+                  (_resolvedChatListId == null || _resolvedChatListId! <= 0)) {
+                _resolvedChatListId = itemChatListId;
+              }
+
               final sender =
                   (item["SenderEmail"] ??
                           item["Sender"] ??
@@ -592,12 +611,36 @@ class _MessageDetailPageState extends State<MessageDetailPage>
               }
 
               if (text.isNotEmpty) {
+                final lowerText = text.toLowerCase().trim();
+                final extRaw = (item["Ext"] ?? item["ext"] ?? "")
+                    .toString()
+                    .toLowerCase()
+                    .trim();
+                final bool isImg =
+                    extRaw.contains("png") ||
+                    extRaw.contains("jpg") ||
+                    extRaw.contains("jpeg") ||
+                    lowerText.endsWith(".png") ||
+                    lowerText.endsWith(".jpg") ||
+                    lowerText.endsWith(".jpeg") ||
+                    lowerText.endsWith(".webp") ||
+                    (lowerText.contains("/uploads/") &&
+                        !lowerText.endsWith(".mp4"));
+
+                final bool isVid =
+                    extRaw.contains("mp4") ||
+                    lowerText.endsWith(".mp4") ||
+                    lowerText.endsWith(".mov") ||
+                    lowerText.endsWith(".mkv");
+
                 loadedChats.add(
                   ChatMessage(
                     text: text,
                     isMe: isMe,
                     time: time,
                     status: status,
+                    isImage: isImg,
+                    isVideo: isVid,
                   ),
                 );
               }
@@ -706,6 +749,9 @@ class _MessageDetailPageState extends State<MessageDetailPage>
 
   @override
   void dispose() {
+    try {
+      _speechToText.stop();
+    } catch (_) {}
     _topSnackTimer?.cancel();
     _topSnackEntry?.remove();
     WidgetsBinding.instance.removeObserver(this);
@@ -1149,146 +1195,517 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                 "[MessageDetailPage] Could not parse send response: $e",
               );
             }
+          } else {
+            if (mounted) {
+              setState(() {
+                _chats.removeWhere((message) => identical(message, localMsg));
+                _pendingLocalChats.removeWhere(
+                  (message) => identical(message, localMsg),
+                );
+              });
+              _showTopMessage("Server error (${res.statusCode})");
+            }
           }
         }
       } catch (e) {
         debugPrint("[MessageDetailPage] Error sending chat message: $e");
+        if (mounted) {
+          setState(() {
+            _chats.removeWhere((message) => identical(message, localMsg));
+            _pendingLocalChats.removeWhere(
+              (message) => identical(message, localMsg),
+            );
+          });
+          _showTopMessage("Failed to send message: $e");
+        }
+      }
+    }
+  }
+
+  Future<void> _addImage(String path) async {
+    final localMsg = ChatMessage(
+      text: path,
+      localFilePath: path,
+      isMe: true,
+      time: _nowStr(),
+      status: MessageStatus.sent,
+      isImage: true,
+      isUploading: true,
+    );
+
+    setState(() {
+      _chats.add(localMsg);
+      _pendingLocalChats.add(localMsg);
+    });
+    _scrollToBottom(animate: true);
+
+    final receiverEmail =
+        widget.messageData["email"] ??
+        widget.messageData["EmailAddress"] ??
+        widget.messageData["ActionEmail"] ??
+        "";
+
+    if (receiverEmail.trim().isNotEmpty) {
+      try {
+        final senderEmail = await SecureStorage().getUserEmail() ?? "";
+        if (senderEmail.trim().isNotEmpty) {
+          final file = File(path);
+          final bytes = await file.readAsBytes();
+          final base64Image = base64Encode(bytes);
+
+          final res = await RegisterService().sendChatMessage(
+            senderEmail: senderEmail.trim(),
+            receiverEmail: receiverEmail.trim(),
+            chatMessage: base64Image,
+          );
+
+          debugPrint(
+            "[MessageDetailPage] sendImage response: ${res.statusCode} -> ${res.body}",
+          );
+
+          if (res.statusCode == 200) {
+            try {
+              final doc = xml.XmlDocument.parse(res.body);
+              final result = doc.findAllElements('SendChatMessageResult');
+              if (result.isNotEmpty) {
+                final apiResult = jsonDecode(result.first.innerText);
+                final data = apiResult is Map ? apiResult["Data"] : null;
+                final status = apiResult is Map ? apiResult["Status"] : null;
+                final dataStatus = data is Map ? data["Status"] : null;
+                final isFailure =
+                    status.toString() == "0" || dataStatus.toString() == "0";
+
+                if (isFailure) {
+                  final apiMessage =
+                      (apiResult["Message"] ??
+                              (data is Map ? data["Message"] : null) ??
+                              "Unable to send image.")
+                          .toString()
+                          .trim();
+
+                  if (mounted) {
+                    setState(() {
+                      _chats.removeWhere((m) => identical(m, localMsg));
+                      _pendingLocalChats.removeWhere(
+                        (m) => identical(m, localMsg),
+                      );
+                    });
+                    _showTopMessage(apiMessage);
+                  }
+                  return;
+                }
+              }
+            } catch (_) {}
+
+            if (mounted) {
+              setState(() {
+                final idx = _chats.indexWhere((m) => identical(m, localMsg));
+                if (idx != -1) {
+                  _chats[idx] = _chats[idx].copyWith(isUploading: false);
+                }
+                final pendingIdx = _pendingLocalChats.indexWhere(
+                  (m) => identical(m, localMsg),
+                );
+                if (pendingIdx != -1) {
+                  _pendingLocalChats[pendingIdx] =
+                      _pendingLocalChats[pendingIdx].copyWith(
+                        isUploading: false,
+                      );
+                }
+              });
+            }
+          } else {
+            if (mounted) {
+              setState(() {
+                _chats.removeWhere((m) => identical(m, localMsg));
+                _pendingLocalChats.removeWhere((m) => identical(m, localMsg));
+              });
+              _showTopMessage("Server error (${res.statusCode})");
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("[MessageDetailPage] Error sending image: $e");
+        if (mounted) {
+          setState(() {
+            _chats.removeWhere((m) => identical(m, localMsg));
+            _pendingLocalChats.removeWhere((m) => identical(m, localMsg));
+          });
+          _showTopMessage("Failed to send image.");
+        }
+      }
+    }
+  }
+
+  Future<void> _addVideo(String path) async {
+    final localMsg = ChatMessage(
+      text: path,
+      localFilePath: path,
+      isMe: true,
+      time: _nowStr(),
+      status: MessageStatus.sent,
+      isVideo: true,
+      isUploading: true,
+    );
+
+    setState(() {
+      _chats.add(localMsg);
+      _pendingLocalChats.add(localMsg);
+    });
+    _scrollToBottom(animate: true);
+
+    final receiverEmail =
+        widget.messageData["email"] ??
+        widget.messageData["EmailAddress"] ??
+        widget.messageData["ActionEmail"] ??
+        "";
+
+    if (receiverEmail.trim().isNotEmpty) {
+      try {
+        final senderEmail = await SecureStorage().getUserEmail() ?? "";
+        if (senderEmail.trim().isNotEmpty) {
+          // Compress video using VideoCompress
+          MediaInfo? compressed;
+          try {
+            compressed = await VideoCompress.compressVideo(
+              path,
+              quality: VideoQuality.MediumQuality,
+              deleteOrigin: false,
+              includeAudio: true,
+            );
+          } catch (e) {
+            debugPrint("[MessageDetailPage] Video compression error: $e");
+          }
+
+          final File uploadFile = compressed?.file ?? File(path);
+          final bytes = await uploadFile.readAsBytes();
+          final base64Video = base64Encode(bytes);
+
+          final res = await RegisterService().sendChatMessage(
+            senderEmail: senderEmail.trim(),
+            receiverEmail: receiverEmail.trim(),
+            chatMessage: base64Video,
+          );
+
+          debugPrint(
+            "[MessageDetailPage] sendVideo response: ${res.statusCode} -> ${res.body}",
+          );
+
+          if (res.statusCode == 200) {
+            try {
+              final doc = xml.XmlDocument.parse(res.body);
+              final result = doc.findAllElements('SendChatMessageResult');
+              if (result.isNotEmpty) {
+                final apiResult = jsonDecode(result.first.innerText);
+                final data = apiResult is Map ? apiResult["Data"] : null;
+                final status = apiResult is Map ? apiResult["Status"] : null;
+                final dataStatus = data is Map ? data["Status"] : null;
+                final isFailure =
+                    status.toString() == "0" || dataStatus.toString() == "0";
+
+                if (isFailure) {
+                  final apiMessage =
+                      (apiResult["Message"] ??
+                              (data is Map ? data["Message"] : null) ??
+                              "Unable to send video.")
+                          .toString()
+                          .trim();
+
+                  if (mounted) {
+                    setState(() {
+                      _chats.removeWhere((m) => identical(m, localMsg));
+                      _pendingLocalChats.removeWhere(
+                        (m) => identical(m, localMsg),
+                      );
+                    });
+                    _showTopMessage(apiMessage);
+                  }
+                  return;
+                }
+              }
+            } catch (_) {}
+
+            if (mounted) {
+              setState(() {
+                final idx = _chats.indexWhere((m) => identical(m, localMsg));
+                if (idx != -1) {
+                  _chats[idx] = _chats[idx].copyWith(isUploading: false);
+                }
+                final pendingIdx = _pendingLocalChats.indexWhere(
+                  (m) => identical(m, localMsg),
+                );
+                if (pendingIdx != -1) {
+                  _pendingLocalChats[pendingIdx] =
+                      _pendingLocalChats[pendingIdx].copyWith(
+                        isUploading: false,
+                      );
+                }
+              });
+            }
+          } else {
+            if (mounted) {
+              setState(() {
+                _chats.removeWhere((m) => identical(m, localMsg));
+                _pendingLocalChats.removeWhere((m) => identical(m, localMsg));
+              });
+              _showTopMessage("Server error (${res.statusCode})");
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("[MessageDetailPage] Error sending video: $e");
+        if (mounted) {
+          setState(() {
+            _chats.removeWhere((m) => identical(m, localMsg));
+            _pendingLocalChats.removeWhere((m) => identical(m, localMsg));
+          });
+          _showTopMessage("Failed to send video.");
+        }
       }
     }
   }
 
   // ─────────────────────────────────────────
-  // 🔥 SEND CAMERA IMAGE
+  // 🔥 VOICE TO TEXT METHODS
   // ─────────────────────────────────────────
-  // Future<void> _sendImage() async {
-  //   final XFile? image = await _picker.pickImage(
-  //     source: ImageSource.camera,
-  //     imageQuality: 70,
-  //   );
-  //   if (image == null) return;
-
-  //   setState(() {
-  //     _chats.add(
-  //       ChatMessage(
-  //         text: image.path,
-  //         isMe: true,
-  //         time: _nowStr(),
-  //         status: MessageStatus.sent,
-  //         isImage: true,
-  //       ),
-  //     );
-  //   });
-
-  //   WidgetsBinding.instance.addPostFrameCallback((_) {
-  //     if (_chatScroll.hasClients) {
-  //       _chatScroll.animateTo(
-  //         _chatScroll.position.maxScrollExtent,
-  //         duration: const Duration(milliseconds: 280),
-  //         curve: Curves.easeOut,
-  //       );
-  //     }
-  //   });
-  // }
-
-  void _addImage(String path) {
-    setState(() {
-      _chats.add(
-        ChatMessage(
-          text: path,
-          isMe: true,
-          time: _nowStr(),
-          status: MessageStatus.sent,
-          isImage: true,
-        ),
+  void _initSpeech() async {
+    try {
+      _speechEnabled = await _speechToText.initialize(
+        onError: (val) {
+          debugPrint('Speech error: $val');
+          if (mounted) setState(() => _isListening = false);
+        },
+        onStatus: (val) {
+          debugPrint('Speech status: $val');
+          if (val == 'done' || val == 'notListening') {
+            if (mounted) setState(() => _isListening = false);
+          }
+        },
       );
-    });
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Speech init error: $e');
+    }
   }
 
-  void _addVideo(String path) {
-    setState(() {
-      _chats.add(
-        ChatMessage(
-          text: path,
-          isMe: true,
-          time: _nowStr(),
-          status: MessageStatus.sent,
-          isVideo: true,
-        ),
+  Future<void> _startListening() async {
+    final status = await Permission.microphone.request();
+    if (!status.isGranted) {
+      Get.snackbar(
+        'Permission Required',
+        'Please allow microphone permission to use voice typing.',
+        backgroundColor: Colors.black87,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
       );
-    });
+      return;
+    }
+
+    if (!_speechEnabled) {
+      _speechEnabled = await _speechToText.initialize(
+        onError: (val) {
+          if (mounted) setState(() => _isListening = false);
+        },
+        onStatus: (val) {
+          if (val == 'done' || val == 'notListening') {
+            if (mounted) setState(() => _isListening = false);
+          }
+        },
+      );
+    }
+
+    if (_speechEnabled) {
+      _wordsSpokenBeforeListening = _ctrl.text;
+      setState(() => _isListening = true);
+
+      await _speechToText.listen(
+        onResult: (result) {
+          if (mounted) {
+            final recognized = result.recognizedWords;
+            final prefix = _wordsSpokenBeforeListening.isEmpty
+                ? ''
+                : _wordsSpokenBeforeListening.endsWith(' ')
+                ? _wordsSpokenBeforeListening
+                : '$_wordsSpokenBeforeListening ';
+            final newText = '$prefix$recognized';
+            _ctrl.value = TextEditingValue(
+              text: newText,
+              selection: TextSelection.collapsed(offset: newText.length),
+            );
+          }
+        },
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 3),
+        cancelOnError: true,
+      );
+    }
   }
 
+  Future<void> _stopListening() async {
+    await _speechToText.stop();
+    if (mounted) setState(() => _isListening = false);
+  }
+
+  void _toggleListening() {
+    if (_isListening) {
+      _stopListening();
+    } else {
+      _startListening();
+    }
+  }
+
+  // ─────────────────────────────────────────
+  // 🔥 MEDIA PICKER (Images & Videos)
+  // ─────────────────────────────────────────
+  // ignore: unused_element
   Future<void> _pickMedia() async {
+    if (_showEmojiPicker) {
+      setState(() => _showEmojiPicker = false);
+    }
+    FocusScope.of(context).unfocus();
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF111217),
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.65),
       builder: (_) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_camera, color: Colors.white),
-                title: const Text(
-                  "Camera Photo",
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () async {
-                  Navigator.pop(context);
-
-                  final XFile? image = await _picker.pickImage(
-                    source: ImageSource.camera,
-                    imageQuality: 70,
-                  );
-
-                  if (image != null) {
-                    _addImage(image.path);
-                  }
-                },
-              ),
-
-              ListTile(
-                leading: const Icon(Icons.photo, color: Colors.white),
-                title: const Text(
-                  "Gallery Photo",
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () async {
-                  Navigator.pop(context);
-
-                  final XFile? image = await _picker.pickImage(
-                    source: ImageSource.gallery,
-                    imageQuality: 70,
-                  );
-
-                  if (image != null) {
-                    _addImage(image.path);
-                  }
-                },
-              ),
-
-              ListTile(
-                leading: const Icon(Icons.video_library, color: Colors.white),
-                title: const Text(
-                  "Gallery Video",
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () async {
-                  Navigator.pop(context);
-
-                  final XFile? video = await _picker.pickVideo(
-                    source: ImageSource.gallery,
-                  );
-
-                  if (video != null) {
-                    _addVideo(video.path);
-                  }
-                },
+        return Container(
+          margin: EdgeInsets.fromLTRB(16.w, 0, 16.w, 24.h),
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 18.h),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141520),
+            borderRadius: BorderRadius.circular(24.r),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black87,
+                blurRadius: 20,
+                offset: Offset(0, 6),
               ),
             ],
           ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36.w,
+                  height: 4.h,
+                  margin: EdgeInsets.only(bottom: 16.h),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(20.r),
+                  ),
+                ),
+                Text(
+                  "Share Media",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 18.h),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _mediaOptionItem(
+                      icon: Icons.camera_alt_rounded,
+                      label: "Camera",
+                      color: const Color(0xFFFF5252),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final XFile? image = await _picker.pickImage(
+                          source: ImageSource.camera,
+                          imageQuality: 75,
+                        );
+                        if (image != null) _addImage(image.path);
+                      },
+                    ),
+                    _mediaOptionItem(
+                      icon: Icons.videocam_rounded,
+                      label: "Record Video",
+                      color: const Color(0xFFFF9800),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final XFile? video = await _picker.pickVideo(
+                          source: ImageSource.camera,
+                          maxDuration: const Duration(minutes: 2),
+                        );
+                        if (video != null) _addVideo(video.path);
+                      },
+                    ),
+                    _mediaOptionItem(
+                      icon: Icons.photo_library_rounded,
+                      label: "Photos",
+                      color: const Color(0xFF2196F3),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final XFile? image = await _picker.pickImage(
+                          source: ImageSource.gallery,
+                          imageQuality: 75,
+                        );
+                        if (image != null) _addImage(image.path);
+                      },
+                    ),
+                    _mediaOptionItem(
+                      icon: Icons.video_library_rounded,
+                      label: "Videos",
+                      color: const Color(0xFF9C27B0),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final XFile? video = await _picker.pickVideo(
+                          source: ImageSource.gallery,
+                        );
+                        if (video != null) _addVideo(video.path);
+                      },
+                    ),
+                  ],
+                ),
+                SizedBox(height: 10.h),
+              ],
+            ),
+          ),
         );
       },
+    );
+  }
+
+  Widget _mediaOptionItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 54.w,
+            height: 54.w,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: color.withValues(alpha: 0.35),
+                width: 1.5,
+              ),
+            ),
+            child: Icon(icon, color: color, size: 24.sp),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: Colors.white70,
+              fontSize: 11.5.sp,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1299,39 +1716,254 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     return '$h:$m ${t.period == DayPeriod.am ? "AM" : "PM"}';
   }
 
-  Future<void> _handleBlockUser() async {
-    final chatListId =
-        _resolvedChatListId ??
-        int.tryParse(
-          (widget.messageData["ChatListId"] ??
-                  widget.messageData["chatListId"] ??
-                  widget.messageData["id"] ??
-                  "0")
-              .toString(),
-        ) ??
-        0;
+  Future<void> _handleBlockOrReport(bool isBlock) async {
+    if (isBlock) {
+      final chatListId =
+          _resolvedChatListId ??
+          int.tryParse(
+            (widget.messageData["ChatListId"] ??
+                    widget.messageData["chatListId"] ??
+                    widget.messageData["id"] ??
+                    "0")
+                .toString(),
+          ) ??
+          0;
+
+      try {
+        final myEmail = await SecureStorage().getUserEmail() ?? "";
+        if (myEmail.isNotEmpty) {
+          final res = await RegisterService().blockChatUser(
+            chatListId: chatListId,
+            email: myEmail.trim(),
+          );
+          debugPrint(
+            "[MessageDetailPage] BlockChatUser response: ${res.statusCode} -> ${res.body}",
+          );
+
+          if (res.statusCode == 200) {
+            try {
+              final doc = xml.XmlDocument.parse(res.body);
+              String innerText = "";
+              final resultNodes = doc.findAllElements('BlockChatUserResult');
+              if (resultNodes.isNotEmpty) {
+                innerText = resultNodes.first.innerText;
+              } else {
+                final stringNodes = doc.findAllElements('string');
+                if (stringNodes.isNotEmpty) {
+                  innerText = stringNodes.first.innerText;
+                } else {
+                  innerText = doc.rootElement.innerText;
+                }
+              }
+
+              if (innerText.trim().isNotEmpty) {
+                final apiResult = jsonDecode(innerText.trim());
+                final msg =
+                    (apiResult is Map
+                            ? (apiResult["Message"] ??
+                                  (apiResult["Data"] is Map
+                                      ? apiResult["Data"]["Message"]
+                                      : null))
+                            : null)
+                        ?.toString();
+                if (mounted) {
+                  Get.snackbar(
+                    'Blocked',
+                    msg ?? 'User has been blocked successfully',
+                    backgroundColor: const Color(
+                      0xFFFF5252,
+                    ).withValues(alpha: 0.85),
+                    colorText: Colors.white,
+                    snackPosition: SnackPosition.BOTTOM,
+                    duration: const Duration(seconds: 2),
+                  );
+                }
+              }
+            } catch (_) {
+              if (mounted) {
+                Get.snackbar(
+                  'Blocked',
+                  'User has been blocked successfully',
+                  backgroundColor: const Color(
+                    0xFFFF5252,
+                  ).withValues(alpha: 0.85),
+                  colorText: Colors.white,
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 2),
+                );
+              }
+            }
+          }
+        }
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        debugPrint("[MessageDetailPage] Error blocking user: $e");
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      }
+      return;
+    }
+
+    final targetEmail =
+        (widget.messageData["email"] ??
+                widget.messageData["EmailAddress"] ??
+                widget.messageData["ActionEmail"] ??
+                widget.messageData["OtherUser"] ??
+                "")
+            .toString()
+            .trim();
 
     try {
       final myEmail = await SecureStorage().getUserEmail() ?? "";
-      if (myEmail.isNotEmpty) {
-        await RegisterService().blockChatUser(
-          chatListId: chatListId,
-          email: myEmail.trim(),
+      if (myEmail.isNotEmpty && targetEmail.isNotEmpty) {
+        final res = await RegisterService().blockageReport(
+          actionFrom: myEmail.trim(),
+          actionTo: targetEmail.trim(),
         );
-      }
-      if (mounted) {
-        Get.snackbar(
-          'Blocked',
-          'User has been blocked successfully',
-          backgroundColor: const Color(0xFFFF5252).withValues(alpha: 0.85),
-          colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
-          duration: const Duration(seconds: 2),
+        debugPrint(
+          "[MessageDetailPage] Blockage_Report response: ${res.statusCode} -> ${res.body}",
         );
-        Navigator.of(context).pop();
+
+        if (res.statusCode == 200) {
+          try {
+            final doc = xml.XmlDocument.parse(res.body);
+            String innerText = "";
+            final resultNodes = doc.findAllElements('Blockage_ReportResult');
+            if (resultNodes.isNotEmpty) {
+              innerText = resultNodes.first.innerText;
+            } else {
+              final stringNodes = doc.findAllElements('string');
+              if (stringNodes.isNotEmpty) {
+                innerText = stringNodes.first.innerText;
+              } else {
+                innerText = doc.rootElement.innerText;
+              }
+            }
+
+            if (innerText.trim().isNotEmpty) {
+              final apiResult = jsonDecode(innerText.trim());
+              final msg =
+                  (apiResult is Map
+                          ? (apiResult["Message"] ??
+                                (apiResult["Data"] is Map
+                                    ? apiResult["Data"]["Message"]
+                                    : null))
+                          : null)
+                      ?.toString();
+              if (mounted) {
+                Get.snackbar(
+                  'Success',
+                  msg ?? 'User reported successfully.',
+                  backgroundColor: const Color(0xFF241522),
+                  colorText: Colors.white,
+                  snackPosition: SnackPosition.TOP,
+                  duration: const Duration(seconds: 3),
+                );
+              }
+            }
+          } catch (_) {
+            if (mounted) {
+              Get.snackbar(
+                'Success',
+                'User reported successfully.',
+                backgroundColor: const Color(0xFF241522),
+                colorText: Colors.white,
+                snackPosition: SnackPosition.TOP,
+                duration: const Duration(seconds: 3),
+              );
+            }
+          }
+        }
       }
     } catch (e) {
-      debugPrint("[MessageDetailPage] Error blocking user: $e");
+      debugPrint("[MessageDetailPage] Error calling Blockage_Report: $e");
+    }
+  }
+
+  Future<void> _handleUnblockUser() async {
+    final targetEmail = (widget.messageData["email"] ??
+            widget.messageData["EmailAddress"] ??
+            widget.messageData["ActionEmail"] ??
+            widget.messageData["OtherUser"] ??
+            "")
+        .toString()
+        .trim();
+
+    try {
+      final myEmail = await SecureStorage().getUserEmail() ?? "";
+      if (myEmail.isNotEmpty && targetEmail.isNotEmpty) {
+        final res = await RegisterService().chatUnblock(
+          myEmail: myEmail.trim(),
+          blockedEmail: targetEmail.trim(),
+        );
+        debugPrint(
+          "[MessageDetailPage] Chat_Unblock response: ${res.statusCode} -> ${res.body}",
+        );
+
+        if (res.statusCode == 200) {
+          try {
+            final doc = xml.XmlDocument.parse(res.body);
+            String innerText = "";
+            final resultNodes = doc.findAllElements('Chat_UnblockResult');
+            if (resultNodes.isNotEmpty) {
+              innerText = resultNodes.first.innerText;
+            } else {
+              final stringNodes = doc.findAllElements('string');
+              if (stringNodes.isNotEmpty) {
+                innerText = stringNodes.first.innerText;
+              } else {
+                innerText = doc.rootElement.innerText;
+              }
+            }
+
+            if (innerText.trim().isNotEmpty) {
+              final apiResult = jsonDecode(innerText.trim());
+              final msg = (apiResult is Map
+                      ? (apiResult["Message"] ??
+                          (apiResult["Data"] is Map
+                              ? apiResult["Data"]["Message"]
+                              : null))
+                      : null)
+                  ?.toString();
+              if (mounted) {
+                Get.snackbar(
+                  'Unblocked',
+                  msg ?? 'User unblocked successfully',
+                  backgroundColor:
+                      const Color(0xFF1E2E20).withValues(alpha: 0.95),
+                  colorText: Colors.white,
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 2),
+                );
+              }
+            }
+          } catch (_) {
+            if (mounted) {
+              Get.snackbar(
+                'Unblocked',
+                'User unblocked successfully',
+                backgroundColor:
+                    const Color(0xFF1E2E20).withValues(alpha: 0.95),
+                colorText: Colors.white,
+                snackPosition: SnackPosition.BOTTOM,
+                duration: const Duration(seconds: 2),
+              );
+            }
+          }
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _blockMessage = null;
+          _isLoadingMessages = true;
+        });
+        _fetchChatMessages();
+      }
+    } catch (e) {
+      debugPrint("[MessageDetailPage] Error unblocking user: $e");
     }
   }
 
@@ -1410,14 +2042,14 @@ class _MessageDetailPageState extends State<MessageDetailPage>
         widget.messageData["isVerified"] == "true" ||
         widget.messageData["isVerified"] == "1";
 
-    final String rawStatus =
+    final String rawOnlineStatus =
         (widget.messageData["OnlineStatus"] ??
                 widget.messageData["onlineStatus"] ??
-                widget.messageData["status"] ??
-                widget.messageData["Status"] ??
+                widget.messageData["online_status"] ??
                 "")
             .toString()
             .trim();
+
     final onlineValue =
         (widget.messageData["isOnline"] ??
                 widget.messageData["IsOnline"] ??
@@ -1426,20 +2058,47 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             .toString()
             .trim()
             .toLowerCase();
-    final String displayStatus =
-        rawStatus.isNotEmpty && rawStatus.toLowerCase() != "null"
-        ? rawStatus
-        : (onlineValue == "true" || onlineValue == "1" || onlineValue == "yes"
-              ? "Online"
-              : "Offline");
-    final String sLower = displayStatus.toLowerCase();
-    final bool isOnline =
-        (sLower == 'online' ||
-            sLower == 'online now' ||
-            sLower == 'active' ||
-            sLower == 'active now') &&
-        sLower != 'hidden' &&
-        sLower != 'offline';
+
+    String displayStatus = "Offline";
+    bool isOnline = false;
+
+    if (rawOnlineStatus.isNotEmpty &&
+        rawOnlineStatus.toLowerCase() != "null" &&
+        rawOnlineStatus.toLowerCase() != "accepted" &&
+        rawOnlineStatus.toLowerCase() != "pending") {
+      final sLower = rawOnlineStatus.toLowerCase();
+      if (sLower == "online" ||
+          sLower == "online now" ||
+          sLower == "active" ||
+          sLower == "active now") {
+        displayStatus = "Online";
+        isOnline = true;
+      } else if (sLower == "hidden") {
+        displayStatus = "Hidden";
+        isOnline = false;
+      } else if (sLower == "away") {
+        displayStatus = "Away";
+        isOnline = false;
+      } else {
+        displayStatus = "Offline";
+        isOnline = false;
+      }
+    } else if (onlineValue.isNotEmpty && onlineValue != "null") {
+      if (onlineValue == "true" ||
+          onlineValue == "1" ||
+          onlineValue == "yes" ||
+          onlineValue == "online") {
+        displayStatus = "Online";
+        isOnline = true;
+      } else if (onlineValue == "hidden") {
+        displayStatus = "Hidden";
+        isOnline = false;
+      } else {
+        displayStatus = "Offline";
+        isOnline = false;
+      }
+    }
+
     final String lastSeen =
         widget.messageData["lastSeen"] ?? widget.messageData["LastSeen"] ?? "";
 
@@ -1483,7 +2142,11 @@ class _MessageDetailPageState extends State<MessageDetailPage>
               isOnline: isOnline,
               onlineStatus: displayStatus,
               lastSeen: lastSeen,
-              onBlockUser: _handleBlockUser,
+              isBlocked: _blockMessage != null &&
+                  _blockMessage!.toLowerCase().contains("block"),
+              onBlockUser: () => _handleBlockOrReport(true),
+              onUnblockUser: _handleUnblockUser,
+              onReportUser: () => _handleBlockOrReport(false),
             ),
 
             Expanded(child: _chatArea()),
@@ -1702,38 +2365,113 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                 ],
               ),
               child: c.isImage
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(14.r),
-                      child: Image.file(
-                        File(c.text),
-                        width: 180.w,
-                        height: 230.h,
-                        fit: BoxFit.cover,
-                      ),
+                  ? Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14.r),
+                          child: _buildImageWidget(c),
+                        ),
+                        if (c.isUploading)
+                          Container(
+                            width: 180.w,
+                            height: 230.h,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(14.r),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 32.w,
+                                  height: 32.w,
+                                  child: const CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.8,
+                                  ),
+                                ),
+                                SizedBox(height: 10.h),
+                                Text(
+                                  "Sending image...",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 11.5.sp,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     )
                   : c.isVideo
-                  ? Container(
-                      width: 180.w,
-                      height: 230.h,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(14.r),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.play_circle_fill,
-                            color: Colors.white,
-                            size: 60.sp,
+                  ? Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 180.w,
+                          height: 230.h,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F1017),
+                            borderRadius: BorderRadius.circular(14.r),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.1),
+                            ),
                           ),
-                          SizedBox(height: 8.h),
-                          Text(
-                            "Video Selected",
-                            style: TextStyle(color: Colors.white),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.play_circle_fill_rounded,
+                                color: Colors.white,
+                                size: 54.sp,
+                              ),
+                              SizedBox(height: 8.h),
+                              Text(
+                                "Video",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        if (c.isUploading)
+                          Container(
+                            width: 180.w,
+                            height: 230.h,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.75),
+                              borderRadius: BorderRadius.circular(14.r),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 32.w,
+                                  height: 32.w,
+                                  child: const CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.8,
+                                  ),
+                                ),
+                                SizedBox(height: 10.h),
+                                Text(
+                                  "Compressing &\nSending...",
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 11.5.sp,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     )
                   : Text(
                       c.text,
@@ -1772,6 +2510,71 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     return Icon(icon, size: 13.sp, color: color);
   }
 
+  Widget _buildImageWidget(ChatMessage c) {
+    if (c.localFilePath != null && File(c.localFilePath!).existsSync()) {
+      return Image.file(
+        File(c.localFilePath!),
+        width: 180.w,
+        height: 230.h,
+        fit: BoxFit.cover,
+      );
+    }
+    if (File(c.text).existsSync()) {
+      return Image.file(
+        File(c.text),
+        width: 180.w,
+        height: 230.h,
+        fit: BoxFit.cover,
+      );
+    }
+    if (c.text.startsWith('http://') || c.text.startsWith('https://')) {
+      return Image.network(
+        c.text,
+        width: 180.w,
+        height: 230.h,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            _mediaErrorPlaceholder(Icons.broken_image_rounded),
+      );
+    }
+    if (c.text.startsWith('/') || c.text.contains('.')) {
+      final fullUrl = c.text.startsWith('/')
+          ? '${AppConstants.baseUrl}${c.text.substring(1)}'
+          : '${AppConstants.baseUrl}${c.text}';
+      return Image.network(
+        fullUrl,
+        width: 180.w,
+        height: 230.h,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            _mediaErrorPlaceholder(Icons.broken_image_rounded),
+      );
+    }
+    try {
+      return Image.memory(
+        base64Decode(c.text),
+        width: 180.w,
+        height: 230.h,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            _mediaErrorPlaceholder(Icons.broken_image_rounded),
+      );
+    } catch (_) {
+      return _mediaErrorPlaceholder(Icons.broken_image_rounded);
+    }
+  }
+
+  Widget _mediaErrorPlaceholder(IconData icon) {
+    return Container(
+      width: 180.w,
+      height: 230.h,
+      color: const Color(0xFF161722),
+      child: Center(
+        child: Icon(icon, color: Colors.white38, size: 32.sp),
+      ),
+    );
+  }
+
   // ─────────────────────────────────────────
   // 🔥 INPUT BAR
   // ─────────────────────────────────────────
@@ -1782,73 +2585,137 @@ class _MessageDetailPageState extends State<MessageDetailPage>
         horizontal: AppSize.w(12),
         vertical: AppSize.h(10),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _circleBtn(icon: Icons.camera_alt_rounded, onTap: _pickMedia),
-          SizedBox(width: AppSize.w(8)),
-          Expanded(
-            child: Container(
+          if (_isListening)
+            Container(
+              margin: EdgeInsets.only(bottom: 8.h),
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
               decoration: BoxDecoration(
-                color: AppColors.inputBg,
-                borderRadius: BorderRadius.circular(28.r),
-                border: Border.all(color: AppColors.inputBorder),
+                color: Colors.redAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(
+                  color: Colors.redAccent.withValues(alpha: 0.4),
+                ),
               ),
-              padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ctrl,
-                      focusNode: _focusNode,
-                      onChanged: (v) {},
-                      onTap: () {
-                        if (_showEmojiPicker) {
-                          setState(() => _showEmojiPicker = false);
-                        }
-                      },
-                      style: GoogleFonts.poppins(
-                        fontSize: 14.sp,
-                        color: Colors.white,
-                      ),
-                      maxLines: 4,
-                      minLines: 1,
-                      decoration: InputDecoration(
-                        hintText: 'Message $name...',
-                        hintStyle: GoogleFonts.poppins(
-                          fontSize: 13.sp,
-                          color: AppColors.grey,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: AppSize.h(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // ─── EMOJI BUTTON ───
-                  GestureDetector(
-                    onTap: () {
-                      setState(() => _showEmojiPicker = !_showEmojiPicker);
-                      if (_showEmojiPicker) FocusScope.of(context).unfocus();
-                    },
-                    child: Padding(
-                      padding: EdgeInsets.only(left: AppSize.w(6)),
-                      child: Text(
-                        _showEmojiPicker ? '⌨️' : '😊',
-                        style: TextStyle(fontSize: 22.sp),
-                      ),
+                  Icon(Icons.mic, color: Colors.redAccent, size: 16.sp),
+                  SizedBox(width: 6.w),
+                  Text(
+                    "Listening... Speak now",
+                    style: GoogleFonts.poppins(
+                      color: Colors.redAccent,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          SizedBox(width: AppSize.w(8)),
-
-          _circleBtn(
-            key: const ValueKey('send'),
-            icon: Icons.send_rounded,
-            onTap: _send,
+          Row(
+            children: [
+              // _circleBtn(icon: Icons.camera_alt_rounded, onTap: _pickMedia),
+              // SizedBox(width: AppSize.w(8)),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.inputBg,
+                    borderRadius: BorderRadius.circular(28.r),
+                    border: Border.all(
+                      color: _isListening
+                          ? Colors.redAccent.withValues(alpha: 0.5)
+                          : AppColors.inputBorder,
+                    ),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: AppSize.w(14)),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _ctrl,
+                          focusNode: _focusNode,
+                          onChanged: (v) {},
+                          onTap: () {
+                            if (_showEmojiPicker) {
+                              setState(() => _showEmojiPicker = false);
+                            }
+                          },
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            color: Colors.white,
+                          ),
+                          maxLines: 4,
+                          minLines: 1,
+                          decoration: InputDecoration(
+                            hintText: _isListening
+                                ? 'Listening...'
+                                : 'Message $name...',
+                            hintStyle: GoogleFonts.poppins(
+                              fontSize: 13.sp,
+                              color: _isListening
+                                  ? Colors.redAccent
+                                  : AppColors.grey,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: AppSize.h(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // ─── VOICE TO TEXT BUTTON ───
+                      GestureDetector(
+                        onTap: _toggleListening,
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4.w),
+                          child: Container(
+                            padding: EdgeInsets.all(6.w),
+                            decoration: BoxDecoration(
+                              color: _isListening
+                                  ? Colors.redAccent.withValues(alpha: 0.2)
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isListening ? Icons.mic : Icons.mic_none_rounded,
+                              color: _isListening
+                                  ? Colors.redAccent
+                                  : AppColors.grey,
+                              size: 22.sp,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // ─── EMOJI BUTTON ───
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _showEmojiPicker = !_showEmojiPicker);
+                          if (_showEmojiPicker) {
+                            FocusScope.of(context).unfocus();
+                          }
+                        },
+                        child: Padding(
+                          padding: EdgeInsets.only(left: 2.w),
+                          child: Text(
+                            _showEmojiPicker ? '⌨️' : '😊',
+                            style: TextStyle(fontSize: 22.sp),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(width: AppSize.w(8)),
+              _circleBtn(
+                key: const ValueKey('send'),
+                icon: Icons.send_rounded,
+                onTap: _send,
+              ),
+            ],
           ),
         ],
       ),
@@ -1960,7 +2827,10 @@ class _ProfileCard extends StatelessWidget {
     this.isOnline = false,
     this.onlineStatus = "Offline",
     this.lastSeen = "",
+    this.isBlocked = false,
     this.onBlockUser,
+    this.onUnblockUser,
+    this.onReportUser,
   });
 
   final String name, imageUrl, age, city, flag;
@@ -1968,7 +2838,10 @@ class _ProfileCard extends StatelessWidget {
   final bool isOnline;
   final String onlineStatus;
   final String lastSeen;
+  final bool isBlocked;
   final VoidCallback? onBlockUser;
+  final VoidCallback? onUnblockUser;
+  final VoidCallback? onReportUser;
 
   static const _cardBg = Color(0xFF0F1017);
   static const _cardBorder = Color(0xFF1C1D2A);
@@ -2060,25 +2933,46 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 SizedBox(height: 16.h),
 
-                _menuItem(
-                  context: context,
-                  icon: Icons.block_rounded,
-                  label: "Block $name",
-                  color: Colors.orangeAccent,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _confirmAction(
-                      context,
-                      title: "Block $name?",
-                      subtitle: "They won't be able to message you anymore.",
-                      actionLabel: "Block",
-                      color: Colors.orangeAccent,
-                      onConfirm: () {
-                        onBlockUser?.call();
-                      },
-                    );
-                  },
-                ),
+                if (isBlocked)
+                  _menuItem(
+                    context: context,
+                    icon: Icons.lock_open_rounded,
+                    label: "Unblock $name",
+                    color: Colors.lightGreenAccent,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _confirmAction(
+                        context,
+                        title: "Unblock $name?",
+                        subtitle: "You will be able to exchange messages again.",
+                        actionLabel: "Unblock",
+                        color: Colors.lightGreenAccent,
+                        onConfirm: () {
+                          onUnblockUser?.call();
+                        },
+                      );
+                    },
+                  )
+                else
+                  _menuItem(
+                    context: context,
+                    icon: Icons.block_rounded,
+                    label: "Block $name",
+                    color: Colors.orangeAccent,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _confirmAction(
+                        context,
+                        title: "Block $name?",
+                        subtitle: "They won't be able to message you anymore.",
+                        actionLabel: "Block",
+                        color: Colors.orangeAccent,
+                        onConfirm: () {
+                          onBlockUser?.call();
+                        },
+                      );
+                    },
+                  ),
 
                 Divider(
                   color: Colors.white.withValues(alpha: 0.06),
@@ -2101,13 +2995,7 @@ class _ProfileCard extends StatelessWidget {
                       actionLabel: "Report",
                       color: Colors.redAccent,
                       onConfirm: () {
-                        Get.snackbar(
-                          'Reported',
-                          'User report submitted successfully',
-                          backgroundColor: Colors.black87,
-                          colorText: Colors.white,
-                          snackPosition: SnackPosition.BOTTOM,
-                        );
+                        onReportUser?.call();
                       },
                     );
                   },

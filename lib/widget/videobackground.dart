@@ -88,7 +88,10 @@ class _VideoBackgroundCardState extends State<VideoBackgroundCard> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.55)],
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.55),
+                  ],
                 ),
               ),
             ),
@@ -105,7 +108,6 @@ class _VideoBackgroundCardState extends State<VideoBackgroundCard> {
                     width: 34.w,
                     height: 34.h,
                     decoration: BoxDecoration(
-
                       borderRadius: BorderRadius.circular(10.r),
                     ),
                     child: Padding(

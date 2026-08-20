@@ -683,6 +683,60 @@ class RegisterService {
     );
   }
 
+  /// SOAP Blockage_Report request
+  Future<XmlResponse> blockageReport({
+    required String actionFrom,
+    required String actionTo,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <Blockage_Report xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <actionFrom>$actionFrom</actionFrom>
+      <actionTo>$actionTo</actionTo>
+    </Blockage_Report>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/Blockage_Report"',
+      },
+    );
+  }
+
+  /// SOAP Blockage_ShowBlockList request
+  Future<XmlResponse> blockageShowBlockList({
+    required String actionFrom,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <Blockage_ShowBlockList xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <actionFrom>$actionFrom</actionFrom>
+    </Blockage_ShowBlockList>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/Blockage_ShowBlockList"',
+      },
+    );
+  }
+
   /// SOAP ShowChatList request
   Future<XmlResponse> showChatList({required String email}) async {
     final String xmlBody =
@@ -839,6 +893,34 @@ class RegisterService {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         'SOAPAction': '"http://tempuri.org/BlockChatUser"',
+      },
+    );
+  }
+
+  /// SOAP Chat_Unblock request
+  Future<XmlResponse> chatUnblock({
+    required String myEmail,
+    required String blockedEmail,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <Chat_Unblock xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <myEmail>$myEmail</myEmail>
+      <blockedEmail>$blockedEmail</blockedEmail>
+    </Chat_Unblock>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/Chat_Unblock"',
       },
     );
   }

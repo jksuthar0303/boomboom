@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:boomboom/screens/profile/updateprofile/blockeduserscreen.dart';
 import 'package:boomboom/screens/profile/updateprofile/deletescreen.dart';
 import 'package:boomboom/screens/profile/updateprofile/feedbackscreen.dart';
 import 'package:boomboom/screens/profile/updateprofile/privacyscreen.dart';
@@ -381,6 +382,16 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       },
       trailingWidget: const _FreeBadge(),
     ),
+    _TileData(
+      iconBg: _C.red,
+      iconBorder: _C.redBorder,
+      emoji: Text('🚫', style: TextStyle(fontSize: 18.sp)),
+      label: 'Blocked Users',
+      subtitle: "Manage blocked profiles",
+      onTap: () {
+        Get.to(() => const BlockedUsersScreen());
+      },
+    ),
   ],
   [
     _TileData(
@@ -484,26 +495,6 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
           value: settings.ghostMode.value,
           onChanged: (v) {
             settings.updateGhostMode(v);
-          },
-          activeThumbColor: Colors.white,
-          activeTrackColor: Colors.deepPurpleAccent,
-        ),
-      ),
-    ),
-    _TileData(
-      iconBg: const Color(0xFF1E1230),
-      iconBorder: const Color(0xFF28164A),
-      emoji: Text('🙈', style: TextStyle(fontSize: 18.sp)),
-      label: 'Exclude Message Profile',
-      subtitle: "message already send",
-      onTap: () {
-        settings.updateExcludeMessageProfile(!settings.hideChatUsers.value);
-      },
-      trailingWidget: Obx(
-        () => Switch(
-          value: settings.hideChatUsers.value,
-          onChanged: (v) {
-            settings.updateExcludeMessageProfile(v);
           },
           activeThumbColor: Colors.white,
           activeTrackColor: Colors.deepPurpleAccent,

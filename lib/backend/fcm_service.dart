@@ -44,7 +44,7 @@ class FCMService {
     try {
       // 1. Initialize FlutterLocalNotifications for Heads-Up Popups
       const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
+          AndroidInitializationSettings('@mipmap/launcher_icon');
 
       const DarwinInitializationSettings initializationSettingsDarwin =
           DarwinInitializationSettings(
@@ -104,7 +104,15 @@ class FCMService {
         }
       }
 
-      // 4. Listen to token refresh
+      // 4. Subscribe to Topic
+      try {
+        await _messaging.subscribeToTopic('topic');
+        debugPrint('🔥 [FCMService] Subscribed to topic: topic');
+      } catch (e) {
+        debugPrint('[FCMService] Error subscribing to topic: $e');
+      }
+
+      // 5. Listen to token refresh
       _messaging.onTokenRefresh.listen((newToken) async {
         debugPrint('🔥 [FCMService] FCM Token Refreshed: $newToken');
         await SecureStorage().saveFcmToken(newToken);
@@ -114,7 +122,7 @@ class FCMService {
         }
       });
 
-      // 5. Handle Foreground Notifications (When app is OPEN)
+      // 6. Handle Foreground Notifications (When app is OPEN)
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
         debugPrint('🔔 [FCMService] Foreground message received: ${message.notification?.title} - ${message.notification?.body}');
 
@@ -248,7 +256,7 @@ class FCMService {
         playSound: true,
         enableVibration: true,
         fullScreenIntent: false,
-        icon: '@mipmap/ic_launcher',
+        icon: '@mipmap/launcher_icon',
       );
 
       const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
@@ -271,6 +279,26 @@ class FCMService {
       );
     } catch (e) {
       debugPrint('[FCMService] Error showing Heads-Up notification: $e');
+    }
+  }
+
+  /// Subscribe to a topic
+  Future<void> subscribeToTopic(String topicName) async {
+    try {
+      await _messaging.subscribeToTopic(topicName);
+      debugPrint('🔥 [FCMService] Successfully subscribed to topic: $topicName');
+    } catch (e) {
+      debugPrint('[FCMService] Failed to subscribe to topic ($topicName): $e');
+    }
+  }
+
+  /// Unsubscribe from a topic
+  Future<void> unsubscribeFromTopic(String topicName) async {
+    try {
+      await _messaging.unsubscribeFromTopic(topicName);
+      debugPrint('🔥 [FCMService] Successfully unsubscribed from topic: $topicName');
+    } catch (e) {
+      debugPrint('[FCMService] Failed to unsubscribe from topic ($topicName): $e');
     }
   }
 }

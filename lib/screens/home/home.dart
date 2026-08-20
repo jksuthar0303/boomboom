@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:xml/xml.dart' as xml;
 import 'package:boomboom/screens/home/homescreenitems/verifyiuser.dart';
 import 'package:boomboom/screens/home/travell/travell.dart';
@@ -613,6 +617,175 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  bool _isBlockedDialogShowing = false;
+
+  void _showBlockedDialog() {
+    if (_isBlockedDialogShowing || !mounted) return;
+    _isBlockedDialogShowing = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (BuildContext dialogContext) {
+          return PopScope(
+            canPop: false,
+            child: Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 28.h),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF181926),
+                  borderRadius: BorderRadius.circular(24.r),
+                  border: Border.all(
+                    color: Colors.redAccent.withValues(alpha: 0.35),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.redAccent.withValues(alpha: 0.15),
+                      blurRadius: 28,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Blocked Icon
+                    Container(
+                      width: 72.w,
+                      height: 72.w,
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.redAccent.withValues(alpha: 0.45),
+                          width: 2,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.block_rounded,
+                        color: Colors.redAccent,
+                        size: 38.sp,
+                      ),
+                    ),
+                    SizedBox(height: 18.h),
+                    // Title
+                    Text(
+                      "You are blocked",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    // Message
+                    Text(
+                      "You are blocked by admin.",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        color: AppColors.textSecondary,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 24.h),
+                    // Contact Us Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48.h,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final Uri emailUri = Uri(
+                            scheme: 'mailto',
+                            path: 'support@boomboom.app',
+                            query: 'subject=Account%20Blocked%20Inquiry',
+                          );
+                          try {
+                            if (await canLaunchUrl(emailUri)) {
+                              await launchUrl(
+                                emailUri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            } else {
+                              await launchUrl(emailUri);
+                            }
+                          } catch (e) {
+                            debugPrint("Error opening email app: $e");
+                          }
+                        },
+                        icon: Icon(
+                          Icons.mail_outline_rounded,
+                          color: Colors.black,
+                          size: 20.sp,
+                        ),
+                        label: Text(
+                          "Contact Us",
+                          style: GoogleFonts.poppins(
+                            color: Colors.black,
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    // Close App Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48.h,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          SystemNavigator.pop();
+                          exit(0);
+                        },
+                        icon: Icon(
+                          Icons.power_settings_new_rounded,
+                          color: Colors.redAccent,
+                          size: 20.sp,
+                        ),
+                        label: Text(
+                          "Close App",
+                          style: GoogleFonts.poppins(
+                            color: Colors.redAccent,
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: Colors.redAccent.withValues(alpha: 0.5),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    });
+  }
+
   Future<void> _loadCachedProfileInfo() async {
     try {
       final jsonStr = await SecureStorage().getProfileJson();
@@ -621,6 +794,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final List? dataList = decoded["Data"];
         if (dataList != null && dataList.isNotEmpty) {
           final data = dataList.first;
+
+          // Check verification / blocked status
+          final String isVerifiedStatus =
+              (data["IsVerified"] ?? data["isVerified"] ?? "")
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+          if (isVerifiedStatus == "blocked") {
+            _showBlockedDialog();
+          }
 
           String? imageUrl;
           dynamic rawMedia = data["Media"] ?? data["Photos"] ?? data["Photo"];

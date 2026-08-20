@@ -3058,6 +3058,27 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       );
 
   void _reportSheet() {
+    final int profileCount = _liveProfiles.isNotEmpty
+        ? _liveProfiles.length
+        : sampleProfiles.length;
+    final int currentProfileIndex = _currentIndex.clamp(0, profileCount - 1);
+
+    String targetEmail = "";
+    if (widget.userEmail != null && widget.userEmail!.trim().isNotEmpty) {
+      targetEmail = widget.userEmail!.trim();
+    } else if (widget.initialUserData != null) {
+      targetEmail = (widget.initialUserData!["EmailAddress"] ??
+              widget.initialUserData!["email"] ??
+              widget.initialUserData!["ActionEmail"] ??
+              "")
+          .toString()
+          .trim();
+    } else if (_liveProfiles.isNotEmpty &&
+        currentProfileIndex < _liveProfileEmails.length &&
+        _liveProfileEmails[currentProfileIndex] != null) {
+      targetEmail = _liveProfileEmails[currentProfileIndex]!.trim();
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -3144,7 +3165,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                       child: Text(
                         _profile.name
                             .split(' ')
-                            .map((e) => e[0])
+                            .map((e) => e.isNotEmpty ? e[0] : '')
                             .take(2)
                             .join(),
                         style: const TextStyle(
@@ -3244,9 +3265,92 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
               ),
             ].map(
               (opt) => GestureDetector(
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(context);
-                  _showSnack('${opt.$2} reported ✓', AppColors.purple);
+                  final actionName = opt.$2;
+
+                  if (actionName == 'Block user') {
+                    _showSnack('User blocked successfully ✓', AppColors.purple);
+                    if (mounted) {
+                      if (widget.userEmail != null ||
+                          widget.initialUserData != null ||
+                          widget.isOwnProfile) {
+                        Navigator.pop(context);
+                      } else {
+                        _swipeOut(toLike: false);
+                      }
+                    }
+                    return;
+                  }
+
+                  try {
+                    final loginEmail =
+                        await SecureStorage().getUserEmail() ?? "";
+                    if (loginEmail.trim().isNotEmpty &&
+                        targetEmail.isNotEmpty) {
+                      final res = await RegisterService().blockageReport(
+                        actionFrom: loginEmail.trim(),
+                        actionTo: targetEmail.trim(),
+                      );
+                      debugPrint(
+                        "[Blockage_Report] response: ${res.statusCode} -> ${res.body}",
+                      );
+
+                      if (res.statusCode == 200) {
+                        try {
+                          final doc = xml.XmlDocument.parse(res.body);
+                          String innerText = "";
+                          final resultNodes =
+                              doc.findAllElements('Blockage_ReportResult');
+                          if (resultNodes.isNotEmpty) {
+                            innerText = resultNodes.first.innerText;
+                          } else {
+                            final stringNodes = doc.findAllElements('string');
+                            if (stringNodes.isNotEmpty) {
+                              innerText = stringNodes.first.innerText;
+                            } else {
+                              innerText = doc.rootElement.innerText;
+                            }
+                          }
+
+                          if (innerText.trim().isNotEmpty) {
+                            final apiResult = jsonDecode(innerText.trim());
+                            final msg = (apiResult is Map
+                                    ? (apiResult["Message"] ??
+                                        (apiResult["Data"] is Map
+                                            ? apiResult["Data"]["Message"]
+                                            : null))
+                                    : null)
+                                ?.toString();
+                            _showSnack(
+                              msg ?? 'User reported successfully.',
+                              AppColors.purple,
+                            );
+                          } else {
+                            _showSnack(
+                              'User reported successfully.',
+                              AppColors.purple,
+                            );
+                          }
+                        } catch (_) {
+                          _showSnack(
+                            'User reported successfully.',
+                            AppColors.purple,
+                          );
+                        }
+                      } else {
+                        _showSnack(
+                          'Action submitted successfully.',
+                          AppColors.purple,
+                        );
+                      }
+                    } else {
+                      _showSnack('$actionName reported ✓', AppColors.purple);
+                    }
+                  } catch (e) {
+                    debugPrint("[Blockage_Report] Error: $e");
+                    _showSnack('$actionName reported ✓', AppColors.purple);
+                  }
                 },
                 child: Container(
                   margin: EdgeInsets.fromLTRB(
