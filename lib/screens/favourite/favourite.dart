@@ -124,7 +124,7 @@ class _LikesScreenState extends State<LikesScreen> {
     try {
       final email = await SecureStorage().getUserEmail() ?? '';
       final results = await Future.wait(
-        List.generate(3, (index) async {
+        List.generate(4, (index) async {
           final response = index == 1
               ? await HomeService().favoriteLikeViewShowByActionEmail(
                   actionEmail: email.trim(),
@@ -147,7 +147,7 @@ class _LikesScreenState extends State<LikesScreen> {
         myLikesCount = results[0];
         whoLikedCount = results[1];
         whoViewedCount = results[2];
-        myMatchesCount = 0;
+        myMatchesCount = results[3];
       });
     } catch (_) {
       // The selected tab still loads normally; counts remain at zero on error.
@@ -157,26 +157,17 @@ class _LikesScreenState extends State<LikesScreen> {
   String _actionForTab(int index) {
     switch (index) {
       case 1:
-        return 'liked';
+        return 'like';
       case 2:
         return 'view';
+      case 3:
+        return 'match';
       default:
         return 'like';
     }
   }
 
   Future<void> _loadUsersForTab(int tabIndex) async {
-    if (tabIndex == 3) {
-      if (mounted) {
-        setState(() {
-          _apiUsers = [];
-          _isLoading = false;
-          _errorMessage = null;
-          _emptyMessage = "My Matches API coming soon";
-        });
-      }
-      return;
-    }
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -186,9 +177,7 @@ class _LikesScreenState extends State<LikesScreen> {
     }
     try {
       final email = await SecureStorage().getUserEmail() ?? '';
-      final response = tabIndex == 3
-          ? await HomeService().showAllExceptMe(myEmail: email.trim())
-          : tabIndex == 1
+      final response = tabIndex == 1
           ? await HomeService().favoriteLikeViewShowByActionEmail(
               actionEmail: email.trim(),
               action: 'like',
@@ -201,16 +190,7 @@ class _LikesScreenState extends State<LikesScreen> {
         throw Exception('HTTP ${response.statusCode}');
       }
 
-      final Map<String, dynamic> result;
-      if (tabIndex == 3) {
-        final doc = xml.XmlDocument.parse(response.body);
-        final nodes = doc.findAllElements('ShowAllExceptMeResult');
-        result = nodes.isNotEmpty
-            ? Map<String, dynamic>.from(jsonDecode(nodes.first.innerText))
-            : <String, dynamic>{};
-      } else {
-        result = XmlResponseParser.parse(response.body);
-      }
+      final Map<String, dynamic> result = XmlResponseParser.parse(response.body);
       if (result['Status'].toString() != '1') {
         if (!mounted) return;
         setState(() {
@@ -288,16 +268,7 @@ class _LikesScreenState extends State<LikesScreen> {
                     return GestureDetector(
                       onTap: () {
                         setState(() => selectedTab = index);
-                        if (index == 3) {
-                          setState(() {
-                            _apiUsers = [];
-                            _emptyMessage = "My Matches API coming soon";
-                            _errorMessage = null;
-                            _isLoading = false;
-                          });
-                        } else {
-                          _loadUsersForTab(index);
-                        }
+                        _loadUsersForTab(index);
                       },
                       child: Container(
                         margin: EdgeInsets.only(right: 10.w),
@@ -406,6 +377,11 @@ class _LikesScreenState extends State<LikesScreen> {
                     ? _buildMessage(_emptyMessage ?? 'No data found', false)
                     : GridView.builder(
                         itemCount: _apiUsers.length,
+                        padding: EdgeInsets.only(
+                          left: 4.w,
+                          right: 4.w,
+                          bottom: 100.h,
+                        ),
                         physics: const BouncingScrollPhysics(),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
@@ -709,7 +685,7 @@ class _LikesScreenState extends State<LikesScreen> {
                             ),
                             SizedBox(width: 1.w),
                             Text(
-                              user["isOnline"] ? "Active now" : "Offline",
+                              (user["onlineStatus"] ?? (user["isOnline"] ? "Online" : "Offline")).toString(),
                               style: AppTextStyles.small.copyWith(
                                 color: user["isOnline"]
                                     ? const Color(0xFF00E676)
@@ -815,7 +791,15 @@ class _LikesScreenState extends State<LikesScreen> {
           ? ''
           : item['Occupation'].toString(),
       'distance': '${item['Lat'] ?? ''}, ${item['Lon'] ?? ''}',
-      'isOnline': item['IsOnline'].toString().toLowerCase() == 'true',
+      'onlineStatus': (item['OnlineStatus'] != null && item['OnlineStatus'].toString().trim().isNotEmpty && item['OnlineStatus'].toString().toLowerCase() != 'null')
+          ? item['OnlineStatus'].toString().trim()
+          : (item['IsOnline'].toString().toLowerCase() == 'true' ? 'Online' : 'Offline'),
+      'isOnline': (() {
+        final st = (item['OnlineStatus'] != null && item['OnlineStatus'].toString().trim().isNotEmpty && item['OnlineStatus'].toString().toLowerCase() != 'null')
+            ? item['OnlineStatus'].toString().trim().toLowerCase()
+            : (item['IsOnline'].toString().toLowerCase() == 'true' ? 'online' : 'offline');
+        return (st == 'online' || st == 'online now' || st == 'active' || st == 'active now') && st != 'hidden' && st != 'offline';
+      })(),
       'isVerified': item['IsVerified'].toString().toLowerCase() == 'true',
       'lookingFor': item['Lookingfor'] ?? 'Not specified',
     };

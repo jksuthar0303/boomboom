@@ -1634,16 +1634,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _everyoneGridCard(Map<String, dynamic> user) {
     final String fullName = (user["FullName"] ?? "User").toString();
     final int age = _calculateUserAge(user["Dob"]?.toString());
+    final String rawOnlineStatus = (user["OnlineStatus"] ??
+            user["onlineStatus"] ??
+            user["Status"] ??
+            user["status"])
+        ?.toString()
+        .trim() ?? "";
     final String onlineValue =
         (user["IsOnline"] ?? user["isOnline"] ?? user["Online"] ?? "")
             .toString()
             .trim()
             .toLowerCase();
-    final bool isOnline =
+    final bool isOnlineVal =
         onlineValue == "true" ||
         onlineValue == "1" ||
         onlineValue == "yes" ||
         onlineValue == "online";
+    final String onlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
+        ? rawOnlineStatus
+        : (isOnlineVal ? "Online" : "Offline");
+    final String sLower = onlineStatus.toLowerCase();
+    final bool isOnline = (sLower == "online" ||
+        sLower == "online now" ||
+        sLower == "active" ||
+        sLower == "active now") && sLower != "hidden" && sLower != "offline";
     final String verifiedValue =
         (user["IsVerified"] ?? user["isVerified"] ?? "")
             .toString()

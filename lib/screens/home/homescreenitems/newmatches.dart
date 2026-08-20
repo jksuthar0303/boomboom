@@ -322,6 +322,12 @@ class _MatchesScreenState extends State<MatchesScreen> {
               final String dob = (rawMap["Dob"] ?? rawMap["dob"] ?? "")
                   .toString();
               final int age = _calculateAge(dob);
+              final String rawOnlineStatus = (rawMap["OnlineStatus"] ??
+                      rawMap["onlineStatus"] ??
+                      rawMap["Status"] ??
+                      rawMap["status"])
+                  ?.toString()
+                  .trim() ?? "";
               final String onlineValue = (rawMap["IsOnline"] ??
                       rawMap["isOnline"] ??
                       rawMap["Online"] ??
@@ -329,10 +335,18 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   .toString()
                   .toLowerCase()
                   .trim();
-              final bool isOnline = onlineValue == "true" ||
+              final bool isOnlineVal = onlineValue == "true" ||
                   onlineValue == "1" ||
                   onlineValue == "yes" ||
                   onlineValue == "online";
+              final String onlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
+                  ? rawOnlineStatus
+                  : (isOnlineVal ? "Online" : "Offline");
+              final String sLower = onlineStatus.toLowerCase();
+              final bool isOnline = (sLower == "online" ||
+                  sLower == "online now" ||
+                  sLower == "active" ||
+                  sLower == "active now") && sLower != "hidden" && sLower != "offline";
               final bool isVerified =
                   rawMap["IsVerified"]?.toString().toLowerCase() == "true";
               final String lookingFor =
@@ -356,6 +370,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 "FullName": name,
                 "age": "$age",
                 "isOnline": isOnline,
+                "onlineStatus": onlineStatus,
                 "isVerified": isVerified,
                 "lookingFor": lookingFor,
                 "distance": distance,
@@ -706,7 +721,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
                         }
 
                         return GridView.builder(
-                          padding: EdgeInsets.symmetric(horizontal: 6.w),
+                          padding: EdgeInsets.only(
+                            left: 6.w,
+                            right: 6.w,
+                            bottom: 100.h,
+                          ),
                           itemCount: displayList.length,
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
@@ -839,7 +858,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                               ),
                                               SizedBox(width: 4.w),
                                               Text(
-                                                isOnline ? "Online" : "Offline",
+                                                (user["onlineStatus"] ?? (isOnline ? "Online" : "Offline")).toString(),
                                                 style: TextStyle(
                                                   color: Colors.white,
                                                   fontWeight: FontWeight.bold,

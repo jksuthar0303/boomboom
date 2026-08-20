@@ -455,7 +455,7 @@ class ExploreUsersScreen extends StatelessWidget {
                                     SizedBox(width: 3.w),
 
                                     Text(
-                                      "Active now",
+                                      (users[index]["onlineStatus"] ?? users[index]["OnlineStatus"] ?? "Online").toString(),
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 9.sp,

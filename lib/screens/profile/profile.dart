@@ -44,7 +44,6 @@ class _C {
   static const teal = Color(0xFF0F2626);
   static const yellow = Color(0xFF2A2010);
   static const orange = Color(0xFF2A1C0E);
-  static const purple = Color(0xFF1E1230);
 }
 
 // ─── Responsive Helper ────────────────────────────────────────────────────────
@@ -165,21 +164,29 @@ Future<void> _openVerificationFlow(BuildContext context) async {
 }
 
 // ─── Settings Screen ──────────────────────────────────────────────────────────
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
-  // final AppSettingsController settings =
-  // Get.put(AppSettingsController());
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    settings.fetchSettings();
+  }
 
   @override
   Widget build(BuildContext context) {
     final isTab = _R.isTablet(context);
 
     return Scaffold(
-      backgroundColor: Colors.transparent, // 👈 change
+      backgroundColor: Colors.transparent,
 
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           image: DecorationImage(
             image: NetworkImage(
               "https://i.postimg.cc/xdgdLC94/MDF3u-Llwv-E7W1ar-Hr-Gw18wf-Hv-Gr65gt-EJt-BEQm-Nabp-BIIvpm-Joq0c0m3b-Xks7yrt-Etty6Wr-T0Iiwowu-Osc-B9.jpg",
@@ -188,7 +195,7 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
 
-        /// 🔥 OVERLAY (optional but recommended)
+        /// 🔥 OVERLAY
         child: Container(
           color: Colors.black.withValues(alpha: 0.6),
 
@@ -470,38 +477,34 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       label: 'Ghost Mode',
       subtitle: "Hide your online presence",
       onTap: () {
-        settings.ghostMode.value = !settings.ghostMode.value;
+        settings.updateGhostMode(!settings.ghostMode.value);
       },
       trailingWidget: Obx(
         () => Switch(
           value: settings.ghostMode.value,
-
           onChanged: (v) {
-            settings.ghostMode.value = v;
+            settings.updateGhostMode(v);
           },
-
           activeThumbColor: Colors.white,
           activeTrackColor: Colors.deepPurpleAccent,
         ),
       ),
     ),
     _TileData(
-      iconBg: _C.purple,
+      iconBg: const Color(0xFF1E1230),
       iconBorder: const Color(0xFF28164A),
       emoji: Text('🙈', style: TextStyle(fontSize: 18.sp)),
       label: 'Exclude Message Profile',
       subtitle: "message already send",
       onTap: () {
-        settings.hideChatUsers.value = !settings.hideChatUsers.value;
+        settings.updateExcludeMessageProfile(!settings.hideChatUsers.value);
       },
       trailingWidget: Obx(
         () => Switch(
           value: settings.hideChatUsers.value,
-
           onChanged: (v) {
-            settings.hideChatUsers.value = v;
+            settings.updateExcludeMessageProfile(v);
           },
-
           activeThumbColor: Colors.white,
           activeTrackColor: Colors.deepPurpleAccent,
         ),
@@ -778,12 +781,13 @@ class _TileRow extends StatelessWidget {
                 ],
 
                 /// 🔥 ARROW
-                if (data.trailingWidget == null || data.label == 'Subscription Plan')
+                if (data.trailingWidget == null ||
+                    data.label == 'Subscription Plan')
                   Icon(
-                  Icons.chevron_right,
-                  color: const Color(0xFF3A3A3A),
-                  size: _R.chevronSize(context),
-                ),
+                    Icons.chevron_right,
+                    color: const Color(0xFF3A3A3A),
+                    size: _R.chevronSize(context),
+                  ),
               ],
             ),
           ),
@@ -857,8 +861,9 @@ Future<Map<String, dynamic>> _loadOwnProfileCardData() async {
     final email = await SecureStorage().getUserEmail();
     if (email != null && email.trim().isNotEmpty) {
       final response = await RegisterService().showProfile(email: email.trim());
-      final nodes = xml.XmlDocument.parse(response.body)
-          .findAllElements('ShowProfileResult');
+      final nodes = xml.XmlDocument.parse(
+        response.body,
+      ).findAllElements('ShowProfileResult');
       if (nodes.isNotEmpty) {
         final decoded = jsonDecode(nodes.first.innerText);
         final data = decoded['Data'];
@@ -891,7 +896,9 @@ class _ProfileCard extends StatelessWidget {
           name = data["FullName"]?.toString() ?? name;
           email = data["EmailAddress"]?.toString() ?? email;
           mediaUrl = data["Media"]?.toString();
-          if (mediaUrl != null && mediaUrl.isNotEmpty && !mediaUrl.startsWith('http')) {
+          if (mediaUrl != null &&
+              mediaUrl.isNotEmpty &&
+              !mediaUrl.startsWith('http')) {
             mediaUrl = 'https://boomboomdate.com/$mediaUrl';
           }
           if (name.isNotEmpty) initialLetter = name[0].toUpperCase();

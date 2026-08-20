@@ -145,9 +145,23 @@ class _ActiveuserState extends State<Activeuser> {
           .toString();
       final String dob = (rawMap["Dob"] ?? rawMap["dob"] ?? "").toString();
       final int age = _calculateAge(dob);
-      final bool isOnline =
+      final String rawOnlineStatus = (rawMap["OnlineStatus"] ??
+              rawMap["onlineStatus"] ??
+              rawMap["Status"] ??
+              rawMap["status"])
+          ?.toString()
+          .trim() ?? "";
+      final bool isOnlineVal =
           rawMap["IsOnline"]?.toString().toLowerCase() == "true" ||
           defaultOnline;
+      final String onlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
+          ? rawOnlineStatus
+          : (isOnlineVal ? "Online" : "Offline");
+      final String sLower = onlineStatus.toLowerCase();
+      final bool isOnline = (sLower == "online" ||
+          sLower == "online now" ||
+          sLower == "active" ||
+          sLower == "active now") && sLower != "hidden" && sLower != "offline";
       final bool isVerified =
           rawMap["IsVerified"]?.toString().toLowerCase() == "true" ||
           defaultVerified;
@@ -168,6 +182,7 @@ class _ActiveuserState extends State<Activeuser> {
         "FullName": name,
         "age": "$age",
         "isOnline": isOnline,
+        "onlineStatus": onlineStatus,
         "isVerified": isVerified,
         "lookingFor": lookingFor,
         "distance": distance,
@@ -488,7 +503,11 @@ class _ActiveuserState extends State<Activeuser> {
                       ),
                     )
                   : GridView.builder(
-                      padding: EdgeInsets.symmetric(horizontal: 6.w),
+                      padding: EdgeInsets.only(
+                        left: 6.w,
+                        right: 6.w,
+                        bottom: 100.h,
+                      ),
                       itemCount: filteredUsers.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
@@ -606,7 +625,7 @@ class _ActiveuserState extends State<Activeuser> {
                                           ),
                                           SizedBox(width: 4.w),
                                           Text(
-                                            isOnline ? "Online" : "Offline",
+                                            (user["onlineStatus"] ?? (isOnline ? "Online" : "Offline")).toString(),
                                             style: TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,

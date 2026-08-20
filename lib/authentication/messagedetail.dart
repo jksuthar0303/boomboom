@@ -31,6 +31,7 @@ class MessageDetailPage extends StatefulWidget {
   final Map<String, String> messageData;
   final ScrollController? sheetScrollController;
   final DraggableScrollableController? draggableController;
+  final ValueChanged<bool>? onKeyboardChanged;
 
   const MessageDetailPage({
     super.key,
@@ -38,6 +39,7 @@ class MessageDetailPage extends StatefulWidget {
     required this.messageData,
     this.sheetScrollController,
     this.draggableController,
+    this.onKeyboardChanged,
   });
 
   // ─────────────────────────────────────────
@@ -49,27 +51,26 @@ class MessageDetailPage extends StatefulWidget {
     required int index,
     required Map<String, String> messageData,
   }) {
-    return showModalBottomSheet(
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (modalContext) {
         final media = MediaQuery.of(modalContext);
-        final keyboardOpen = media.viewInsets.bottom > 0;
-        final availableHeight = media.size.height - media.viewInsets.bottom;
+        final keyboardHeight = media.viewInsets.bottom;
+        final isKeyboardOpen = keyboardHeight > 0;
 
-        return AnimatedPadding(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+        return Padding(
+          padding: EdgeInsets.only(bottom: keyboardHeight),
           child: Align(
             alignment: Alignment.bottomCenter,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: const Duration(milliseconds: 150),
               curve: Curves.easeOut,
-              height: keyboardOpen
-                  ? availableHeight
+              height: isKeyboardOpen
+                  ? (media.size.height - media.padding.top - keyboardHeight)
+                        .clamp(250.0, media.size.height)
                   : media.size.height * 0.62,
               child: ClipRRect(
                 borderRadius: BorderRadius.only(
@@ -170,6 +171,8 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   final List<ChatMessage> _chats = [];
   final List<ChatMessage> _pendingLocalChats = [];
   Timer? _pollingTimer;
+  OverlayEntry? _topSnackEntry;
+  Timer? _topSnackTimer;
   bool _isPollingInProgress = false;
   int? _resolvedChatListId;
 
@@ -185,6 +188,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
         if (_showEmojiPicker) {
           setState(() => _showEmojiPicker = false);
         }
+        widget.onKeyboardChanged?.call(true);
         _expandChatForKeyboard();
         Future.delayed(const Duration(milliseconds: 280), () {
           _scrollToBottom(animate: true);
@@ -223,9 +227,89 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     Future.delayed(const Duration(milliseconds: 650), expand);
   }
 
+  void _showTopMessage(String message) {
+    _topSnackTimer?.cancel();
+    _topSnackEntry?.remove();
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (overlayContext) {
+        final topInset = MediaQuery.of(overlayContext).padding.top;
+        return Positioned(
+          top: topInset + 12.h,
+          left: 16.w,
+          right: 16.w,
+          child: Material(
+            color: Colors.transparent,
+            child: SafeArea(
+              bottom: false,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 13.h),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF241522),
+                  borderRadius: BorderRadius.circular(14.r),
+                  border: Border.all(
+                    color: const Color(0xFFFF6B6B).withValues(alpha: 0.55),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black54,
+                      blurRadius: 16,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: const Color(0xFFFF8A80),
+                      size: 20.sp,
+                    ),
+                    SizedBox(width: 10.w),
+                    Expanded(
+                      child: Text(
+                        message,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    _topSnackEntry = entry;
+    overlay.insert(entry);
+    _topSnackTimer = Timer(const Duration(seconds: 4), () {
+      if (entry.mounted) entry.remove();
+      if (identical(_topSnackEntry, entry)) _topSnackEntry = null;
+    });
+  }
+
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
+    final keyboardOpen =
+        WidgetsBinding
+            .instance
+            .platformDispatcher
+            .views
+            .first
+            .viewInsets
+            .bottom >
+        0;
+    widget.onKeyboardChanged?.call(keyboardOpen);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || widget.draggableController == null) return;
       final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
@@ -263,21 +347,25 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     if (_isPollingInProgress) return;
     _isPollingInProgress = true;
 
-    int chatListId = _resolvedChatListId ??
-        int.tryParse((widget.messageData["ChatListId"] ??
-                widget.messageData["chatListId"] ??
-                widget.messageData["id"] ??
-                "0")
-            .toString()) ??
+    int chatListId =
+        _resolvedChatListId ??
+        int.tryParse(
+          (widget.messageData["ChatListId"] ??
+                  widget.messageData["chatListId"] ??
+                  widget.messageData["id"] ??
+                  "0")
+              .toString(),
+        ) ??
         0;
 
-    final otherEmail = (widget.messageData["email"] ??
-            widget.messageData["EmailAddress"] ??
-            widget.messageData["ActionEmail"] ??
-            widget.messageData["OtherUser"] ??
-            "")
-        .toString()
-        .trim();
+    final otherEmail =
+        (widget.messageData["email"] ??
+                widget.messageData["EmailAddress"] ??
+                widget.messageData["ActionEmail"] ??
+                widget.messageData["OtherUser"] ??
+                "")
+            .toString()
+            .trim();
 
     try {
       final myEmail = await SecureStorage().getUserEmail() ?? "";
@@ -285,21 +373,35 @@ class _MessageDetailPageState extends State<MessageDetailPage>
       // 🔥 If opened from profile with chatListId == 0, check if chat already exists in ShowChatList!
       if (chatListId <= 0 && otherEmail.isNotEmpty && myEmail.isNotEmpty) {
         try {
-          final listRes = await RegisterService().showChatList(email: myEmail.trim());
+          final listRes = await RegisterService().showChatList(
+            email: myEmail.trim(),
+          );
           if (listRes.statusCode == 200) {
             final listDoc = xml.XmlDocument.parse(listRes.body);
             final listElements = listDoc.findAllElements('ShowChatListResult');
             if (listElements.isNotEmpty) {
               final dynamic listJson = jsonDecode(listElements.first.innerText);
-              if (listJson is Map && listJson["Status"] == 1 && listJson["Data"] is List) {
+              if (listJson is Map &&
+                  listJson["Status"] == 1 &&
+                  listJson["Data"] is List) {
                 final List data = listJson["Data"];
                 for (var c in data) {
-                  final cOther = (c["OtherUser"] ?? c["Sender"] ?? c["Reciever"] ?? c["Email"] ?? "")
-                      .toString()
-                      .trim()
-                      .toLowerCase();
+                  final cOther =
+                      (c["OtherUser"] ??
+                              c["Sender"] ??
+                              c["Reciever"] ??
+                              c["Email"] ??
+                              "")
+                          .toString()
+                          .trim()
+                          .toLowerCase();
                   if (cOther == otherEmail.toLowerCase()) {
-                    final foundId = int.tryParse((c["ChatListId"] ?? c["Id"] ?? c["id"] ?? "0").toString()) ?? 0;
+                    final foundId =
+                        int.tryParse(
+                          (c["ChatListId"] ?? c["Id"] ?? c["id"] ?? "0")
+                              .toString(),
+                        ) ??
+                        0;
                     if (foundId > 0) {
                       chatListId = foundId;
                       _resolvedChatListId = foundId;
@@ -340,20 +442,24 @@ class _MessageDetailPageState extends State<MessageDetailPage>
           );
 
           if (jsonResult["Status"] == 0) {
-            final String rawApiMsg = (jsonResult["Message"] ??
-                    (jsonResult["Data"] is Map ? jsonResult["Data"]["Message"] : null) ??
-                    "")
-                .toString()
-                .trim();
+            final String rawApiMsg =
+                (jsonResult["Message"] ??
+                        (jsonResult["Data"] is Map
+                            ? jsonResult["Data"]["Message"]
+                            : null) ??
+                        "")
+                    .toString()
+                    .trim();
 
             final bool isBlocked = rawApiMsg.toLowerCase().contains("block");
 
-            final sender = (widget.messageData["Sender"] ??
-                    widget.messageData["SenderEmail"] ??
-                    widget.messageData["sender"] ??
-                    "")
-                .toString()
-                .trim();
+            final sender =
+                (widget.messageData["Sender"] ??
+                        widget.messageData["SenderEmail"] ??
+                        widget.messageData["sender"] ??
+                        "")
+                    .toString()
+                    .trim();
             final bool isMeSender = sender.isNotEmpty
                 ? sender.toLowerCase() == myEmail.toLowerCase()
                 : (widget.messageData["isSender"] == "true");
@@ -385,12 +491,11 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             Map<String, dynamic>? pendingItem;
             for (final rawItem in list) {
               if (rawItem is Map) {
-                final chatStatus = (rawItem["ChatStatus"] ??
-                        rawItem["chatStatus"] ??
-                        "")
-                    .toString()
-                    .trim()
-                    .toLowerCase();
+                final chatStatus =
+                    (rawItem["ChatStatus"] ?? rawItem["chatStatus"] ?? "")
+                        .toString()
+                        .trim()
+                        .toLowerCase();
                 if (chatStatus == "pending") {
                   pendingItem = Map<String, dynamic>.from(rawItem);
                   break;
@@ -399,12 +504,13 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             }
 
             if (pendingItem != null) {
-              final pendingMessage = (pendingItem["Message"] ??
-                      pendingItem["ChatMessage"] ??
-                      jsonResult["Message"] ??
-                      "Please accept the chat request to continue the conversation.")
-                  .toString()
-                  .trim();
+              final pendingMessage =
+                  (pendingItem["Message"] ??
+                          pendingItem["ChatMessage"] ??
+                          jsonResult["Message"] ??
+                          "Please accept the chat request to continue the conversation.")
+                      .toString()
+                      .trim();
 
               if (mounted) {
                 setState(() {
@@ -423,27 +529,48 @@ class _MessageDetailPageState extends State<MessageDetailPage>
 
             final List<ChatMessage> loadedChats = [];
             for (var item in list) {
-              final sender = (item["SenderEmail"] ?? item["Sender"] ?? item["Senderemail"] ?? "")
-                  .toString()
-                  .trim();
-              final isMe = myEmail.isNotEmpty &&
+              final sender =
+                  (item["SenderEmail"] ??
+                          item["Sender"] ??
+                          item["Senderemail"] ??
+                          "")
+                      .toString()
+                      .trim();
+              final isMe =
+                  myEmail.isNotEmpty &&
                   sender.toLowerCase() == myEmail.toLowerCase();
-              final text =
-                  (item["ChatMessage"] ?? item["Message"] ?? "").toString();
-              final rawTime = item["MessageDateandTime"] ??
+              final text = (item["ChatMessage"] ?? item["Message"] ?? "")
+                  .toString();
+              final rawTime =
+                  item["MessageDateandTime"] ??
                   item["Time"] ??
                   item["Date"] ??
                   item["CreatedDate"];
               final time = _formatMessageTime(rawTime?.toString());
 
-              final msgStatusRaw = (item["MessageStatus"] ?? "").toString().toLowerCase().trim();
-              final isReadVal = item["IsRead"] ?? item["isRead"] ?? item["Isread"];
-              final isDeliveredVal = item["IsDelivered"] ?? item["isDelivered"] ?? item["Isdelivered"];
+              final msgStatusRaw = (item["MessageStatus"] ?? "")
+                  .toString()
+                  .toLowerCase()
+                  .trim();
+              final isReadVal =
+                  item["IsRead"] ?? item["isRead"] ?? item["Isread"];
+              final isDeliveredVal =
+                  item["IsDelivered"] ??
+                  item["isDelivered"] ??
+                  item["Isdelivered"];
 
               MessageStatus status;
-              if (isReadVal == 1 || isReadVal == "1" || isReadVal == true || isReadVal == "true" || msgStatusRaw == "read") {
+              if (isReadVal == 1 ||
+                  isReadVal == "1" ||
+                  isReadVal == true ||
+                  isReadVal == "true" ||
+                  msgStatusRaw == "read") {
                 status = MessageStatus.read;
-              } else if (isDeliveredVal == 1 || isDeliveredVal == "1" || isDeliveredVal == true || isDeliveredVal == "true" || msgStatusRaw == "delivered") {
+              } else if (isDeliveredVal == 1 ||
+                  isDeliveredVal == "1" ||
+                  isDeliveredVal == true ||
+                  isDeliveredVal == "true" ||
+                  msgStatusRaw == "delivered") {
                 status = MessageStatus.delivered;
               } else {
                 status = MessageStatus.sent;
@@ -451,10 +578,16 @@ class _MessageDetailPageState extends State<MessageDetailPage>
 
               // If this message was sent to me and is not yet marked read, mark it read via API
               if (!isMe) {
-                final messageIdRaw = item["Id"] ?? item["MessageId"] ?? item["id"];
+                final messageIdRaw =
+                    item["Id"] ?? item["MessageId"] ?? item["id"];
                 final messageId = int.tryParse(messageIdRaw?.toString() ?? "");
-                if (messageId != null && messageId > 0 && status != MessageStatus.read) {
-                  RegisterService().messageRead(messageId: messageId, email: myEmail);
+                if (messageId != null &&
+                    messageId > 0 &&
+                    status != MessageStatus.read) {
+                  RegisterService().messageRead(
+                    messageId: messageId,
+                    email: myEmail,
+                  );
                 }
               }
 
@@ -471,15 +604,19 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             }
 
             // Remove server-confirmed messages from local pending list
-            _pendingLocalChats.removeWhere((pending) =>
-                loadedChats.any((s) => s.isMe && s.text.trim() == pending.text.trim()));
+            _pendingLocalChats.removeWhere(
+              (pending) => loadedChats.any(
+                (s) => s.isMe && s.text.trim() == pending.text.trim(),
+              ),
+            );
 
             final combinedChats = List<ChatMessage>.from(loadedChats);
             // Append any pending local messages that server has not returned yet
             combinedChats.addAll(_pendingLocalChats);
 
             // Detect if count, text, or tick status changed
-            final bool hasChanged = combinedChats.length != _chats.length ||
+            final bool hasChanged =
+                combinedChats.length != _chats.length ||
                 combinedChats.asMap().entries.any((entry) {
                   final i = entry.key;
                   if (i >= _chats.length) return true;
@@ -487,7 +624,11 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                       entry.value.text != _chats[i].text;
                 });
 
-            if (mounted && (hasChanged || isInitial || _isLoadingMessages || _blockMessage != null)) {
+            if (mounted &&
+                (hasChanged ||
+                    isInitial ||
+                    _isLoadingMessages ||
+                    _blockMessage != null)) {
               setState(() {
                 _chats.clear();
                 _chats.addAll(combinedChats);
@@ -565,6 +706,8 @@ class _MessageDetailPageState extends State<MessageDetailPage>
 
   @override
   void dispose() {
+    _topSnackTimer?.cancel();
+    _topSnackEntry?.remove();
     WidgetsBinding.instance.removeObserver(this);
     _pollingTimer?.cancel();
     _pollingTimer = null;
@@ -931,7 +1074,8 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   // 🔥 SEND MESSAGE
   // ─────────────────────────────────────────
   Future<void> _sendMessage(String t) async {
-    final receiverEmail = widget.messageData["email"] ??
+    final receiverEmail =
+        widget.messageData["email"] ??
         widget.messageData["EmailAddress"] ??
         widget.messageData["ActionEmail"] ??
         "";
@@ -960,7 +1104,9 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             receiverEmail: receiverEmail.trim(),
             chatMessage: t,
           );
-          debugPrint("[MessageDetailPage] sendChatMessage response: ${res.statusCode} -> ${res.body}");
+          debugPrint(
+            "[MessageDetailPage] sendChatMessage response: ${res.statusCode} -> ${res.body}",
+          );
 
           // The API can return HTTP 200 with a business-level failure, for
           // example LikeRequired. Do not leave the optimistic message in the
@@ -974,36 +1120,34 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                 final data = apiResult is Map ? apiResult["Data"] : null;
                 final status = apiResult is Map ? apiResult["Status"] : null;
                 final dataStatus = data is Map ? data["Status"] : null;
-                final isFailure = status.toString() == "0" ||
-                    dataStatus.toString() == "0";
+                final isFailure =
+                    status.toString() == "0" || dataStatus.toString() == "0";
 
                 if (isFailure) {
-                  final apiMessage = (apiResult["Message"] ??
-                          (data is Map ? data["Message"] : null) ??
-                          "Unable to send message.")
-                      .toString()
-                      .trim();
+                  final apiMessage =
+                      (apiResult["Message"] ??
+                              (data is Map ? data["Message"] : null) ??
+                              "Unable to send message.")
+                          .toString()
+                          .trim();
 
                   if (mounted) {
                     setState(() {
-                      _chats.removeWhere((message) => identical(message, localMsg));
-                      _pendingLocalChats
-                          .removeWhere((message) => identical(message, localMsg));
-                    });
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        SnackBar(
-                          content: Text(apiMessage),
-                          behavior: SnackBarBehavior.floating,
-                          backgroundColor: const Color(0xFF241522),
-                        ),
+                      _chats.removeWhere(
+                        (message) => identical(message, localMsg),
                       );
+                      _pendingLocalChats.removeWhere(
+                        (message) => identical(message, localMsg),
+                      );
+                    });
+                    _showTopMessage(apiMessage);
                   }
                 }
               }
             } catch (e) {
-              debugPrint("[MessageDetailPage] Could not parse send response: $e");
+              debugPrint(
+                "[MessageDetailPage] Could not parse send response: $e",
+              );
             }
           }
         }
@@ -1156,12 +1300,15 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   }
 
   Future<void> _handleBlockUser() async {
-    final chatListId = _resolvedChatListId ??
-        int.tryParse((widget.messageData["ChatListId"] ??
-                widget.messageData["chatListId"] ??
-                widget.messageData["id"] ??
-                "0")
-            .toString()) ??
+    final chatListId =
+        _resolvedChatListId ??
+        int.tryParse(
+          (widget.messageData["ChatListId"] ??
+                  widget.messageData["chatListId"] ??
+                  widget.messageData["id"] ??
+                  "0")
+              .toString(),
+        ) ??
         0;
 
     try {
@@ -1193,33 +1340,40 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   // ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    String name = (widget.messageData["name"] ??
-            widget.messageData["FullName"] ??
-            widget.messageData["Name"] ??
-            "")
-        .toString()
-        .trim();
-    String image = (widget.messageData["image"] ??
-            widget.messageData["Image"] ??
-            widget.messageData["Media"] ??
-            widget.messageData["ProfileImage"] ??
-            "")
-        .toString()
-        .trim();
+    String name =
+        (widget.messageData["name"] ??
+                widget.messageData["FullName"] ??
+                widget.messageData["Name"] ??
+                "")
+            .toString()
+            .trim();
+    String image =
+        (widget.messageData["image"] ??
+                widget.messageData["Image"] ??
+                widget.messageData["Media"] ??
+                widget.messageData["ProfileImage"] ??
+                "")
+            .toString()
+            .trim();
 
-    final senderName = (widget.messageData["SenderName"] ?? "").toString().trim();
-    final receiverName = (widget.messageData["RecieverName"] ??
-            widget.messageData["ReceiverName"] ??
-            "")
+    final senderName = (widget.messageData["SenderName"] ?? "")
         .toString()
         .trim();
-    final senderImage =
-        (widget.messageData["SenderImage"] ?? "").toString().trim();
-    final receiverImage = (widget.messageData["RecieverImage"] ??
-            widget.messageData["ReceiverImage"] ??
-            "")
+    final receiverName =
+        (widget.messageData["RecieverName"] ??
+                widget.messageData["ReceiverName"] ??
+                "")
+            .toString()
+            .trim();
+    final senderImage = (widget.messageData["SenderImage"] ?? "")
         .toString()
         .trim();
+    final receiverImage =
+        (widget.messageData["RecieverImage"] ??
+                widget.messageData["ReceiverImage"] ??
+                "")
+            .toString()
+            .trim();
 
     final bool isSender = widget.messageData["isSender"] == "true";
 
@@ -1252,30 +1406,46 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     final age = widget.messageData["age"] ?? "";
     final city = widget.messageData["city"] ?? "";
     final flag = widget.messageData["flag"] ?? "";
-    final bool isVerified = widget.messageData["isVerified"] == "true" ||
+    final bool isVerified =
+        widget.messageData["isVerified"] == "true" ||
         widget.messageData["isVerified"] == "1";
 
-    final onlineValue = (widget.messageData["isOnline"] ??
-            widget.messageData["IsOnline"] ??
-            widget.messageData["Online"] ??
-            "")
-        .toString()
-        .trim()
-        .toLowerCase();
-    final bool isOnline = onlineValue == "true" ||
-        onlineValue == "1" ||
-        onlineValue == "yes" ||
-        onlineValue == "online";
-    final String lastSeen = widget.messageData["lastSeen"] ??
-        widget.messageData["LastSeen"] ??
-        "";
+    final String rawStatus =
+        (widget.messageData["OnlineStatus"] ??
+                widget.messageData["onlineStatus"] ??
+                widget.messageData["status"] ??
+                widget.messageData["Status"] ??
+                "")
+            .toString()
+            .trim();
+    final onlineValue =
+        (widget.messageData["isOnline"] ??
+                widget.messageData["IsOnline"] ??
+                widget.messageData["Online"] ??
+                "")
+            .toString()
+            .trim()
+            .toLowerCase();
+    final String displayStatus =
+        rawStatus.isNotEmpty && rawStatus.toLowerCase() != "null"
+        ? rawStatus
+        : (onlineValue == "true" || onlineValue == "1" || onlineValue == "yes"
+              ? "Online"
+              : "Offline");
+    final String sLower = displayStatus.toLowerCase();
+    final bool isOnline =
+        (sLower == 'online' ||
+            sLower == 'online now' ||
+            sLower == 'active' ||
+            sLower == 'active now') &&
+        sLower != 'hidden' &&
+        sLower != 'offline';
+    final String lastSeen =
+        widget.messageData["lastSeen"] ?? widget.messageData["LastSeen"] ?? "";
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      // The modal container already resizes above the keyboard. Avoid
-      // applying the inset a second time inside this nested Scaffold.
-      resizeToAvoidBottomInset: false,
-      body: SafeArea(
+    return Material(
+      color: AppColors.bg,
+      child: SafeArea(
         top: true,
         bottom: !_showEmojiPicker,
         child: Column(
@@ -1311,6 +1481,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
               flag: flag,
               isVerified: isVerified,
               isOnline: isOnline,
+              onlineStatus: displayStatus,
               lastSeen: lastSeen,
               onBlockUser: _handleBlockUser,
             ),
@@ -1322,7 +1493,9 @@ class _MessageDetailPageState extends State<MessageDetailPage>
               _blockedNoticeBanner(_blockMessage!)
             else
               _inputBar(name),
-            if (!_isLoadingMessages && _showEmojiPicker && _blockMessage == null)
+            if (!_isLoadingMessages &&
+                _showEmojiPicker &&
+                _blockMessage == null)
               _emojiPickerPanel(),
           ],
         ),
@@ -1335,13 +1508,11 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     final Color tintColor = isBlocked
         ? const Color(0xFFFF5252)
         : (_isSenderPending
-            ? const Color(0xFFFFA726)
-            : const Color(0xFFFF5252));
+              ? const Color(0xFFFFA726)
+              : const Color(0xFFFF5252));
     final IconData icon = isBlocked
         ? Icons.block_rounded
-        : (_isSenderPending
-            ? Icons.hourglass_top_rounded
-            : Icons.info_outline);
+        : (_isSenderPending ? Icons.hourglass_top_rounded : Icons.info_outline);
 
     return Container(
       width: double.infinity,
@@ -1350,9 +1521,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E2C),
         borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(
-          color: tintColor.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: tintColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -1389,13 +1558,13 @@ class _MessageDetailPageState extends State<MessageDetailPage>
       final Color tintColor = isBlocked
           ? const Color(0xFFFF5252)
           : (_isSenderPending
-              ? const Color(0xFFFFA726)
-              : const Color(0xFFFF5252));
+                ? const Color(0xFFFFA726)
+                : const Color(0xFFFF5252));
       final IconData icon = isBlocked
           ? Icons.block_rounded
           : (_isSenderPending
-              ? Icons.hourglass_top_rounded
-              : Icons.lock_outline_rounded);
+                ? Icons.hourglass_top_rounded
+                : Icons.lock_outline_rounded);
 
       return Center(
         child: Padding(
@@ -1409,11 +1578,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                   color: tintColor.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  icon,
-                  color: tintColor,
-                  size: 36.sp,
-                ),
+                child: Icon(icon, color: tintColor, size: 36.sp),
               ),
               SizedBox(height: 14.h),
               Text(
@@ -1760,7 +1925,6 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     );
   }
 
-
   Widget _circleBtn({
     Key? key,
     required IconData icon,
@@ -1794,6 +1958,7 @@ class _ProfileCard extends StatelessWidget {
     required this.flag,
     this.isVerified = false,
     this.isOnline = false,
+    this.onlineStatus = "Offline",
     this.lastSeen = "",
     this.onBlockUser,
   });
@@ -1801,6 +1966,7 @@ class _ProfileCard extends StatelessWidget {
   final String name, imageUrl, age, city, flag;
   final bool isVerified;
   final bool isOnline;
+  final String onlineStatus;
   final String lastSeen;
   final VoidCallback? onBlockUser;
 
@@ -2221,24 +2387,24 @@ class _ProfileCard extends StatelessWidget {
         ),
         SizedBox(height: AppSize.h(3)),
 
-        // Active Now (only when online)
-        if (isOnline) ...[
+        // Online / Offline Status
+        if (onlineStatus.isNotEmpty) ...[
           Row(
             children: [
               Container(
                 width: 7.w,
                 height: 7.w,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Color(0xFF00E676),
+                  color: isOnline ? const Color(0xFF00E676) : Colors.grey,
                 ),
               ),
               SizedBox(width: 5.w),
               Text(
-                "Active now",
+                onlineStatus,
                 style: GoogleFonts.poppins(
                   fontSize: 11.sp,
-                  color: const Color(0xFF00E676),
+                  color: isOnline ? const Color(0xFF00E676) : Colors.grey,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -2261,10 +2427,7 @@ class _ProfileCard extends StatelessWidget {
                     city,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 11.sp,
-                      color: _grey,
-                    ),
+                    style: GoogleFonts.poppins(fontSize: 11.sp, color: _grey),
                   ),
                 ),
               if (flag.isNotEmpty) ...[

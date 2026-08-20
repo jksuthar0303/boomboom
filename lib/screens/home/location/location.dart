@@ -49,10 +49,9 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
     // ── NEARBY TAB (Index 3): Show Only Online Users ──
     if (_selectedCategory == 3) {
       list = list.where((u) {
-        final onlineStr = (u["IsOnline"] ?? u["isOnline"] ?? "")
-            .toString()
-            .toLowerCase();
-        return onlineStr == "true" || onlineStr == "1";
+        final rawStatus = (u["OnlineStatus"] ?? u["onlineStatus"] ?? "").toString().toLowerCase();
+        final onlineStr = (u["IsOnline"] ?? u["isOnline"] ?? "").toString().toLowerCase();
+        return rawStatus == "online" || rawStatus == "active" || onlineStr == "true" || onlineStr == "1";
       }).toList();
       return list;
     }
@@ -556,7 +555,10 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                   .toString()
                   .toLowerCase()
                   .trim();
+          final rawStatus = (user["OnlineStatus"] ?? user["onlineStatus"] ?? "").toString().trim();
           final isOnline =
+              rawStatus.toLowerCase() == "online" ||
+              rawStatus.toLowerCase() == "active" ||
               onlineValue == "true" ||
               onlineValue == "1" ||
               onlineValue == "yes" ||
@@ -1392,9 +1394,11 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                 (user["FullName"] ?? user["name"] ?? "User")
                                     .toString();
                             final String? media = user["Media"]?.toString();
+                            final rawStatus = (user["OnlineStatus"] ?? user["onlineStatus"] ?? "").toString().toLowerCase();
                             final isOnline =
-                                user["IsOnline"]?.toString().toLowerCase() ==
-                                "true";
+                                rawStatus == "online" ||
+                                rawStatus == "active" ||
+                                user["IsOnline"]?.toString().toLowerCase() == "true";
 
                             Uint8List? imageBytes;
                             bool hasHttp = false;

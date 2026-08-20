@@ -305,6 +305,7 @@ class ProfileModel {
   final int completionPercent;
   final bool isVerified;
   final bool isOnline;
+  final String onlineStatus;
   final String? telegramUsername;
 
   const ProfileModel({
@@ -325,6 +326,7 @@ class ProfileModel {
     this.completionPercent = 72,
     this.isVerified = false,
     this.isOnline = false,
+    this.onlineStatus = 'Offline',
     this.seenAgo = '5 min ago',
     this.telegramUsername,
   });
@@ -333,6 +335,7 @@ class ProfileModel {
     String? country,
     List<MediaItem>? media,
     bool? isOnline,
+    String? onlineStatus,
     String? distance,
   }) => ProfileModel(
     name: name,
@@ -352,6 +355,7 @@ class ProfileModel {
     completionPercent: completionPercent,
     isVerified: isVerified,
     isOnline: isOnline ?? this.isOnline,
+    onlineStatus: onlineStatus ?? this.onlineStatus,
     seenAgo: seenAgo,
     telegramUsername: telegramUsername,
   );
@@ -1158,6 +1162,12 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           data["IsVerified"]?.toString().toLowerCase() == "true" ||
           data["isVerified"] == true ||
           data["isVerified"]?.toString().toLowerCase() == "true";
+      final String rawOnlineStatus = (data["OnlineStatus"] ??
+              data["onlineStatus"] ??
+              data["Status"] ??
+              data["status"])
+          ?.toString()
+          .trim() ?? "";
       final String onlineValue = (data["IsOnline"] ??
               data["isOnline"] ??
               data["Online"] ??
@@ -1169,6 +1179,9 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           onlineValue == "1" ||
           onlineValue == "yes" ||
           onlineValue == "online";
+      final String onlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
+          ? rawOnlineStatus
+          : (isOnline ? "Online" : "Offline");
       final String city =
           (data["City"] ?? data["city"] ?? data["Country"] ?? "").toString();
       final double? latitude = double.tryParse(data['Lat']?.toString() ?? '');
@@ -1344,6 +1357,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         media: mediaItems,
         isVerified: isVerified,
         isOnline: isOnline,
+        onlineStatus: onlineStatus,
       );
     } catch (e) {
       debugPrint("[BoomProfileScreen] Error building profile model: $e");
@@ -1873,7 +1887,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     });
   }
 
-  // ── Open custom Telegram page ──
+  // ── Open message / chat detail page ──
   void _openTelegramPage(ProfileModel p) {
     String imageStr = '';
     if (p.media.isNotEmpty) {
@@ -1884,58 +1898,66 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         imageStr = base64Encode(first.bytes!);
       }
     }
-    final DraggableScrollableController sheetCtrl =
-        DraggableScrollableController();
     final int profileCount = _liveProfiles.isNotEmpty
         ? _liveProfiles.length
         : sampleProfiles.length;
     final int currentProfileIndex = _currentIndex.clamp(0, profileCount - 1);
-    final String? recipientEmail =
-        _liveProfiles.isNotEmpty &&
-            currentProfileIndex < _liveProfileEmails.length
-        ? _liveProfileEmails[currentProfileIndex]
-        : (otherProfile != null ? widget.userEmail : null);
+    
+    String targetEmail = "";
+    if (widget.userEmail != null && widget.userEmail!.trim().isNotEmpty) {
+      targetEmail = widget.userEmail!.trim();
+    } else if (widget.initialUserData != null) {
+      targetEmail = (widget.initialUserData!["EmailAddress"] ??
+              widget.initialUserData!["email"] ??
+              widget.initialUserData!["ActionEmail"] ??
+              "")
+          .toString()
+          .trim();
+    } else if (_liveProfiles.isNotEmpty &&
+        currentProfileIndex < _liveProfileEmails.length &&
+        _liveProfileEmails[currentProfileIndex] != null) {
+      targetEmail = _liveProfileEmails[currentProfileIndex]!.trim();
+    }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.6),
-      builder: (_) {
-        return DraggableScrollableSheet(
-          controller: sheetCtrl,
-          initialChildSize: 0.62,
-          minChildSize: 0.50,
-          maxChildSize: 1.0,
-          snap: true,
-          snapSizes: const [0.62, 1.0],
-          expand: false,
-          builder: (ctx, sheetScrollController) {
-            return ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28.r)),
-              child: MessageDetailPage(
-                index: 0,
-                messageData: {
-                  "name": p.name,
-                  "image": imageStr,
-                  "age": p.age,
-                  "gender": p.gender,
-                  "city": p.city,
-                  "email": recipientEmail ?? "",
-                  "flag": p.country.isNotEmpty
-                      ? countryFlag(p.country)
-                      : flagForCity(p.city),
-                  "distance": p.distance,
-                  "lastSeen": p.seenAgo,
-                  "isVerified": p.isVerified ? "true" : "false",
-                },
-                sheetScrollController: sheetScrollController,
-                draggableController: sheetCtrl,
-              ),
-            );
-          },
-        );
-      },
+    final String flag = p.country.isNotEmpty
+        ? countryFlag(p.country)
+        : flagForCity(p.city);
+
+    final String statusLower = p.onlineStatus.toLowerCase();
+    final bool isOnlineActive = (statusLower == 'online' ||
+        statusLower == 'online now' ||
+        statusLower == 'active now' ||
+        statusLower == 'active') && statusLower != 'hidden' && statusLower != 'offline';
+    final String displayOnlineStatus = p.onlineStatus.isNotEmpty
+        ? p.onlineStatus
+        : (isOnlineActive ? "Online" : "Offline");
+
+    final Map<String, String> messageMap = {
+      "name": p.name,
+      "image": imageStr,
+      "age": p.age,
+      "gender": p.gender,
+      "city": p.city,
+      "flag": flag,
+      "email": targetEmail,
+      "EmailAddress": targetEmail,
+      "ActionEmail": targetEmail,
+      "OtherUser": targetEmail,
+      "SenderImage": imageStr,
+      "RecieverImage": imageStr,
+      "isOnline": isOnlineActive.toString(),
+      "status": displayOnlineStatus,
+      "OnlineStatus": displayOnlineStatus,
+      "distance": p.distance,
+      "lastSeen": p.seenAgo,
+      "isVerified": p.isVerified ? "true" : "false",
+      "chatListId": "0",
+    };
+
+    MessageDetailPage.show(
+      context,
+      index: currentProfileIndex,
+      messageData: messageMap,
     );
   }
 
@@ -2507,6 +2529,15 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     }
 
     // 2. 🟢 Online / Offline Status
+    final String statusLower = p.onlineStatus.toLowerCase();
+    final bool isOnlineActive = (statusLower == 'online' ||
+        statusLower == 'online now' ||
+        statusLower == 'active now' ||
+        statusLower == 'active') && statusLower != 'hidden' && statusLower != 'offline';
+    final String displayOnlineStatus = p.onlineStatus.isNotEmpty
+        ? p.onlineStatus
+        : (isOnlineActive ? "Online" : "Offline");
+
     badgeWidgets.add(
       _buildBadgeContainer(
         child: Row(
@@ -2516,14 +2547,14 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
               width: 7.w,
               height: 7.w,
               decoration: BoxDecoration(
-                color: p.isOnline ? const Color(0xFF00E676) : Colors.grey,
+                color: isOnlineActive ? const Color(0xFF00E676) : Colors.grey,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 1),
               ),
             ),
             SizedBox(width: 5.w),
             Text(
-              p.isOnline ? "Online now" : "Offline",
+              displayOnlineStatus,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),

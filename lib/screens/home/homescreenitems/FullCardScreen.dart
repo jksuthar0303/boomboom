@@ -426,13 +426,26 @@ class _FullCardScreenState extends State<FullCardScreen> {
     );
   }
 
-  /// 🔥 USER CARD
   Widget _card(Map<String, dynamic> user, int index) {
     final String fullName = (user["FullName"] ?? "User").toString();
     final int age = _calculateAge(user["Dob"]?.toString());
-    final bool isOnline = _readBool(
+    final String rawOnlineStatus = (user["OnlineStatus"] ??
+            user["onlineStatus"] ??
+            user["Status"] ??
+            user["status"])
+        ?.toString()
+        .trim() ?? "";
+    final bool isOnlineVal = _readBool(
       user["IsOnline"] ?? user["isOnline"] ?? user["Online"],
     );
+    final String displayOnlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
+        ? rawOnlineStatus
+        : (isOnlineVal ? "Online" : "Offline");
+    final String statusLower = displayOnlineStatus.toLowerCase();
+    final bool isOnline = (statusLower == 'online' ||
+        statusLower == 'online now' ||
+        statusLower == 'active' ||
+        statusLower == 'active now') && statusLower != 'hidden' && statusLower != 'offline';
     final bool isVerified = _readBool(user["IsVerified"] ?? user["isVerified"]);
     final String lookingFor = (user["Lookingfor"] ?? "Serious Love").toString();
     final String distance = _calculateDistance(
@@ -580,7 +593,7 @@ class _FullCardScreenState extends State<FullCardScreen> {
                               ),
                               SizedBox(width: 5.w),
                               Text(
-                                isOnline ? "Online now" : "Offline",
+                                displayOnlineStatus,
                                 style: AppTextStyles.small.copyWith(
                                   color: Colors.white,
                                   fontSize: 10.sp,
@@ -822,7 +835,8 @@ class _FullCardScreenState extends State<FullCardScreen> {
                           "SenderImage": userImg,
                           "RecieverImage": userImg,
                           "isOnline": isOnline.toString(),
-                          "status": isOnline ? "Online" : "Offline",
+                          "status": displayOnlineStatus,
+                          "OnlineStatus": displayOnlineStatus,
                           "chatListId":
                               (user["ChatListId"] ?? user["chatListId"] ?? "0")
                                   .toString(),
