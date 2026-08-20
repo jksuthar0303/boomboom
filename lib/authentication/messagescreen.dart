@@ -941,14 +941,24 @@ class MessagePageState extends State<MessagePage> {
     final unreadRaw = item["UnreadCount"] ?? item["unread"] ?? "0";
     final int unreadCount = int.tryParse(unreadRaw.toString()) ?? 0;
 
-    final bool isOnline = (item["IsOnline"] == true ||
-            item["IsOnline"] == 1 ||
-            item["IsOnline"] == "true" ||
-            item["IsOnline"] == "1" ||
-            item["Online"] == true ||
-            item["Online"] == "true") ||
+    final onlineValue = (item["IsOnline"] ??
+            item["isOnline"] ??
+            item["Online"] ??
+            item["online"] ??
+            "")
+        .toString()
+        .trim()
+        .toLowerCase();
+    final bool isOnline = (onlineValue == "true" ||
+            onlineValue == "1" ||
+            onlineValue == "yes" ||
+            onlineValue == "online") ||
         _onlineUsers.any((u) =>
-            (u["email"] ?? u["Email"] ?? u["OtherUser"] ?? "")
+            (u["email"] ??
+                    u["Email"] ??
+                    u["EmailAddress"] ??
+                    u["OtherUser"] ??
+                    "")
                 .toString()
                 .trim()
                 .toLowerCase() ==

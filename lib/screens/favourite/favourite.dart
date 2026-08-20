@@ -20,10 +20,16 @@ class _LikesScreenState extends State<LikesScreen> {
   int myLikesCount = 0;
   int whoLikedCount = 0;
   int whoViewedCount = 0;
+  int myMatchesCount = 0;
   // int whoSortedCount = 18;
   // int mySortedCount = 7;
 
-  List<int> get counts => [myLikesCount, whoLikedCount, whoViewedCount];
+  List<int> get counts => [
+    myLikesCount,
+    whoLikedCount,
+    whoViewedCount,
+    myMatchesCount,
+  ];
 
   int selectedTab = 0;
   bool _isLoading = true;
@@ -35,6 +41,7 @@ class _LikesScreenState extends State<LikesScreen> {
     "My Likes",
     "Who Liked",
     "Recently Viewed",
+    "My Matches",
     // "Who Favourite Me",
     // "My Favourite",
   ];
@@ -110,6 +117,41 @@ class _LikesScreenState extends State<LikesScreen> {
   void initState() {
     super.initState();
     _loadUsersForTab(0);
+    _loadAllTabCounts();
+  }
+
+  Future<void> _loadAllTabCounts() async {
+    try {
+      final email = await SecureStorage().getUserEmail() ?? '';
+      final results = await Future.wait(
+        List.generate(3, (index) async {
+          final response = index == 1
+              ? await HomeService().favoriteLikeViewShowByActionEmail(
+                  actionEmail: email.trim(),
+                  action: 'like',
+                )
+              : await HomeService().favoriteLikeViewShowByMyEmail(
+                  myEmail: email.trim(),
+                  action: _actionForTab(index),
+                );
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            return 0;
+          }
+          final result = XmlResponseParser.parse(response.body);
+          final data = result['Data'] is List ? result['Data'] as List : [];
+          return data.whereType<Map>().length;
+        }),
+      );
+      if (!mounted) return;
+      setState(() {
+        myLikesCount = results[0];
+        whoLikedCount = results[1];
+        whoViewedCount = results[2];
+        myMatchesCount = 0;
+      });
+    } catch (_) {
+      // The selected tab still loads normally; counts remain at zero on error.
+    }
   }
 
   String _actionForTab(int index) {
@@ -124,6 +166,17 @@ class _LikesScreenState extends State<LikesScreen> {
   }
 
   Future<void> _loadUsersForTab(int tabIndex) async {
+    if (tabIndex == 3) {
+      if (mounted) {
+        setState(() {
+          _apiUsers = [];
+          _isLoading = false;
+          _errorMessage = null;
+          _emptyMessage = "My Matches API coming soon";
+        });
+      }
+      return;
+    }
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -133,7 +186,9 @@ class _LikesScreenState extends State<LikesScreen> {
     }
     try {
       final email = await SecureStorage().getUserEmail() ?? '';
-      final response = tabIndex == 1
+      final response = tabIndex == 3
+          ? await HomeService().showAllExceptMe(myEmail: email.trim())
+          : tabIndex == 1
           ? await HomeService().favoriteLikeViewShowByActionEmail(
               actionEmail: email.trim(),
               action: 'like',
@@ -146,7 +201,16 @@ class _LikesScreenState extends State<LikesScreen> {
         throw Exception('HTTP ${response.statusCode}');
       }
 
-      final result = XmlResponseParser.parse(response.body);
+      final Map<String, dynamic> result;
+      if (tabIndex == 3) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final nodes = doc.findAllElements('ShowAllExceptMeResult');
+        result = nodes.isNotEmpty
+            ? Map<String, dynamic>.from(jsonDecode(nodes.first.innerText))
+            : <String, dynamic>{};
+      } else {
+        result = XmlResponseParser.parse(response.body);
+      }
       if (result['Status'].toString() != '1') {
         if (!mounted) return;
         setState(() {
@@ -170,6 +234,7 @@ class _LikesScreenState extends State<LikesScreen> {
         if (tabIndex == 0) myLikesCount = data.length;
         if (tabIndex == 1) whoLikedCount = data.length;
         if (tabIndex == 2) whoViewedCount = data.length;
+        if (tabIndex == 3) myMatchesCount = data.length;
         _isLoading = false;
       });
     } catch (e) {
@@ -203,6 +268,7 @@ class _LikesScreenState extends State<LikesScreen> {
                       Icons.favorite_rounded,
                       Icons.people_alt_rounded,
                       Icons.remove_red_eye_rounded,
+                      Icons.compare_arrows_rounded,
                       // Icons.bookmark_rounded,
                       // Icons.sort_rounded,
                     ];
@@ -211,6 +277,7 @@ class _LikesScreenState extends State<LikesScreen> {
                       Colors.red,
                       Colors.purple,
                       Colors.blue,
+                      Colors.cyan,
                       // Colors.green,
                       // Colors.amber,
                     ];
@@ -221,7 +288,16 @@ class _LikesScreenState extends State<LikesScreen> {
                     return GestureDetector(
                       onTap: () {
                         setState(() => selectedTab = index);
-                        _loadUsersForTab(index);
+                        if (index == 3) {
+                          setState(() {
+                            _apiUsers = [];
+                            _emptyMessage = "My Matches API coming soon";
+                            _errorMessage = null;
+                            _isLoading = false;
+                          });
+                        } else {
+                          _loadUsersForTab(index);
+                        }
                       },
                       child: Container(
                         margin: EdgeInsets.only(right: 10.w),
@@ -333,8 +409,8 @@ class _LikesScreenState extends State<LikesScreen> {
                         physics: const BouncingScrollPhysics(),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          mainAxisSpacing: 12.h,
-                          crossAxisSpacing: 12.w,
+                          mainAxisSpacing: 6.h,
+                          crossAxisSpacing: 6.w,
                           childAspectRatio: 0.68,
                         ),
                         itemBuilder: (_, i) => _card(i),
@@ -348,26 +424,88 @@ class _LikesScreenState extends State<LikesScreen> {
   }
 
   Widget _buildMessage(String message, bool retry) {
+    final emptyTitles = [
+      "No liked profiles yet",
+      "No one has liked you yet",
+      "No recent views yet",
+      "No matches yet",
+    ];
+    final emptySubtitles = [
+      "Profiles you like will appear here.",
+      "Your new likes will appear here.",
+      "Profiles you view will appear here.",
+      "Your mutual matches will appear here.",
+    ];
+    final emptyIcons = [
+      Icons.favorite_rounded,
+      Icons.people_alt_rounded,
+      Icons.visibility_rounded,
+      Icons.compare_arrows_rounded,
+    ];
+    final int tabIndex = selectedTab.clamp(0, 3).toInt();
+
     return Center(
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 24.w),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              retry
-                  ? message
-                  : "No favourites yet. Profiles you like will appear here.",
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60, height: 1.4),
-            ),
-            if (retry) ...[
-              SizedBox(height: 10.h),
-              OutlinedButton(
-                onPressed: () => _loadUsersForTab(selectedTab),
-                child: const Text('Retry'),
+            Container(
+              width: 78.w,
+              height: 78.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: (retry ? Colors.orangeAccent : Colors.cyanAccent)
+                    .withValues(alpha: 0.10),
+                border: Border.all(
+                  color: (retry ? Colors.orangeAccent : Colors.cyanAccent)
+                      .withValues(alpha: 0.35),
+                  width: 1.5,
+                ),
               ),
-            ],
+              child: Icon(
+                retry ? Icons.cloud_off_rounded : emptyIcons[tabIndex],
+                color: retry ? Colors.orangeAccent : Colors.cyanAccent,
+                size: 40.sp,
+              ),
+            ),
+            SizedBox(height: 15.h),
+            Text(
+              retry ? "Unable to load data" : emptyTitles[tabIndex],
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 7.h),
+            Text(
+              retry ? message : emptySubtitles[tabIndex],
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white60,
+                fontSize: 13.sp,
+                height: 1.4,
+              ),
+            ),
+            SizedBox(height: 14.h),
+            TextButton.icon(
+              onPressed: () => _loadUsersForTab(selectedTab),
+              icon: Icon(
+                Icons.refresh_rounded,
+                color: Colors.cyanAccent,
+                size: 18.sp,
+              ),
+              label: Text(
+                "Refresh",
+                style: TextStyle(
+                  color: Colors.cyanAccent,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -562,16 +700,20 @@ class _LikesScreenState extends State<LikesScreen> {
                             Container(
                               width: 6.w,
                               height: 6.w,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF2ECC71),
+                              decoration: BoxDecoration(
+                                color: user["isOnline"]
+                                    ? const Color(0xFF2ECC71)
+                                    : Colors.grey,
                                 shape: BoxShape.circle,
                               ),
                             ),
                             SizedBox(width: 1.w),
                             Text(
-                              user["isOnline"] ? "Online" : "Offline",
+                              user["isOnline"] ? "Active now" : "Offline",
                               style: AppTextStyles.small.copyWith(
-                                color: Colors.white70,
+                                color: user["isOnline"]
+                                    ? const Color(0xFF00E676)
+                                    : Colors.white70,
                                 fontSize: 8.sp,
                                 fontWeight: FontWeight.w900,
                               ),

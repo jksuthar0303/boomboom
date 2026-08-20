@@ -49,36 +49,40 @@ class MessageDetailPage extends StatefulWidget {
     required int index,
     required Map<String, String> messageData,
   }) {
-    final DraggableScrollableController sheetCtrl =
-        DraggableScrollableController();
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.6),
-      builder: (_) {
-        return DraggableScrollableSheet(
-          controller: sheetCtrl,
-          initialChildSize: 0.62,
-          minChildSize: 0.50,
-          maxChildSize: 1.0,
-          expand: false,
-          snap: true,
-          snapSizes: const [0.62, 1.0],
-          builder: (ctx, scrollController) {
-            return ClipRRect(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(28.r),
-                topRight: Radius.circular(28.r),
+      builder: (modalContext) {
+        final media = MediaQuery.of(modalContext);
+        final keyboardOpen = media.viewInsets.bottom > 0;
+        final availableHeight = media.size.height - media.viewInsets.bottom;
+
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              height: keyboardOpen
+                  ? availableHeight
+                  : media.size.height * 0.62,
+              child: ClipRRect(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(28.r),
+                  topRight: Radius.circular(28.r),
+                ),
+                child: MessageDetailPage(
+                  index: index,
+                  messageData: messageData,
+                ),
               ),
-              child: MessageDetailPage(
-                index: index,
-                messageData: messageData,
-                sheetScrollController: scrollController,
-                draggableController: sheetCtrl,
-              ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -88,7 +92,8 @@ class MessageDetailPage extends StatefulWidget {
   State<MessageDetailPage> createState() => _MessageDetailPageState();
 }
 
-class _MessageDetailPageState extends State<MessageDetailPage> {
+class _MessageDetailPageState extends State<MessageDetailPage>
+    with WidgetsBindingObserver {
   final TextEditingController _ctrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final ScrollController _chatScroll = ScrollController();
@@ -174,19 +179,13 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         if (_showEmojiPicker) {
           setState(() => _showEmojiPicker = false);
         }
-        if (widget.draggableController != null &&
-            widget.draggableController!.isAttached) {
-          widget.draggableController!.animateTo(
-            1.0,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-          );
-        }
+        _expandChatForKeyboard();
         Future.delayed(const Duration(milliseconds: 280), () {
           _scrollToBottom(animate: true);
         });
@@ -196,6 +195,50 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
     // Realtime polling every 500ms
     _pollingTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       _fetchChatMessages(isInitial: false);
+    });
+  }
+
+  void _expandChatForKeyboard() {
+    final controller = widget.draggableController;
+    if (controller == null) return;
+
+    void expand() {
+      if (!mounted || !controller.isAttached) return;
+      try {
+        controller.animateTo(
+          1.0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } catch (_) {
+        // The sheet may still be attaching while the keyboard opens.
+      }
+    }
+
+    // Run once immediately and again after the keyboard has changed the
+    // available height; the second pass prevents the sheet from staying at
+    // its half-screen snap position.
+    WidgetsBinding.instance.addPostFrameCallback((_) => expand());
+    Future.delayed(const Duration(milliseconds: 350), expand);
+    Future.delayed(const Duration(milliseconds: 650), expand);
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.draggableController == null) return;
+      final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+      final controller = widget.draggableController!;
+      if (!controller.isAttached) return;
+
+      try {
+        controller.animateTo(
+          keyboardHeight > 0 ? 1.0 : 0.62,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+      } catch (_) {}
     });
   }
 
@@ -282,11 +325,10 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
         return;
       }
 
-      final targetEmail = otherEmail.isNotEmpty ? otherEmail : myEmail;
-
       final response = await RegisterService().showChatMessages(
         chatListId: chatListId,
-        email: targetEmail.trim(),
+        // ShowChatMessages expects the logged-in user's email.
+        email: myEmail.trim(),
       );
 
       if (response.statusCode == 200) {
@@ -336,6 +378,49 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
             return;
           } else if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
             final List list = jsonResult["Data"];
+
+            // A successful response can still represent a pending request.
+            // In that case the API message is the conversation state; do not
+            // render old messages or allow another message to be sent.
+            Map<String, dynamic>? pendingItem;
+            for (final rawItem in list) {
+              if (rawItem is Map) {
+                final chatStatus = (rawItem["ChatStatus"] ??
+                        rawItem["chatStatus"] ??
+                        "")
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+                if (chatStatus == "pending") {
+                  pendingItem = Map<String, dynamic>.from(rawItem);
+                  break;
+                }
+              }
+            }
+
+            if (pendingItem != null) {
+              final pendingMessage = (pendingItem["Message"] ??
+                      pendingItem["ChatMessage"] ??
+                      jsonResult["Message"] ??
+                      "Please accept the chat request to continue the conversation.")
+                  .toString()
+                  .trim();
+
+              if (mounted) {
+                setState(() {
+                  _chats.clear();
+                  _pendingLocalChats.clear();
+                  _blockMessage = pendingMessage.isEmpty
+                      ? "Please accept the chat request to continue the conversation."
+                      : pendingMessage;
+                  _isSenderPending = true;
+                  _isLoadingMessages = false;
+                });
+              }
+              _isPollingInProgress = false;
+              return;
+            }
+
             final List<ChatMessage> loadedChats = [];
             for (var item in list) {
               final sender = (item["SenderEmail"] ?? item["Sender"] ?? item["Senderemail"] ?? "")
@@ -480,6 +565,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollingTimer?.cancel();
     _pollingTimer = null;
     _focusNode.dispose();
@@ -844,7 +930,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
   // ─────────────────────────────────────────
   // 🔥 SEND MESSAGE
   // ─────────────────────────────────────────
-  void _sendMessage(String t) async {
+  Future<void> _sendMessage(String t) async {
     final receiverEmail = widget.messageData["email"] ??
         widget.messageData["EmailAddress"] ??
         widget.messageData["ActionEmail"] ??
@@ -875,6 +961,51 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
             chatMessage: t,
           );
           debugPrint("[MessageDetailPage] sendChatMessage response: ${res.statusCode} -> ${res.body}");
+
+          // The API can return HTTP 200 with a business-level failure, for
+          // example LikeRequired. Do not leave the optimistic message in the
+          // chat and show the exact API message to the user.
+          if (res.statusCode == 200) {
+            try {
+              final doc = xml.XmlDocument.parse(res.body);
+              final result = doc.findAllElements('SendChatMessageResult');
+              if (result.isNotEmpty) {
+                final apiResult = jsonDecode(result.first.innerText);
+                final data = apiResult is Map ? apiResult["Data"] : null;
+                final status = apiResult is Map ? apiResult["Status"] : null;
+                final dataStatus = data is Map ? data["Status"] : null;
+                final isFailure = status.toString() == "0" ||
+                    dataStatus.toString() == "0";
+
+                if (isFailure) {
+                  final apiMessage = (apiResult["Message"] ??
+                          (data is Map ? data["Message"] : null) ??
+                          "Unable to send message.")
+                      .toString()
+                      .trim();
+
+                  if (mounted) {
+                    setState(() {
+                      _chats.removeWhere((message) => identical(message, localMsg));
+                      _pendingLocalChats
+                          .removeWhere((message) => identical(message, localMsg));
+                    });
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(apiMessage),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: const Color(0xFF241522),
+                        ),
+                      );
+                  }
+                }
+              }
+            } catch (e) {
+              debugPrint("[MessageDetailPage] Could not parse send response: $e");
+            }
+          }
         }
       } catch (e) {
         debugPrint("[MessageDetailPage] Error sending chat message: $e");
@@ -1121,21 +1252,29 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
     final age = widget.messageData["age"] ?? "";
     final city = widget.messageData["city"] ?? "";
     final flag = widget.messageData["flag"] ?? "";
-    final distance = widget.messageData["distance"] ?? "";
     final bool isVerified = widget.messageData["isVerified"] == "true" ||
         widget.messageData["isVerified"] == "1";
 
-    final bool isOnline = widget.messageData["isOnline"] == "true" ||
-        widget.messageData["isOnline"] == "1" ||
-        widget.messageData["IsOnline"] == "true" ||
-        widget.messageData["IsOnline"] == "1";
+    final onlineValue = (widget.messageData["isOnline"] ??
+            widget.messageData["IsOnline"] ??
+            widget.messageData["Online"] ??
+            "")
+        .toString()
+        .trim()
+        .toLowerCase();
+    final bool isOnline = onlineValue == "true" ||
+        onlineValue == "1" ||
+        onlineValue == "yes" ||
+        onlineValue == "online";
     final String lastSeen = widget.messageData["lastSeen"] ??
         widget.messageData["LastSeen"] ??
         "";
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      resizeToAvoidBottomInset: true,
+      // The modal container already resizes above the keyboard. Avoid
+      // applying the inset a second time inside this nested Scaffold.
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         top: true,
         bottom: !_showEmojiPicker,
@@ -1170,7 +1309,6 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
               age: age,
               city: city,
               flag: flag,
-              distance: distance,
               isVerified: isVerified,
               isOnline: isOnline,
               lastSeen: lastSeen,
@@ -1654,14 +1792,13 @@ class _ProfileCard extends StatelessWidget {
     required this.age,
     required this.city,
     required this.flag,
-    this.distance = "",
     this.isVerified = false,
     this.isOnline = false,
     this.lastSeen = "",
     this.onBlockUser,
   });
 
-  final String name, imageUrl, age, city, flag, distance;
+  final String name, imageUrl, age, city, flag;
   final bool isVerified;
   final bool isOnline;
   final String lastSeen;
@@ -2137,49 +2274,6 @@ class _ProfileCard extends StatelessWidget {
               ],
             ],
           ),
-        if (distance.isNotEmpty) ...[
-          SizedBox(height: AppSize.h(6)),
-          // Distance Badge
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSize.w(10),
-              vertical: AppSize.h(5),
-            ),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.orangeAccent, width: 0.5),
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.location_on,
-                  color: Colors.orangeAccent,
-                  size: 10.sp,
-                ),
-                SizedBox(width: AppSize.w(4)),
-                Text(
-                  () {
-                    final cleanNum =
-                        distance.replaceAll(RegExp(r'[^\d.]'), '');
-                    final d = double.tryParse(cleanNum);
-                    if (d != null && d < 1.0) {
-                      return "1 km away";
-                    }
-                    return distance.toLowerCase().contains("km")
-                        ? distance
-                        : "$distance km away";
-                  }(),
-                  style: GoogleFonts.poppins(
-                    fontSize: 8.sp,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.orangeAccent,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }
