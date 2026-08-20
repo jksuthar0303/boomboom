@@ -645,4 +645,257 @@ class RegisterService {
       },
     );
   }
+
+  /// SOAP SendChatMessage request
+  Future<XmlResponse> sendChatMessage({
+    required String senderEmail,
+    required String receiverEmail,
+    required String chatMessage,
+  }) async {
+    final cleanMsg = chatMessage
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <SendChatMessage xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <SenderEmail>$senderEmail</SenderEmail>
+      <RecieverEmail>$receiverEmail</RecieverEmail>
+      <ChatMessage>$cleanMsg</ChatMessage>
+    </SendChatMessage>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/SendChatMessage"',
+      },
+    );
+  }
+
+  /// SOAP ShowChatList request
+  Future<XmlResponse> showChatList({required String email}) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ShowChatList xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Email>$email</Email>
+    </ShowChatList>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/ShowChatList"',
+      },
+    );
+  }
+
+  /// SOAP ShowPendingChats request
+  Future<XmlResponse> showPendingChats({required String email}) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ShowPendingChats xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <Email>$email</Email>
+    </ShowPendingChats>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/ShowPendingChats"',
+      },
+    );
+  }
+
+  /// SOAP ShowChatMessages request
+  Future<XmlResponse> showChatMessages({
+    required int chatListId,
+    required String email,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ShowChatMessages xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <ChatListId>$chatListId</ChatListId>
+      <Email>$email</Email>
+    </ShowChatMessages>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/ShowChatMessages"',
+      },
+    );
+  }
+
+  /// SOAP AcceptChat request
+  Future<XmlResponse> acceptChat({
+    required int chatListId,
+    required String email,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <AcceptChat xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <ChatListId>$chatListId</ChatListId>
+      <Email>$email</Email>
+    </AcceptChat>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/AcceptChat"',
+      },
+    );
+  }
+
+  /// SOAP RejectChat request
+  Future<XmlResponse> rejectChat({
+    required int chatListId,
+    required String email,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <RejectChat xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <ChatListId>$chatListId</ChatListId>
+      <Email>$email</Email>
+    </RejectChat>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/RejectChat"',
+      },
+    );
+  }
+
+  /// SOAP BlockChatUser request
+  Future<XmlResponse> blockChatUser({
+    required int chatListId,
+    required String email,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <BlockChatUser xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <ChatListId>$chatListId</ChatListId>
+      <Email>$email</Email>
+    </BlockChatUser>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/BlockChatUser"',
+      },
+    );
+  }
+
+  /// SOAP MessageRead request
+  Future<XmlResponse> messageRead({
+    required int messageId,
+    required String email,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <MessageRead xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <MessageId>$messageId</MessageId>
+      <Email>$email</Email>
+    </MessageRead>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/MessageRead"',
+      },
+    );
+  }
+
+  /// SOAP MessageDelivered request
+  Future<XmlResponse> messageDelivered({
+    required int messageId,
+    required String email,
+  }) async {
+    final String xmlBody =
+        '''<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <MessageDelivered xmlns="$namespace">
+      <token>${AppConstants.dummyToken}</token>
+      <MessageId>$messageId</MessageId>
+      <Email>$email</Email>
+    </MessageDelivered>
+  </soap:Body>
+</soap:Envelope>'''
+            .trim();
+
+    return await _client.postXml(
+      endpoint: AppConstants.apiEndpoint,
+      xmlBody: xmlBody,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': '"http://tempuri.org/MessageDelivered"',
+      },
+    );
+  }
 }

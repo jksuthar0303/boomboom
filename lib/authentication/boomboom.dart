@@ -10,6 +10,7 @@ import 'package:boomboom/backend/home_service.dart';
 import 'package:boomboom/backend/secure_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:xml/xml.dart' as xml;
 import '../constant/appsize.dart';
 import '../constant/apptextstyle.dart';
@@ -27,37 +28,192 @@ String countryFlag(String input) {
 
   final trimmed = input.trim().toUpperCase();
   const countryToIso = {
+    'AFGHANISTAN': 'AF',
+    'ALBANIA': 'AL',
+    'ALGERIA': 'DZ',
+    'ANDORRA': 'AD',
+    'ANGOLA': 'AO',
+    'ANTIGUA AND BARBUDA': 'AG',
+    'ARGENTINA': 'AR',
+    'ARMENIA': 'AM',
+    'AUSTRALIA': 'AU',
+    'AUSTRIA': 'AT',
+    'AZERBAIJAN': 'AZ',
+    'BAHAMAS': 'BS',
+    'BAHRAIN': 'BH',
+    'BANGLADESH': 'BD',
+    'BARBADOS': 'BB',
+    'BELARUS': 'BY',
+    'BELGIUM': 'BE',
+    'BELIZE': 'BZ',
+    'BENIN': 'BJ',
+    'BHUTAN': 'BT',
+    'BOLIVIA': 'BO',
+    'BOSNIA': 'BA',
+    'BOTSWANA': 'BW',
+    'BRAZIL': 'BR',
+    'BRUNEI': 'BN',
+    'BULGARIA': 'BG',
+    'BURKINA FASO': 'BF',
+    'BURUNDI': 'BI',
+    'CABO VERDE': 'CV',
+    'CAMBODIA': 'KH',
+    'CAMEROON': 'CM',
+    'CANADA': 'CA',
+    'CHAD': 'TD',
+    'CHILE': 'CL',
+    'CHINA': 'CN',
+    'COLOMBIA': 'CO',
+    'COMOROS': 'KM',
+    'CONGO': 'CG',
+    'COSTA RICA': 'CR',
+    'CROATIA': 'HR',
+    'CUBA': 'CU',
+    'CYPRUS': 'CY',
+    'CZECH REPUBLIC': 'CZ',
+    'CZECHIA': 'CZ',
+    'DENMARK': 'DK',
+    'DJIBOUTI': 'DJ',
+    'DOMINICA': 'DM',
+    'DOMINICAN REPUBLIC': 'DO',
+    'ECUADOR': 'EC',
+    'EGYPT': 'EG',
+    'EL SALVADOR': 'SV',
+    'EQUATORIAL GUINEA': 'GQ',
+    'ERITREA': 'ER',
+    'ESTONIA': 'EE',
+    'ESWATINI': 'SZ',
+    'ETHIOPIA': 'ET',
+    'FIJI': 'FJ',
+    'FINLAND': 'FI',
+    'FRANCE': 'FR',
+    'GABON': 'GA',
+    'GAMBIA': 'GM',
+    'GEORGIA': 'GE',
+    'GERMANY': 'DE',
+    'GHANA': 'GH',
+    'GREECE': 'GR',
+    'GRENADA': 'GD',
+    'GUATEMALA': 'GT',
+    'GUINEA': 'GN',
+    'GUYANA': 'GY',
+    'HAITI': 'HT',
+    'HONDURAS': 'HN',
+    'HONG KONG': 'HK',
+    'HUNGARY': 'HU',
+    'ICELAND': 'IS',
     'INDIA': 'IN',
-    'UNITED STATES': 'US',
-    'USA': 'US',
-    'UNITED KINGDOM': 'GB',
-    'UK': 'GB',
+    'INDONESIA': 'ID',
+    'IRAN': 'IR',
+    'IRAQ': 'IQ',
+    'IRELAND': 'IE',
+    'ISRAEL': 'IL',
+    'ITALY': 'IT',
+    'IVORY COAST': 'CI',
+    'JAMAICA': 'JM',
+    'JAPAN': 'JP',
+    'JORDAN': 'JO',
+    'KAZAKHSTAN': 'KZ',
+    'KENYA': 'KE',
+    'KUWAIT': 'KW',
+    'KYRGYZSTAN': 'KG',
+    'LAOS': 'LA',
+    'LATVIA': 'LV',
+    'LEBANON': 'LB',
+    'LESOTHO': 'LS',
+    'LIBERIA': 'LR',
+    'LIBYA': 'LY',
+    'LIECHTENSTEIN': 'LI',
+    'LITHUANIA': 'LT',
+    'LUXEMBOURG': 'LU',
+    'MADAGASCAR': 'MG',
+    'MALAWI': 'MW',
+    'MALAYSIA': 'MY',
+    'MALDIVES': 'MV',
+    'MALI': 'ML',
+    'MALTA': 'MT',
+    'MAURITANIA': 'MR',
+    'MAURITIUS': 'MU',
+    'MEXICO': 'MX',
+    'MOLDOVA': 'MD',
+    'MONACO': 'MC',
+    'MONGOLIA': 'MN',
+    'MONTENEGRO': 'ME',
+    'MOROCCO': 'MA',
+    'MOZAMBIQUE': 'MZ',
+    'MYANMAR': 'MM',
+    'NAMIBIA': 'NA',
+    'NEPAL': 'NP',
+    'NETHERLANDS': 'NL',
+    'NEW ZEALAND': 'NZ',
+    'NICARAGUA': 'NI',
+    'NIGER': 'NE',
+    'NIGERIA': 'NG',
+    'NORTH KOREA': 'KP',
+    'NORTH MACEDONIA': 'MK',
+    'NORWAY': 'NO',
+    'OMAN': 'OM',
+    'PAKISTAN': 'PK',
+    'PALESTINE': 'PS',
+    'PANAMA': 'PA',
+    'PAPUA NEW GUINEA': 'PG',
+    'PARAGUAY': 'PY',
+    'PERU': 'PE',
+    'PHILIPPINES': 'PH',
+    'POLAND': 'PL',
+    'PORTUGAL': 'PT',
+    'QATAR': 'QA',
+    'ROMANIA': 'RO',
+    'RUSSIA': 'RU',
+    'RWANDA': 'RW',
+    'SAUDI ARABIA': 'SA',
+    'SENEGAL': 'SN',
+    'SERBIA': 'RS',
+    'SEYCHELLES': 'SC',
+    'SIERRA LEONE': 'SL',
+    'SINGAPORE': 'SG',
+    'SLOVAKIA': 'SK',
+    'SLOVENIA': 'SI',
+    'SOMALIA': 'SO',
+    'SOUTH AFRICA': 'ZA',
+    'SOUTH KOREA': 'KR',
+    'KOREA': 'KR',
+    'SOUTH SUDAN': 'SS',
+    'SPAIN': 'ES',
+    'SRI LANKA': 'LK',
+    'SUDAN': 'SD',
+    'SURINAME': 'SR',
+    'SWEDEN': 'SE',
+    'SWITZERLAND': 'CH',
+    'SYRIA': 'SY',
+    'TAIWAN': 'TW',
+    'TAJIKISTAN': 'TJ',
+    'TANZANIA': 'TZ',
+    'THAILAND': 'TH',
+    'TOGO': 'TG',
+    'TRINIDAD AND TOBAGO': 'TT',
+    'TUNISIA': 'TN',
+    'TURKEY': 'TR',
+    'TURKIYE': 'TR',
+    'UGANDA': 'UG',
+    'UKRAINE': 'UA',
     'UNITED ARAB EMIRATES': 'AE',
     'UAE': 'AE',
-    'CANADA': 'CA',
-    'AUSTRALIA': 'AU',
-    'GERMANY': 'DE',
-    'FRANCE': 'FR',
-    'SINGAPORE': 'SG',
-    'JAPAN': 'JP',
-    'RUSSIA': 'RU',
-    'CHINA': 'CN',
-    'BRAZIL': 'BR',
-    'INDONESIA': 'ID',
-    'PAKISTAN': 'PK',
-    'BANGLADESH': 'BD',
-    'NEPAL': 'NP',
-    'SRI LANKA': 'LK',
-    'SPAIN': 'ES',
-    'ITALY': 'IT',
-    'THAILAND': 'TH',
-    'MALAYSIA': 'MY',
-    'PHILIPPINES': 'PH',
+    'DUBAI': 'AE',
+    'UNITED KINGDOM': 'GB',
+    'UK': 'GB',
+    'ENGLAND': 'GB',
+    'UNITED STATES': 'US',
+    'USA': 'US',
+    'AMERICA': 'US',
+    'URUGUAY': 'UY',
+    'UZBEKISTAN': 'UZ',
+    'VATICAN': 'VA',
+    'VENEZUELA': 'VE',
     'VIETNAM': 'VN',
-    'TURKEY': 'TR',
-    'EGYPT': 'EG',
-    'SOUTH AFRICA': 'ZA',
-    'NEW ZEALAND': 'NZ',
+    'YEMEN': 'YE',
+    'ZAMBIA': 'ZM',
+    'ZIMBABWE': 'ZW',
   };
 
   String iso = countryToIso[trimmed] ?? (trimmed.length == 2 ? trimmed : '');
@@ -148,6 +304,7 @@ class ProfileModel {
   final List<MediaItem> media;
   final int completionPercent;
   final bool isVerified;
+  final bool isOnline;
   final String? telegramUsername;
 
   const ProfileModel({
@@ -167,17 +324,23 @@ class ProfileModel {
     required this.media,
     this.completionPercent = 72,
     this.isVerified = false,
+    this.isOnline = false,
     this.seenAgo = '5 min ago',
     this.telegramUsername,
   });
 
-  ProfileModel copyWith({String? country, List<MediaItem>? media}) => ProfileModel(
+  ProfileModel copyWith({
+    String? country,
+    List<MediaItem>? media,
+    bool? isOnline,
+    String? distance,
+  }) => ProfileModel(
     name: name,
     age: age,
     job: job,
     city: city,
     country: country ?? this.country,
-    distance: distance,
+    distance: distance ?? this.distance,
     height: height,
     lookingFor: lookingFor,
     gender: gender,
@@ -188,6 +351,7 @@ class ProfileModel {
     media: media ?? this.media,
     completionPercent: completionPercent,
     isVerified: isVerified,
+    isOnline: isOnline ?? this.isOnline,
     seenAgo: seenAgo,
     telegramUsername: telegramUsername,
   );
@@ -617,6 +781,9 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   bool _isLoadingOtherProfile = false;
   bool _isLoadingLiveFeed = true;
   bool _profileNotFound = false;
+  Position? _currentPosition;
+  double? _otherLatitude;
+  double? _otherLongitude;
 
   ProfileModel get _profile {
     if (widget.isOwnProfile && ownProfile != null) {
@@ -688,11 +855,12 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
             for (var item in rawList) {
               if (item is Map) {
-                final email = (item["EmailAddress"] ??
-                        item["email"] ??
-                        item["ActionEmail"])
-                    ?.toString()
-                    .trim();
+                final email =
+                    (item["EmailAddress"] ??
+                            item["email"] ??
+                            item["ActionEmail"])
+                        ?.toString()
+                        .trim();
                 if (!isManualRefresh &&
                     email != null &&
                     email.isNotEmpty &&
@@ -759,10 +927,10 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                 final mediaUrl = (m["Media"] ?? m["Url"] ?? m["url"] ?? "")
                     .toString()
                     .trim();
-                final mediaTypeStr =
-                    (m["Type"] ?? "").toString().toLowerCase();
+                final mediaTypeStr = (m["Type"] ?? "").toString().toLowerCase();
                 if (mediaUrl.isNotEmpty) {
-                  final isVideo = mediaTypeStr.contains("video") ||
+                  final isVideo =
+                      mediaTypeStr.contains("video") ||
                       mediaUrl.endsWith(".mp4") ||
                       mediaUrl.endsWith(".mov");
                   final fullUrl = mediaUrl.startsWith("http")
@@ -782,7 +950,9 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         }
       }
     } catch (e) {
-      debugPrint("[BoomProfileScreen] Error fetching ShowMediaByEmail for $email: $e");
+      debugPrint(
+        "[BoomProfileScreen] Error fetching ShowMediaByEmail for $email: $e",
+      );
     }
     return [];
   }
@@ -899,7 +1069,9 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                   final existing = otherProfile!.media;
                   final List<MediaItem> combined = [...extraMedia];
                   for (var em in existing) {
-                    if (!combined.any((m) => m.url.isNotEmpty && m.url == em.url)) {
+                    if (!combined.any(
+                      (m) => m.url.isNotEmpty && m.url == em.url,
+                    )) {
                       combined.add(em);
                     }
                   }
@@ -964,14 +1136,15 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       final String calculatedAge = dob.isNotEmpty
           ? _calculateAge(dob).toString()
           : (data["age"] ?? "24").toString();
-      final String bio = (data["BIO"] ??
-              data["bio"] ??
-              data["Bio"] ??
-              data["about"] ??
-              data["About"] ??
-              "")
-          .toString()
-          .trim();
+      final String bio =
+          (data["BIO"] ??
+                  data["bio"] ??
+                  data["Bio"] ??
+                  data["about"] ??
+                  data["About"] ??
+                  "")
+              .toString()
+              .trim();
       final String job = (data["Occupation"] ?? data["occupation"] ?? "")
           .toString();
       final String height = (data["Height"] ?? data["height"] ?? "").toString();
@@ -985,10 +1158,25 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           data["IsVerified"]?.toString().toLowerCase() == "true" ||
           data["isVerified"] == true ||
           data["isVerified"]?.toString().toLowerCase() == "true";
+      final String onlineValue = (data["IsOnline"] ??
+              data["isOnline"] ??
+              data["Online"] ??
+              "")
+          .toString()
+          .trim()
+          .toLowerCase();
+      final bool isOnline = onlineValue == "true" ||
+          onlineValue == "1" ||
+          onlineValue == "yes" ||
+          onlineValue == "online";
       final String city =
           (data["City"] ?? data["city"] ?? data["Country"] ?? "").toString();
       final double? latitude = double.tryParse(data['Lat']?.toString() ?? '');
       final double? longitude = double.tryParse(data['Lon']?.toString() ?? '');
+      if (latitude != null && longitude != null) {
+        _otherLatitude = latitude;
+        _otherLongitude = longitude;
+      }
       final String apiCountry = (data['Country'] ?? data['country'] ?? '')
           .toString()
           .trim();
@@ -1002,8 +1190,11 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                     longitude <= 98.0
                 ? 'India'
                 : '');
-      final String distance = (data["Distance"] ?? data["distance"] ?? "")
-          .toString();
+      final String apiDistance =
+          (data["Distance"] ?? data["distance"] ?? "").toString().trim();
+      final String distance = apiDistance.isNotEmpty && apiDistance != "0"
+          ? apiDistance
+          : _distanceFromCurrentPosition(latitude, longitude);
 
       final List<MediaItem> mediaItems = [];
       void addMediaItem(dynamic val) {
@@ -1152,6 +1343,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         lifestyle: lifestyleList,
         media: mediaItems,
         isVerified: isVerified,
+        isOnline: isOnline,
       );
     } catch (e) {
       debugPrint("[BoomProfileScreen] Error building profile model: $e");
@@ -1179,6 +1371,49 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       if (lat != null && lon != null && (lat != 0 || lon != 0)) {
         _resolveCountry(p, lat, lon);
       }
+    }
+  }
+
+  String _distanceFromCurrentPosition(double? latitude, double? longitude) {
+    if (_currentPosition == null || latitude == null || longitude == null) {
+      return "";
+    }
+    final meters = Geolocator.distanceBetween(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      latitude,
+      longitude,
+    );
+    if (meters < 1000) return "${meters.round()} m";
+    return "${(meters / 1000).toStringAsFixed(1)} km";
+  }
+
+  Future<void> _loadCurrentPosition() async {
+    try {
+      Position? position = await Geolocator.getLastKnownPosition();
+      if (position == null && await Geolocator.isLocationServiceEnabled()) {
+        var permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.always ||
+            permission == LocationPermission.whileInUse) {
+          position = await Geolocator.getCurrentPosition();
+        }
+      }
+      if (position == null || !mounted) return;
+      _currentPosition = position;
+      if (otherProfile != null &&
+          _otherLatitude != null &&
+          _otherLongitude != null) {
+        setState(() {
+          otherProfile = otherProfile!.copyWith(
+            distance: _distanceFromCurrentPosition(
+              _otherLatitude,
+              _otherLongitude,
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint("[BoomProfileScreen] Location distance error: $e");
     }
   }
 
@@ -1343,6 +1578,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   @override
   void initState() {
     super.initState();
+    _loadCurrentPosition();
     showStar = widget.showStar;
     showMore = widget.showMore;
     showTelegram = widget.showTelegram;
@@ -1354,10 +1590,13 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     if (widget.isLiked != null) {
       _isDirectProfileLiked = widget.isLiked!;
     } else if (widget.initialUserData != null) {
-      final action = widget.initialUserData!['Action']?.toString().toLowerCase() ??
+      final action =
+          widget.initialUserData!['Action']?.toString().toLowerCase() ??
           widget.initialUserData!['action']?.toString().toLowerCase();
       final isLiked = widget.initialUserData!['isLiked'];
-      if (action == 'like' || isLiked == true || isLiked?.toString().toLowerCase() == 'true') {
+      if (action == 'like' ||
+          isLiked == true ||
+          isLiked?.toString().toLowerCase() == 'true') {
         _isDirectProfileLiked = true;
       }
     }
@@ -1368,8 +1607,8 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       final rawUser = widget.initialUserData;
       final Map<String, dynamic> mergedInitial = rawUser != null
           ? (rawUser["raw"] is Map
-              ? {...Map<String, dynamic>.from(rawUser["raw"]), ...rawUser}
-              : rawUser)
+                ? {...Map<String, dynamic>.from(rawUser["raw"]), ...rawUser}
+                : rawUser)
           : {};
 
       final email =
@@ -1406,13 +1645,18 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         final doc = xml.XmlDocument.parse(response.body);
         final res = doc.findAllElements('FavoriteLikeView_ShowByMyEmailResult');
         if (res.isNotEmpty) {
-          final Map<String, dynamic> jsonResult = jsonDecode(res.first.innerText);
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
           if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
             final List data = jsonResult["Data"];
             final isLiked = data.any((u) {
               if (u is Map) {
-                final e = (u["EmailAddress"] ?? u["email"] ?? u["ActionEmail"])?.toString().trim();
-                return e != null && e.toLowerCase() == actionEmail.trim().toLowerCase();
+                final e = (u["EmailAddress"] ?? u["email"] ?? u["ActionEmail"])
+                    ?.toString()
+                    .trim();
+                return e != null &&
+                    e.toLowerCase() == actionEmail.trim().toLowerCase();
               }
               return false;
             });
@@ -1543,7 +1787,9 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           action: toLike ? 'like' : 'dislike',
         );
       } catch (e) {
-        debugPrint('[BoomProfileScreen] Error saving swipe action ($toLike): $e');
+        debugPrint(
+          '[BoomProfileScreen] Error saving swipe action ($toLike): $e',
+        );
       }
     }
 
@@ -1638,6 +1884,18 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         imageStr = base64Encode(first.bytes!);
       }
     }
+    final DraggableScrollableController sheetCtrl =
+        DraggableScrollableController();
+    final int profileCount = _liveProfiles.isNotEmpty
+        ? _liveProfiles.length
+        : sampleProfiles.length;
+    final int currentProfileIndex = _currentIndex.clamp(0, profileCount - 1);
+    final String? recipientEmail =
+        _liveProfiles.isNotEmpty &&
+            currentProfileIndex < _liveProfileEmails.length
+        ? _liveProfileEmails[currentProfileIndex]
+        : (otherProfile != null ? widget.userEmail : null);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1645,11 +1903,12 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (_) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.58,
-          minChildSize: 0.58,
+          controller: sheetCtrl,
+          initialChildSize: 0.62,
+          minChildSize: 0.50,
           maxChildSize: 1.0,
           snap: true,
-          snapSizes: const [0.58, 1.0],
+          snapSizes: const [0.62, 1.0],
           expand: false,
           builder: (ctx, sheetScrollController) {
             return ClipRRect(
@@ -1662,6 +1921,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                   "age": p.age,
                   "gender": p.gender,
                   "city": p.city,
+                  "email": recipientEmail ?? "",
                   "flag": p.country.isNotEmpty
                       ? countryFlag(p.country)
                       : flagForCity(p.city),
@@ -1670,6 +1930,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                   "isVerified": p.isVerified ? "true" : "false",
                 },
                 sheetScrollController: sheetScrollController,
+                draggableController: sheetCtrl,
               ),
             );
           },
@@ -1715,7 +1976,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                 ),
                 SizedBox(height: 12.h),
                 Text(
-                  "You're all caught up! New people will appear as they join.",
+                  "No more profiles are available right now. Check back soon.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white70,
@@ -2222,35 +2483,19 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
     final resolvedFlag = displayCountry.toLowerCase().contains('india')
         ? countryFlag('IN')
         : flagForCity(displayCountry);
-    final badges = [
-      '🕐 ${p.seenAgo}',
-      '📍 ${p.distance}',
-      '$resolvedFlag  $displayCountry',
-      '🎯 ${p.lookingFor}',
-      '📏 ${p.height}',
-    ];
-    final visibleBadges = badges.skip(2).toList();
-    return SizedBox(
-      height: AppSize.h(32), // ✅ 35 → 32, thoda zyada room
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: visibleBadges.length,
-        separatorBuilder: (_, _) => SizedBox(width: AppSize.w(6)),
-        itemBuilder: (_, i) => Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSize.w(8),
-            vertical: AppSize.h(6),
-          ),
-          // ✅ vertical padding kam kiya
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.52),
-            borderRadius: BorderRadius.circular(20.r),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
-          ),
-          alignment: Alignment.center,
-          // ✅ yeh add karo — text vertically center rahega
+    final String dist =
+        (p.distance.isNotEmpty && p.distance != "0" && p.distance != "0 km")
+        ? p.distance
+        : "Nearby";
+
+    final List<Widget> badgeWidgets = [];
+
+    // 1. 🇮🇳 Country
+    if (displayCountry.isNotEmpty) {
+      badgeWidgets.add(
+        _buildBadgeContainer(
           child: Text(
-            visibleBadges[i],
+            "$resolvedFlag  $displayCountry",
             style: TextStyle(
               color: Colors.white,
               fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),
@@ -2258,7 +2503,132 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
             ),
           ),
         ),
+      );
+    }
+
+    // 2. 🟢 Online / Offline Status
+    badgeWidgets.add(
+      _buildBadgeContainer(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7.w,
+              height: 7.w,
+              decoration: BoxDecoration(
+                color: p.isOnline ? const Color(0xFF00E676) : Colors.grey,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+            ),
+            SizedBox(width: 5.w),
+            Text(
+              p.isOnline ? "Online now" : "Offline",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+
+    // 3. 📍 Distance (km away)
+    badgeWidgets.add(
+      _buildBadgeContainer(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.location_on,
+              color: Colors.purpleAccent,
+              size: isTablet ? 14.sp : 12.sp,
+            ),
+            SizedBox(width: 4.w),
+            Text(
+              dist.toLowerCase().contains('away') || dist == 'Nearby'
+                  ? dist
+                  : '$dist away',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // 4. ❤️ Looking for
+    if (p.lookingFor.isNotEmpty) {
+      badgeWidgets.add(
+        _buildBadgeContainer(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.favorite,
+                color: Colors.pinkAccent,
+                size: isTablet ? 13.sp : 11.sp,
+              ),
+              SizedBox(width: 4.w),
+              Text(
+                p.lookingFor,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 5. 📏 Height
+    if (p.height.isNotEmpty) {
+      badgeWidgets.add(
+        _buildBadgeContainer(
+          child: Text(
+            "📏 ${p.height}",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: AppSize.h(32),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: badgeWidgets.length,
+        separatorBuilder: (_, _) => SizedBox(width: AppSize.w(6)),
+        itemBuilder: (_, i) => badgeWidgets[i],
+      ),
+    );
+  }
+
+  Widget _buildBadgeContainer({required Widget child}) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSize.w(8),
+        vertical: AppSize.h(6),
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      alignment: Alignment.center,
+      child: child,
     );
   }
 
@@ -2303,7 +2673,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: p.media.length,
-              separatorBuilder: (_, _) => SizedBox(width: AppSize.w(12)),
+              separatorBuilder: (_, _) => SizedBox(width: AppSize.w(6)),
               itemBuilder: (_, i) {
                 // ✅ Video button wala if block bilkul hata diya
                 final m = p.media[i];

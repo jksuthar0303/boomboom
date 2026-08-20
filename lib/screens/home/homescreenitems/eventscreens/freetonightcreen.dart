@@ -399,7 +399,7 @@ class _FreeTonightScreenState extends State<FreeTonightScreen> {
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24.w),
                 child: Text(
-                  "You're all caught up! New people will appear as they join.",
+                  "No one has added a Free Tonight plan in your area yet.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white54,

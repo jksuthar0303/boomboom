@@ -18,11 +18,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
 
-  int get totalUnreadUsers {
-    return MessagePageState.messageList
-        .where((e) => e.unreadCount > 0)
-        .length;
-  }
+  int get totalUnreadUsers => 0;
 
   int index = 0;
 

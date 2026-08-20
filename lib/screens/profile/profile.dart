@@ -469,6 +469,9 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       emoji: Text('👻', style: TextStyle(fontSize: 18.sp)),
       label: 'Ghost Mode',
       subtitle: "Hide your online presence",
+      onTap: () {
+        settings.ghostMode.value = !settings.ghostMode.value;
+      },
       trailingWidget: Obx(
         () => Switch(
           value: settings.ghostMode.value,
@@ -488,6 +491,9 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       emoji: Text('🙈', style: TextStyle(fontSize: 18.sp)),
       label: 'Exclude Message Profile',
       subtitle: "message already send",
+      onTap: () {
+        settings.hideChatUsers.value = !settings.hideChatUsers.value;
+      },
       trailingWidget: Obx(
         () => Switch(
           value: settings.hideChatUsers.value,
@@ -611,18 +617,7 @@ class _TileGroupWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = _R.tileGroupRadius(context);
     final hm = noMargin ? 0.0 : _R.cardHMargin(context);
-    final visibleTiles = tiles
-        .where(
-          (tile) =>
-              tile.label != 'Ghost Mode' &&
-              tile.label != 'Exclude Message Profile',
-        )
-        .toList();
-    visibleTiles.sort((a, b) {
-      if (a.label == 'Share App') return -1;
-      if (b.label == 'Share App') return 1;
-      return 0;
-    });
+    final visibleTiles = tiles;
     if (visibleTiles.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -783,7 +778,8 @@ class _TileRow extends StatelessWidget {
                 ],
 
                 /// 🔥 ARROW
-                Icon(
+                if (data.trailingWidget == null || data.label == 'Subscription Plan')
+                  Icon(
                   Icons.chevron_right,
                   color: const Color(0xFF3A3A3A),
                   size: _R.chevronSize(context),

@@ -322,8 +322,17 @@ class _MatchesScreenState extends State<MatchesScreen> {
               final String dob = (rawMap["Dob"] ?? rawMap["dob"] ?? "")
                   .toString();
               final int age = _calculateAge(dob);
-              final bool isOnline =
-                  rawMap["IsOnline"]?.toString().toLowerCase() == "true";
+              final String onlineValue = (rawMap["IsOnline"] ??
+                      rawMap["isOnline"] ??
+                      rawMap["Online"] ??
+                      "")
+                  .toString()
+                  .toLowerCase()
+                  .trim();
+              final bool isOnline = onlineValue == "true" ||
+                  onlineValue == "1" ||
+                  onlineValue == "yes" ||
+                  onlineValue == "online";
               final bool isVerified =
                   rawMap["IsVerified"]?.toString().toLowerCase() == "true";
               final String lookingFor =
@@ -352,7 +361,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 "distance": distance,
                 "img": media,
                 "Media": media,
-                "country": rawMap["Country"] ?? "India",
+                "country": (rawMap["Country"] ??
+                        rawMap["country"] ??
+                        rawMap["CountryName"] ??
+                        "India")
+                    .toString(),
                 "liked": false,
                 "raw": rawMap,
               });
@@ -627,21 +640,67 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
                         if (displayList.isEmpty) {
                           return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.filter_alt_off_rounded,
-                                  color: Colors.white38,
-                                  size: 36.sp,
-                                ),
-                                SizedBox(height: 8.h),
-                                const Text(
-                                  "You're all caught up! New people will appear as they join.",
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white60),
-                                ),
-                              ],
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 28.w),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 78.w,
+                                    height: 78.w,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.cyanAccent.withValues(alpha: 0.10),
+                                      border: Border.all(
+                                        color: Colors.cyanAccent.withValues(alpha: 0.35),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.people_alt_rounded,
+                                      color: Colors.cyanAccent,
+                                      size: 40.sp,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16.h),
+                                  Text(
+                                    "No matches yet",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18.sp,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  SizedBox(height: 7.h),
+                                  Text(
+                                    "New people will appear here as they join.",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white60,
+                                      fontSize: 13.sp,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  SizedBox(height: 14.h),
+                                  TextButton.icon(
+                                    onPressed: _fetchAllUsers,
+                                    icon: Icon(
+                                      Icons.refresh_rounded,
+                                      color: Colors.cyanAccent,
+                                      size: 18.sp,
+                                    ),
+                                    label: Text(
+                                      "Refresh",
+                                      style: TextStyle(
+                                        color: Colors.cyanAccent,
+                                        fontSize: 13.sp,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         }
@@ -666,6 +725,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                     img.startsWith("https"));
                             final bool isOnline = user["isOnline"] == true;
                             final bool isVerified = user["isVerified"] == true;
+                            final String country =
+                                (user["country"] ?? "India").toString();
 
                             return GestureDetector(
                               onTap: () {
@@ -849,6 +910,42 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
                                             SizedBox(height: 4.h),
 
+                                            /// COUNTRY
+                                            Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 6.w,
+                                                vertical: 2.h,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.45,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12.r),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    countryFlag(country),
+                                                    style: TextStyle(
+                                                      fontSize: 9.sp,
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 3.w),
+                                                  Text(
+                                                    country,
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 9.sp,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            SizedBox(height: 4.h),
+
                                             /// DISTANCE & LOOKING FOR
                                             Row(
                                               mainAxisAlignment:
@@ -882,7 +979,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                                       ),
                                                       SizedBox(width: 2.w),
                                                       Text(
-                                                        "${user["distance"]}",
+                                                        "${user["distance"]}"
+                                                                .toLowerCase()
+                                                                .contains(
+                                                                  "away",
+                                                                )
+                                                            ? "${user["distance"]}"
+                                                            : "${user["distance"]} away",
                                                         style: TextStyle(
                                                           color: Colors.white,
                                                           fontSize: 9.sp,

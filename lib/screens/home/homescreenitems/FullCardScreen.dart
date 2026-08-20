@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:boomboom/authentication/boomboom.dart';
+import '../../../authentication/messagedetail.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:xml/xml.dart' as xml;
@@ -26,6 +28,8 @@ class _FullCardScreenState extends State<FullCardScreen> {
   List<Map<String, dynamic>> _users = [];
   Position? _currentPosition;
   final Set<String> _likedUserIds = {};
+  static final Map<String, String> _staticCountryCache = {};
+  final Set<String> _resolvingKeys = {};
 
   @override
   void initState() {
@@ -63,11 +67,21 @@ class _FullCardScreenState extends State<FullCardScreen> {
                 ? rawList.sublist(rawList.length - 10)
                 : rawList;
 
+            final mappedUsers = List<Map<String, dynamic>>.from(last10);
+            for (var user in mappedUsers) {
+              final c = _getUserCountry(user);
+              if (c.isNotEmpty) {
+                user["Country"] = c;
+                user["country"] = c;
+              }
+            }
+
             if (mounted) {
               setState(() {
-                _users = List<Map<String, dynamic>>.from(last10);
+                _users = mappedUsers;
                 _isLoading = false;
               });
+              _resolveAllUserCountries(mappedUsers);
             }
             return;
           }
@@ -81,6 +95,86 @@ class _FullCardScreenState extends State<FullCardScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  void _resolveAllUserCountries(List<Map<String, dynamic>> users) {
+    for (var user in users) {
+      _getUserCountry(user);
+    }
+  }
+
+  String _getUserCountry(Map<String, dynamic> user) {
+    final String explicitCountry =
+        (user["Country"] ?? user["country"] ?? user["CountryName"] ?? "")
+            .toString()
+            .trim();
+    if (explicitCountry.isNotEmpty &&
+        explicitCountry.toLowerCase() != "null" &&
+        explicitCountry != "0") {
+      return explicitCountry;
+    }
+
+    final key =
+        (user["EmailAddress"] ??
+                user["email"] ??
+                user["id"] ??
+                user["FullName"] ??
+                "")
+            .toString()
+            .trim();
+    if (key.isNotEmpty && _staticCountryCache.containsKey(key)) {
+      return _staticCountryCache[key]!;
+    }
+
+    final lat = double.tryParse(user['Lat']?.toString() ?? '');
+    final lon = double.tryParse(user['Lon']?.toString() ?? '');
+    if (lat != null && lon != null && (lat != 0 || lon != 0)) {
+      if (lat >= 6.0 && lat <= 37.5 && lon >= 68.0 && lon <= 98.0) {
+        if (key.isNotEmpty) _staticCountryCache[key] = "India";
+        return "India";
+      }
+      if (lat >= 4.0 && lat <= 14.0 && lon >= 2.5 && lon <= 15.0) {
+        if (key.isNotEmpty) _staticCountryCache[key] = "Nigeria";
+        return "Nigeria";
+      }
+      _resolveCountryAsync(key, lat, lon);
+      return "";
+    }
+
+    final String city = (user["City"] ?? user["city"] ?? user["Location"] ?? "")
+        .toString()
+        .trim();
+    if (city.isNotEmpty && city.toLowerCase() != "null") {
+      return city;
+    }
+
+    return "";
+  }
+
+  Future<void> _resolveCountryAsync(String key, double lat, double lon) async {
+    if (key.isEmpty ||
+        _resolvingKeys.contains(key) ||
+        _staticCountryCache.containsKey(key)) {
+      return;
+    }
+    _resolvingKeys.add(key);
+    try {
+      final geocoder = geo.Geocoding();
+      final placemarks = await geocoder.placemarkFromCoordinates(lat, lon);
+      if (placemarks.isNotEmpty) {
+        final country = (placemarks.first.country ?? '').trim();
+        if (country.isNotEmpty) {
+          _staticCountryCache[key] = country;
+          if (mounted) {
+            setState(() {});
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[FullCardScreen] Geocoding lookup error: $e");
+    } finally {
+      _resolvingKeys.remove(key);
     }
   }
 
@@ -98,6 +192,14 @@ class _FullCardScreenState extends State<FullCardScreen> {
     } catch (_) {
       return 24;
     }
+  }
+
+  bool _readBool(dynamic value) {
+    final normalized = value?.toString().trim().toLowerCase();
+    return normalized == 'true' ||
+        normalized == '1' ||
+        normalized == 'yes' ||
+        normalized == 'online';
   }
 
   String _calculateDistance(String? latStr, String? lonStr) {
@@ -148,23 +250,57 @@ class _FullCardScreenState extends State<FullCardScreen> {
 
       if (displayUsers.isEmpty) {
         return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.filter_alt_off_rounded,
-                color: AppColors.grey,
-                size: 36.sp,
-              ),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24.w),
-                child: Text(
-                  "You're all caught up! New people will appear as they join.",
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.body.copyWith(color: AppColors.grey),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 18.h),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 64.w,
+                  height: 64.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.cyanAccent.withValues(alpha: 0.10),
+                    border: Border.all(
+                      color: Colors.cyanAccent.withValues(alpha: 0.32),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.people_alt_rounded,
+                    color: Colors.cyanAccent,
+                    size: 32.sp,
+                  ),
                 ),
-              ),
-            ],
+                SizedBox(height: 10.h),
+                Text(
+                  "No new profiles found",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  "Please refresh or check back soon.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white60, fontSize: 12.sp),
+                ),
+                TextButton.icon(
+                  onPressed: _fetchUsers,
+                  icon: Icon(
+                    Icons.refresh_rounded,
+                    color: Colors.cyanAccent,
+                    size: 17.sp,
+                  ),
+                  label: Text(
+                    "Refresh",
+                    style: TextStyle(color: Colors.cyanAccent, fontSize: 12.sp),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }
@@ -178,12 +314,17 @@ class _FullCardScreenState extends State<FullCardScreen> {
 
           return GestureDetector(
             onTap: () {
+              final userWithCountry = Map<String, dynamic>.from(user);
+              final resolvedC = _getUserCountry(user);
+              userWithCountry["Country"] = resolvedC;
+              userWithCountry["country"] = resolvedC;
+
               Get.to(
                 () => BoomProfileScreen(
                   userEmail:
                       user["EmailAddress"]?.toString() ??
                       user["email"]?.toString(),
-                  initialUserData: user,
+                  initialUserData: userWithCountry,
                 ),
                 transition: Transition.rightToLeft,
               );
@@ -289,9 +430,10 @@ class _FullCardScreenState extends State<FullCardScreen> {
   Widget _card(Map<String, dynamic> user, int index) {
     final String fullName = (user["FullName"] ?? "User").toString();
     final int age = _calculateAge(user["Dob"]?.toString());
-    final bool isOnline = user["IsOnline"]?.toString().toLowerCase() == "true";
-    final bool isVerified =
-        user["IsVerified"]?.toString().toLowerCase() == "true";
+    final bool isOnline = _readBool(
+      user["IsOnline"] ?? user["isOnline"] ?? user["Online"],
+    );
+    final bool isVerified = _readBool(user["IsVerified"] ?? user["isVerified"]);
     final String lookingFor = (user["Lookingfor"] ?? "Serious Love").toString();
     final String distance = _calculateDistance(
       user["Lat"]?.toString(),
@@ -304,6 +446,9 @@ class _FullCardScreenState extends State<FullCardScreen> {
         mediaStr.isNotEmpty &&
         mediaStr.toLowerCase() != "null" &&
         (mediaStr.startsWith("http") || mediaStr.startsWith("https"));
+
+    final String country = _getUserCountry(user);
+    final String flag = countryFlag(country);
 
     return Container(
       width: AppSize.w(280),
@@ -374,33 +519,35 @@ class _FullCardScreenState extends State<FullCardScreen> {
                           ],
                         ),
 
-                        SizedBox(height: 8.h),
+                        if (country.isNotEmpty) ...[
+                          SizedBox(height: 8.h),
 
-                        /// COUNTRY / CITY
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8.w,
-                            vertical: 4.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.45),
-                            borderRadius: BorderRadius.circular(20.r),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text("🇮🇳", style: TextStyle(fontSize: 10.sp)),
-                              SizedBox(width: 4.w),
-                              Text(
-                                "India",
-                                style: AppTextStyles.small.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 10.sp,
+                          /// COUNTRY / CITY
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8.w,
+                              vertical: 4.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(20.r),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(flag, style: TextStyle(fontSize: 10.sp)),
+                                SizedBox(width: 4.w),
+                                Text(
+                                  country,
+                                  style: AppTextStyles.small.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 10.sp,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
 
                         SizedBox(height: 6.h),
 
@@ -598,7 +745,9 @@ class _FullCardScreenState extends State<FullCardScreen> {
                               ),
                               SizedBox(width: 4.w),
                               Text(
-                                distance,
+                                distance.toLowerCase().contains('away')
+                                    ? distance
+                                    : '$distance away',
                                 style: AppTextStyles.small.copyWith(
                                   color: Colors.white,
                                   fontSize: 10.sp,
@@ -643,50 +792,93 @@ class _FullCardScreenState extends State<FullCardScreen> {
                     SizedBox(height: 12.h),
 
                     /// MESSAGE BOX
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 45.h,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(30.r),
-                              border: Border.all(color: Colors.white12),
-                            ),
-                            child: Row(
-                              children: [
-                                /// TEXT
-                                Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(left: 15.w),
-                                    child: Text(
-                                      "Send message...",
-                                      style: AppTextStyles.body.copyWith(
-                                        color: Colors.white70,
-                                        fontSize: AppSize.sp(12),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        final String userEmail =
+                            (user["EmailAddress"] ?? user["email"] ?? "")
+                                .toString()
+                                .trim();
+                        final String userImg = hasValidImage
+                            ? mediaStr
+                            : (user["Media"] ??
+                                      user["media"] ??
+                                      user["Image"] ??
+                                      "")
+                                  .toString();
+                        final Map<String, String> messageMap = {
+                          "name": fullName,
+                          "image": userImg,
+                          "age": age.toString(),
+                          "gender": (user["Gender"] ?? user["gender"] ?? "M")
+                              .toString(),
+                          "city": (user["City"] ?? user["city"] ?? country)
+                              .toString(),
+                          "flag": flag,
+                          "email": userEmail,
+                          "EmailAddress": userEmail,
+                          "ActionEmail": userEmail,
+                          "OtherUser": userEmail,
+                          "SenderImage": userImg,
+                          "RecieverImage": userImg,
+                          "isOnline": isOnline.toString(),
+                          "status": isOnline ? "Online" : "Offline",
+                          "chatListId":
+                              (user["ChatListId"] ?? user["chatListId"] ?? "0")
+                                  .toString(),
+                        };
+
+                        MessageDetailPage.show(
+                          context,
+                          index: index,
+                          messageData: messageMap,
+                        );
+                      },
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 45.h,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(30.r),
+                                border: Border.all(color: Colors.white12),
+                              ),
+                              child: Row(
+                                children: [
+                                  /// TEXT
+                                  Expanded(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(left: 15.w),
+                                      child: Text(
+                                        "Send message...",
+                                        style: AppTextStyles.body.copyWith(
+                                          color: Colors.white70,
+                                          fontSize: AppSize.sp(12),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                Container(
-                                  height: double.infinity,
-                                  width: 42.w,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: ClipOval(
-                                    child: Image.asset(
-                                      "assets/arroriconimage.png",
-                                      fit: BoxFit.cover,
+                                  Container(
+                                    height: double.infinity,
+                                    width: 42.w,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: ClipOval(
+                                      child: Image.asset(
+                                        "assets/arroriconimage.png",
+                                        fit: BoxFit.cover,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        SizedBox(width: 10.w),
-                      ],
+                          SizedBox(width: 10.w),
+                        ],
+                      ),
                     ),
                   ],
                 ),

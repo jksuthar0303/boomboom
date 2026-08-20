@@ -770,410 +770,157 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // ignore: unused_local_variable
           final filterVersion = FilterController.instance.filterVersion.value;
           return ListView(
-          children: [
-            // ── TOP BAR ──────────────────────────────────
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14.w),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => Get.to(() => SettingsScreen()),
-                        child: CircleAvatar(
-                          radius: 18.r,
-                          backgroundImage: NetworkImage(_profileImageUrl),
-                        ),
-                      ),
-                      SizedBox(width: 10.w),
-                      Row(
-                        children: [
-                          Text(
-                            _currentCityName,
-                            style: AppTextStyles.subHeading,
-                          ),
-                          SizedBox(width: 4.w),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      // ✅ Circle grey (pehle jaisa) — sirf icon YELLOW
-                      GestureDetector(
-                        onTap: () {
-                          Get.to(() => const NotificationSettingsScreen());
-                        },
-                        child: CustomLottieee(
-                          asset: "assets/Notification bell.json",
-                          height: 28.h,
-                          width: 28.w,
-                        ),
-                      ),
-
-                      SizedBox(width: 10.w),
-
-                      // Filter Icon — connected to FilterController
-                      GestureDetector(
-                        onTap: () async {
-                          await Get.to(() => const FilterPreferencesScreen());
-                          setState(() {});
-                        },
-                        child: Obx(() {
-                          final isActive =
-                              FilterController.instance.isFilterActive;
-                          return CircleAvatar(
-                            backgroundColor: isActive
-                                ? const Color(0xFFE8335A)
-                                : Colors.grey.shade800,
-                            child: const Icon(
-                              Icons.tune_rounded,
-                              color: Colors.white,
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 16.h),
-
-            // ── CAROUSEL ─────────────────────────────────
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14.w),
-              child: SizedBox(
-                height: 200.h,
-                child: Stack(
-                  children: [
-                    PageView.builder(
-                      controller: _pageController,
-                      itemCount: _topCards.length,
-                      onPageChanged: (index) {
-                        setState(() => _currentPage = index);
-                      },
-                      itemBuilder: (context, index) {
-                        final card = _topCards[index];
-                        if (card["isTravelAlert"] == true) {
-                          return _travelAlertCard(card);
-                        }
-                        return _normalCard(card);
-                      },
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      left: 0,
-                      right: 0,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          _topCards.length,
-                          (index) => AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            margin: EdgeInsets.symmetric(horizontal: 4.w),
-                            width: _currentPage == index ? 20.w : 7.w,
-                            height: 7.h,
-                            decoration: BoxDecoration(
-                              color: _currentPage == index
-                                  ? Colors.white
-                                  : Colors.white38,
-                              borderRadius: BorderRadius.circular(10.r),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            SizedBox(height: 20.h),
-
-            // ── NEW MATCHES LABEL ─────────────────────────
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14.w),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(22.r),
-                  border: Border.all(
-                    color: Colors.cyanAccent.withValues(alpha: 0.15),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.cyanAccent.withValues(alpha: 0.08),
-                      blurRadius: 20,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40.w,
-                      height: 40.w,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.cyanAccent,
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.cyanAccent.withValues(alpha: 0.5),
-                            blurRadius: 15,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.local_fire_department,
-                        color: Colors.orangeAccent,
-                        size: 18.sp,
-                      ),
-                    ),
-                    SizedBox(width: 8.w),
-                    Text(
-                      "NEW",
-                      style: AppTextStyles.subHeading.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            SizedBox(height: 12.h),
-
-            SizedBox(height: AppSize.h(420), child: FullCardScreen()),
-
-            SizedBox(height: 24.h),
-
-            // ── ACTIVE / VERIFIED TABS ────────────────────
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14.w),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      _tabController.animateTo(0);
-                      setState(() {});
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12.w,
-                        vertical: 6.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _tabController.index == 0
-                            ? Colors.cyanAccent.withValues(alpha: 0.15)
-                            : Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(
-                          color: _tabController.index == 0
-                              ? Colors.cyanAccent.withValues(alpha: 0.4)
-                              : Colors.white.withValues(alpha: 0.08),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8.w,
-                            height: 8.w,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF2ECC71),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          SizedBox(width: 6.w),
-                          Text(
-                            "Active",
-                            style: AppTextStyles.subHeading.copyWith(
-                              fontSize: 12.sp,
-                              color: _tabController.index == 0
-                                  ? Colors.white
-                                  : Colors.white54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 8.w),
-                  GestureDetector(
-                    onTap: () {
-                      _tabController.animateTo(1);
-                      setState(() {});
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12.w,
-                        vertical: 6.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _tabController.index == 1
-                            ? Colors.cyanAccent.withValues(alpha: 0.15)
-                            : Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(
-                          color: _tabController.index == 1
-                              ? Colors.cyanAccent.withValues(alpha: 0.4)
-                              : Colors.white.withValues(alpha: 0.08),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.verified_rounded,
-                            color: Colors.cyanAccent,
-                            size: 11.sp,
-                          ),
-                          SizedBox(width: 6.w),
-                          Text(
-                            "Verified",
-                            style: AppTextStyles.subHeading.copyWith(
-                              fontSize: 12.sp,
-                              color: _tabController.index == 1
-                                  ? Colors.white
-                                  : Colors.white54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 18.h),
-
-            Builder(
-              builder: (_) {
-                final isActive = _tabController.index == 0;
-                final isLoading = isActive
-                    ? _isOnlineLoading
-                    : _isVerifiedLoading;
-                final rawList = isActive ? _onlineUsers : _verifiedUsers;
-
-                if (isLoading) {
-                  return SizedBox(
-                    height: 220.h,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF9B59B6),
-                        strokeWidth: 2.5,
-                      ),
-                    ),
-                  );
-                }
-
-                // Filter profiles in frontend memory
-                final filtered = FilterController.instance.applyFilterToUsers(
-                  rawList,
-                  userPosition: _currentPosition,
-                );
-                final displayUsers = filtered.take(5).toList();
-
-                return _activeVerifiedUserRow(displayUsers, isActive);
-              },
-            ),
-
-            SizedBox(height: 28.h),
-
-            // ── EVERYONE ROW ──────────────────────────────
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14.w),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(22.r),
-                  border: Border.all(
-                    color: Colors.cyanAccent.withValues(alpha: 0.15),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.cyanAccent.withValues(alpha: 0.08),
-                      blurRadius: 20,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
+            children: [
+              // ── TOP BAR ──────────────────────────────────
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14.w),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
-                        Container(
-                          width: 40.w,
-                          height: 52.w,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.cyanAccent,
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.cyanAccent.withValues(alpha: 0.5),
-                                blurRadius: 15,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.groups_rounded,
-                            color: Colors.cyanAccent,
-                            size: 15.sp,
+                        GestureDetector(
+                          onTap: () => Get.to(() => SettingsScreen()),
+                          child: CircleAvatar(
+                            radius: 18.r,
+                            backgroundImage: NetworkImage(_profileImageUrl),
                           ),
                         ),
-                        SizedBox(width: 14.w),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        SizedBox(width: 10.w),
+                        Row(
                           children: [
                             Text(
-                              "Everyone",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 22.sp,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              _currentCityName,
+                              style: AppTextStyles.subHeading,
                             ),
-                            SizedBox(height: 2.h),
-                            Text(
-                              "Everyone's here, explore freely",
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 11.sp,
-                              ),
-                            ),
+                            SizedBox(width: 4.w),
                           ],
                         ),
                       ],
                     ),
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const MatchesScreen(),
+                    Row(
+                      children: [
+                        // ✅ Circle grey (pehle jaisa) — sirf icon YELLOW
+                        GestureDetector(
+                          onTap: () {
+                            Get.to(() => const NotificationSettingsScreen());
+                          },
+                          child: CustomLottieee(
+                            asset: "assets/Notification bell.json",
+                            height: 28.h,
+                            width: 28.w,
+                          ),
+                        ),
+
+                        SizedBox(width: 10.w),
+
+                        // Filter Icon — connected to FilterController
+                        GestureDetector(
+                          onTap: () async {
+                            await Get.to(() => const FilterPreferencesScreen());
+                            setState(() {});
+                          },
+                          child: Obx(() {
+                            final isActive =
+                                FilterController.instance.isFilterActive;
+                            return CircleAvatar(
+                              backgroundColor: isActive
+                                  ? const Color(0xFFE8335A)
+                                  : Colors.grey.shade800,
+                              child: const Icon(
+                                Icons.tune_rounded,
+                                color: Colors.white,
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 16.h),
+
+              // ── CAROUSEL ─────────────────────────────────
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14.w),
+                child: SizedBox(
+                  height: 200.h,
+                  child: Stack(
+                    children: [
+                      PageView.builder(
+                        controller: _pageController,
+                        itemCount: _topCards.length,
+                        onPageChanged: (index) {
+                          setState(() => _currentPage = index);
+                        },
+                        itemBuilder: (context, index) {
+                          final card = _topCards[index];
+                          if (card["isTravelAlert"] == true) {
+                            return _travelAlertCard(card);
+                          }
+                          return _normalCard(card);
+                        },
+                      ),
+                      Positioned(
+                        bottom: 10,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            _topCards.length,
+                            (index) => AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              margin: EdgeInsets.symmetric(horizontal: 4.w),
+                              width: _currentPage == index ? 20.w : 7.w,
+                              height: 7.h,
+                              decoration: BoxDecoration(
+                                color: _currentPage == index
+                                    ? Colors.white
+                                    : Colors.white38,
+                                borderRadius: BorderRadius.circular(10.r),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      child: Container(
-                        width: 30.w,
-                        height: 30.w,
+                    ],
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 20.h),
+
+              // ── NEW MATCHES LABEL ─────────────────────────
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14.w),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 8.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(22.r),
+                    border: Border.all(
+                      color: Colors.cyanAccent.withValues(alpha: 0.15),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.cyanAccent.withValues(alpha: 0.08),
+                        blurRadius: 20,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40.w,
+                        height: 40.w,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
@@ -1182,80 +929,250 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.cyanAccent.withValues(alpha: 0.4),
-                              blurRadius: 10,
+                              color: Colors.cyanAccent.withValues(alpha: 0.5),
+                              blurRadius: 15,
                               spreadRadius: 1,
                             ),
                           ],
                         ),
                         child: Icon(
-                          Icons.arrow_forward,
-                          color: Colors.cyanAccent,
-                          size: 15.sp,
+                          Icons.local_fire_department,
+                          color: Colors.orangeAccent,
+                          size: 18.sp,
+                        ),
+                      ),
+                      SizedBox(width: 8.w),
+                      Text(
+                        "NEW",
+                        style: AppTextStyles.subHeading.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 12.h),
+
+              SizedBox(height: AppSize.h(420), child: FullCardScreen()),
+
+              SizedBox(height: 24.h),
+
+              // ── ACTIVE / VERIFIED TABS ────────────────────
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14.w),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        _tabController.animateTo(0);
+                        setState(() {});
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 6.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _tabController.index == 0
+                              ? Colors.cyanAccent.withValues(alpha: 0.15)
+                              : Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                            color: _tabController.index == 0
+                                ? Colors.cyanAccent.withValues(alpha: 0.4)
+                                : Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8.w,
+                              height: 8.w,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF2ECC71),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            SizedBox(width: 6.w),
+                            Text(
+                              "Active",
+                              style: AppTextStyles.subHeading.copyWith(
+                                fontSize: 12.sp,
+                                color: _tabController.index == 0
+                                    ? Colors.white
+                                    : Colors.white54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    GestureDetector(
+                      onTap: () {
+                        _tabController.animateTo(1);
+                        setState(() {});
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 6.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _tabController.index == 1
+                              ? Colors.cyanAccent.withValues(alpha: 0.15)
+                              : Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                            color: _tabController.index == 1
+                                ? Colors.cyanAccent.withValues(alpha: 0.4)
+                                : Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.verified_rounded,
+                              color: Colors.cyanAccent,
+                              size: 11.sp,
+                            ),
+                            SizedBox(width: 6.w),
+                            Text(
+                              "Verified",
+                              style: AppTextStyles.subHeading.copyWith(
+                                fontSize: 12.sp,
+                                color: _tabController.index == 1
+                                    ? Colors.white
+                                    : Colors.white54,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
 
-            SizedBox(height: 12.h),
+              SizedBox(height: 18.h),
 
-            // ── EVERYONE GRID ─────────────────────────────
-            Builder(
-              builder: (_) {
-                if (_isEveryoneLoading) {
-                  return SizedBox(
-                    height: 180.h,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF9B59B6),
-                        strokeWidth: 2.5,
-                      ),
-                    ),
-                  );
-                }
+              Builder(
+                builder: (_) {
+                  final isActive = _tabController.index == 0;
+                  final isLoading = isActive
+                      ? _isOnlineLoading
+                      : _isVerifiedLoading;
+                  final rawList = isActive ? _onlineUsers : _verifiedUsers;
 
-                if (_everyoneUsers.isEmpty) {
-                  return Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 20.w),
-                    child: Center(
-                      child: Text(
-                        "You're all caught up! New people will appear as they join.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white60,
-                          fontSize: 13.sp,
-                          height: 1.4,
+                  if (isLoading) {
+                    return SizedBox(
+                      height: 220.h,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF9B59B6),
+                          strokeWidth: 2.5,
                         ),
                       ),
-                    ),
+                    );
+                  }
+
+                  // Filter profiles in frontend memory
+                  final filtered = FilterController.instance.applyFilterToUsers(
+                    rawList,
+                    userPosition: _currentPosition,
                   );
-                }
+                  final displayUsers = filtered.take(5).toList();
 
-                // Filter profiles in frontend memory
-                final filtered = FilterController.instance.applyFilterToUsers(
-                  _everyoneUsers,
-                  userPosition: _currentPosition,
-                );
-                // First 11 filtered users from API, 12th is "See All"
-                final displayUsers = filtered.take(11).toList();
+                  return _activeVerifiedUserRow(displayUsers, isActive);
+                },
+              ),
 
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: displayUsers.length + 1,
-                  padding: EdgeInsets.symmetric(horizontal: 14.w),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8.w,
-                    mainAxisSpacing: 8.h,
-                    childAspectRatio: 0.64,
+              SizedBox(height: 28.h),
+
+              // ── EVERYONE ROW ──────────────────────────────
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14.w),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14.w,
+                    vertical: 14.h,
                   ),
-                  itemBuilder: (_, index) {
-                    if (index == displayUsers.length) {
-                      return GestureDetector(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(22.r),
+                    border: Border.all(
+                      color: Colors.cyanAccent.withValues(alpha: 0.15),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.cyanAccent.withValues(alpha: 0.08),
+                        blurRadius: 20,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 40.w,
+                            height: 52.w,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.cyanAccent,
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.cyanAccent.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  blurRadius: 15,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.groups_rounded,
+                              color: Colors.cyanAccent,
+                              size: 15.sp,
+                            ),
+                          ),
+                          SizedBox(width: 14.w),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Everyone",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22.sp,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 2.h),
+                              Text(
+                                "Everyone's here, explore freely",
+                                style: TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 11.sp,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      GestureDetector(
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1263,49 +1180,134 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
                         child: Container(
+                          width: 30.w,
+                          height: 30.w,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14.r),
-                            gradient: const LinearGradient(
-                              colors: [Colors.cyanAccent, Colors.blueAccent],
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.cyanAccent,
+                              width: 1.5,
                             ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(10.w),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.arrow_forward,
-                                  color: Colors.white,
-                                  size: 22.sp,
-                                ),
-                              ),
-                              SizedBox(height: 10.h),
-                              Text(
-                                "See All",
-                                style: AppTextStyles.small.copyWith(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12.sp,
-                                ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.cyanAccent.withValues(alpha: 0.4),
+                                blurRadius: 10,
+                                spreadRadius: 1,
                               ),
                             ],
                           ),
+                          child: Icon(
+                            Icons.arrow_forward,
+                            color: Colors.cyanAccent,
+                            size: 15.sp,
+                          ),
                         ),
-                      );
-                    }
-                    return _everyoneGridCard(displayUsers[index]);
-                  },
-                );
-              },
-            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-            SizedBox(height: 100.h),
-          ],
+              SizedBox(height: 12.h),
+
+              // ── EVERYONE GRID ─────────────────────────────
+              Builder(
+                builder: (_) {
+                  if (_isEveryoneLoading) {
+                    return SizedBox(
+                      height: 180.h,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF9B59B6),
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (_everyoneUsers.isEmpty) {
+                    return _homeEmptyState(
+                      title: "No new profiles found",
+                      subtitle: "Please refresh or check back soon.",
+                      icon: Icons.people_alt_rounded,
+                      onRefresh: _fetchEveryoneUsers,
+                    );
+                  }
+
+                  // Filter profiles in frontend memory
+                  final filtered = FilterController.instance.applyFilterToUsers(
+                    _everyoneUsers,
+                    userPosition: _currentPosition,
+                  );
+                  // First 11 filtered users from API, 12th is "See All"
+                  final displayUsers = filtered.take(11).toList();
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: displayUsers.length + 1,
+                    padding: EdgeInsets.symmetric(horizontal: 10.w),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 6.w,
+                      mainAxisSpacing: 5.h,
+                      // Slightly taller cards so profiles are easier to see.
+                      childAspectRatio: 0.56,
+                    ),
+                    itemBuilder: (_, index) {
+                      if (index == displayUsers.length) {
+                        return GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MatchesScreen(),
+                            ),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14.r),
+                              gradient: const LinearGradient(
+                                colors: [Colors.cyanAccent, Colors.blueAccent],
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(10.w),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_forward,
+                                    color: Colors.white,
+                                    size: 22.sp,
+                                  ),
+                                ),
+                                SizedBox(height: 10.h),
+                                Text(
+                                  "See All",
+                                  style: AppTextStyles.small.copyWith(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      return _everyoneGridCard(displayUsers[index]);
+                    },
+                  );
+                },
+              ),
+
+              // Keep the last row above the persistent bottom navigation bar.
+              SizedBox(height: 108.h + MediaQuery.of(context).padding.bottom),
+            ],
           );
         }),
       ),
@@ -1317,18 +1319,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     bool isActive,
   ) {
     if (users.isEmpty) {
-      return SizedBox(
-        height: 100.h,
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.w),
-            child: Text(
-              "You're all caught up! New people will appear as they join.",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 12.sp),
-            ),
-          ),
-        ),
+      return _homeEmptyState(
+        title: isActive ? "No active people" : "No verified people",
+        subtitle: isActive
+            ? "Active profiles will appear here when people come online."
+            : "Verified profiles will appear here as they are approved.",
+        icon: isActive ? Icons.wifi_tethering_rounded : Icons.verified_rounded,
+        onRefresh: isActive ? _fetchOnlineUsers : _fetchVerifiedUsers,
       );
     }
 
@@ -1522,6 +1519,68 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _homeEmptyState({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onRefresh,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 62.w,
+              height: 62.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.cyanAccent.withValues(alpha: 0.10),
+                border: Border.all(
+                  color: Colors.cyanAccent.withValues(alpha: 0.30),
+                ),
+              ),
+              child: Icon(icon, color: Colors.cyanAccent, size: 30.sp),
+            ),
+            SizedBox(height: 10.h),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white60,
+                fontSize: 12.sp,
+                height: 1.35,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: onRefresh,
+              icon: Icon(
+                Icons.refresh_rounded,
+                color: Colors.cyanAccent,
+                size: 17.sp,
+              ),
+              label: Text(
+                "Refresh",
+                style: TextStyle(color: Colors.cyanAccent, fontSize: 12.sp),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildUserRowInitialBg(String initial) {
     return Container(
       decoration: const BoxDecoration(
@@ -1575,9 +1634,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _everyoneGridCard(Map<String, dynamic> user) {
     final String fullName = (user["FullName"] ?? "User").toString();
     final int age = _calculateUserAge(user["Dob"]?.toString());
-    final bool isOnline = user["IsOnline"]?.toString().toLowerCase() == "true";
-    final bool isVerified =
-        user["IsVerified"]?.toString().toLowerCase() == "true";
+    final String onlineValue =
+        (user["IsOnline"] ?? user["isOnline"] ?? user["Online"] ?? "")
+            .toString()
+            .trim()
+            .toLowerCase();
+    final bool isOnline =
+        onlineValue == "true" ||
+        onlineValue == "1" ||
+        onlineValue == "yes" ||
+        onlineValue == "online";
+    final String verifiedValue =
+        (user["IsVerified"] ?? user["isVerified"] ?? "")
+            .toString()
+            .trim()
+            .toLowerCase();
+    final bool isVerified = verifiedValue == "true" || verifiedValue == "1";
     final String? media = user["Media"]?.toString();
     final bool hasValidImg =
         media != null &&

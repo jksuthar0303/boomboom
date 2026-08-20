@@ -357,7 +357,7 @@ class _LikesScreenState extends State<LikesScreen> {
             Text(
               retry
                   ? message
-                  : "You're all caught up! New people will appear as they join.",
+                  : "No favourites yet. Profiles you like will appear here.",
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white60, height: 1.4),
             ),

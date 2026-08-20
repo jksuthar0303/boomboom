@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -6,7 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:get/get.dart';
 
+import 'package:xml/xml.dart' as xml;
+
+import '../backend/registerservice.dart';
+import '../backend/secure_storage.dart';
 import '../constant/appsize.dart';
 import '../constant/colors.dart';
 import '../model/messagedetails.dart';
@@ -24,12 +30,14 @@ class MessageDetailPage extends StatefulWidget {
   final int index;
   final Map<String, String> messageData;
   final ScrollController? sheetScrollController;
+  final DraggableScrollableController? draggableController;
 
   const MessageDetailPage({
     super.key,
     required this.index,
     required this.messageData,
     this.sheetScrollController,
+    this.draggableController,
   });
 
   // ─────────────────────────────────────────
@@ -41,6 +49,8 @@ class MessageDetailPage extends StatefulWidget {
     required int index,
     required Map<String, String> messageData,
   }) {
+    final DraggableScrollableController sheetCtrl =
+        DraggableScrollableController();
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -48,12 +58,13 @@ class MessageDetailPage extends StatefulWidget {
       barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (_) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.5,
+          controller: sheetCtrl,
+          initialChildSize: 0.62,
+          minChildSize: 0.50,
           maxChildSize: 1.0,
           expand: false,
           snap: true,
-          snapSizes: const [0.5, 1.0],
+          snapSizes: const [0.62, 1.0],
           builder: (ctx, scrollController) {
             return ClipRRect(
               borderRadius: BorderRadius.only(
@@ -64,6 +75,7 @@ class MessageDetailPage extends StatefulWidget {
                 index: index,
                 messageData: messageData,
                 sheetScrollController: scrollController,
+                draggableController: sheetCtrl,
               ),
             );
           },
@@ -78,6 +90,7 @@ class MessageDetailPage extends StatefulWidget {
 
 class _MessageDetailPageState extends State<MessageDetailPage> {
   final TextEditingController _ctrl = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   final ScrollController _chatScroll = ScrollController();
   final ImagePicker _picker = ImagePicker();
   bool _showEmojiPicker = false;
@@ -146,16 +159,299 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
     '💸',
   ];
 
+  bool _isLoadingMessages = true;
+  String? _blockMessage;
+  bool _isSenderPending = false;
+  final List<ChatMessage> _chats = [];
+  final List<ChatMessage> _pendingLocalChats = [];
+  Timer? _pollingTimer;
+  bool _isPollingInProgress = false;
+  int? _resolvedChatListId;
+
   // ─────────────────────────────────────────
   // 🔥 INIT STATE
   // ─────────────────────────────────────────
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {});
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus) {
+        if (_showEmojiPicker) {
+          setState(() => _showEmojiPicker = false);
+        }
+        if (widget.draggableController != null &&
+            widget.draggableController!.isAttached) {
+          widget.draggableController!.animateTo(
+            1.0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+        Future.delayed(const Duration(milliseconds: 280), () {
+          _scrollToBottom(animate: true);
+        });
+      }
+    });
+    _fetchChatMessages(isInitial: true);
+    // Realtime polling every 500ms
+    _pollingTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      _fetchChatMessages(isInitial: false);
+    });
   }
 
-  final List<ChatMessage> _chats = [];
+  void _scrollToBottom({bool animate = true}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final scrollCtrl = widget.sheetScrollController ?? _chatScroll;
+      if (scrollCtrl.hasClients) {
+        if (animate) {
+          scrollCtrl.animateTo(
+            scrollCtrl.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOut,
+          );
+        } else {
+          scrollCtrl.jumpTo(scrollCtrl.position.maxScrollExtent);
+        }
+      }
+    });
+  }
+
+  Future<void> _fetchChatMessages({bool isInitial = false}) async {
+    if (_isPollingInProgress) return;
+    _isPollingInProgress = true;
+
+    int chatListId = _resolvedChatListId ??
+        int.tryParse((widget.messageData["ChatListId"] ??
+                widget.messageData["chatListId"] ??
+                widget.messageData["id"] ??
+                "0")
+            .toString()) ??
+        0;
+
+    final otherEmail = (widget.messageData["email"] ??
+            widget.messageData["EmailAddress"] ??
+            widget.messageData["ActionEmail"] ??
+            widget.messageData["OtherUser"] ??
+            "")
+        .toString()
+        .trim();
+
+    try {
+      final myEmail = await SecureStorage().getUserEmail() ?? "";
+
+      // 🔥 If opened from profile with chatListId == 0, check if chat already exists in ShowChatList!
+      if (chatListId <= 0 && otherEmail.isNotEmpty && myEmail.isNotEmpty) {
+        try {
+          final listRes = await RegisterService().showChatList(email: myEmail.trim());
+          if (listRes.statusCode == 200) {
+            final listDoc = xml.XmlDocument.parse(listRes.body);
+            final listElements = listDoc.findAllElements('ShowChatListResult');
+            if (listElements.isNotEmpty) {
+              final dynamic listJson = jsonDecode(listElements.first.innerText);
+              if (listJson is Map && listJson["Status"] == 1 && listJson["Data"] is List) {
+                final List data = listJson["Data"];
+                for (var c in data) {
+                  final cOther = (c["OtherUser"] ?? c["Sender"] ?? c["Reciever"] ?? c["Email"] ?? "")
+                      .toString()
+                      .trim()
+                      .toLowerCase();
+                  if (cOther == otherEmail.toLowerCase()) {
+                    final foundId = int.tryParse((c["ChatListId"] ?? c["Id"] ?? c["id"] ?? "0").toString()) ?? 0;
+                    if (foundId > 0) {
+                      chatListId = foundId;
+                      _resolvedChatListId = foundId;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // If still new conversation, allow typing directly
+      if (chatListId <= 0) {
+        if (mounted) {
+          setState(() {
+            _isLoadingMessages = false;
+            _blockMessage = null;
+          });
+        }
+        _isPollingInProgress = false;
+        return;
+      }
+
+      final targetEmail = otherEmail.isNotEmpty ? otherEmail : myEmail;
+
+      final response = await RegisterService().showChatMessages(
+        chatListId: chatListId,
+        email: targetEmail.trim(),
+      );
+
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowChatMessagesResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+
+          if (jsonResult["Status"] == 0) {
+            final String rawApiMsg = (jsonResult["Message"] ??
+                    (jsonResult["Data"] is Map ? jsonResult["Data"]["Message"] : null) ??
+                    "")
+                .toString()
+                .trim();
+
+            final bool isBlocked = rawApiMsg.toLowerCase().contains("block");
+
+            final sender = (widget.messageData["Sender"] ??
+                    widget.messageData["SenderEmail"] ??
+                    widget.messageData["sender"] ??
+                    "")
+                .toString()
+                .trim();
+            final bool isMeSender = sender.isNotEmpty
+                ? sender.toLowerCase() == myEmail.toLowerCase()
+                : (widget.messageData["isSender"] == "true");
+
+            final String msg;
+            if (rawApiMsg.isNotEmpty && rawApiMsg.toLowerCase() != "null") {
+              msg = rawApiMsg;
+            } else if (isMeSender) {
+              msg = "Waiting for user to accept your chat request";
+            } else {
+              msg = "Please accept the chat request first.";
+            }
+
+            if (mounted && (_blockMessage != msg || _isLoadingMessages)) {
+              setState(() {
+                _blockMessage = msg;
+                _isSenderPending = !isBlocked && isMeSender;
+                _isLoadingMessages = false;
+              });
+            }
+            _isPollingInProgress = false;
+            return;
+          } else if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            final List list = jsonResult["Data"];
+            final List<ChatMessage> loadedChats = [];
+            for (var item in list) {
+              final sender = (item["SenderEmail"] ?? item["Sender"] ?? item["Senderemail"] ?? "")
+                  .toString()
+                  .trim();
+              final isMe = myEmail.isNotEmpty &&
+                  sender.toLowerCase() == myEmail.toLowerCase();
+              final text =
+                  (item["ChatMessage"] ?? item["Message"] ?? "").toString();
+              final rawTime = item["MessageDateandTime"] ??
+                  item["Time"] ??
+                  item["Date"] ??
+                  item["CreatedDate"];
+              final time = _formatMessageTime(rawTime?.toString());
+
+              final msgStatusRaw = (item["MessageStatus"] ?? "").toString().toLowerCase().trim();
+              final isReadVal = item["IsRead"] ?? item["isRead"] ?? item["Isread"];
+              final isDeliveredVal = item["IsDelivered"] ?? item["isDelivered"] ?? item["Isdelivered"];
+
+              MessageStatus status;
+              if (isReadVal == 1 || isReadVal == "1" || isReadVal == true || isReadVal == "true" || msgStatusRaw == "read") {
+                status = MessageStatus.read;
+              } else if (isDeliveredVal == 1 || isDeliveredVal == "1" || isDeliveredVal == true || isDeliveredVal == "true" || msgStatusRaw == "delivered") {
+                status = MessageStatus.delivered;
+              } else {
+                status = MessageStatus.sent;
+              }
+
+              // If this message was sent to me and is not yet marked read, mark it read via API
+              if (!isMe) {
+                final messageIdRaw = item["Id"] ?? item["MessageId"] ?? item["id"];
+                final messageId = int.tryParse(messageIdRaw?.toString() ?? "");
+                if (messageId != null && messageId > 0 && status != MessageStatus.read) {
+                  RegisterService().messageRead(messageId: messageId, email: myEmail);
+                }
+              }
+
+              if (text.isNotEmpty) {
+                loadedChats.add(
+                  ChatMessage(
+                    text: text,
+                    isMe: isMe,
+                    time: time,
+                    status: status,
+                  ),
+                );
+              }
+            }
+
+            // Remove server-confirmed messages from local pending list
+            _pendingLocalChats.removeWhere((pending) =>
+                loadedChats.any((s) => s.isMe && s.text.trim() == pending.text.trim()));
+
+            final combinedChats = List<ChatMessage>.from(loadedChats);
+            // Append any pending local messages that server has not returned yet
+            combinedChats.addAll(_pendingLocalChats);
+
+            // Detect if count, text, or tick status changed
+            final bool hasChanged = combinedChats.length != _chats.length ||
+                combinedChats.asMap().entries.any((entry) {
+                  final i = entry.key;
+                  if (i >= _chats.length) return true;
+                  return entry.value.status != _chats[i].status ||
+                      entry.value.text != _chats[i].text;
+                });
+
+            if (mounted && (hasChanged || isInitial || _isLoadingMessages || _blockMessage != null)) {
+              setState(() {
+                _chats.clear();
+                _chats.addAll(combinedChats);
+                _blockMessage = null;
+                _isLoadingMessages = false;
+              });
+              _scrollToBottom(animate: !isInitial);
+            }
+            _isPollingInProgress = false;
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[MessageDetailPage] Error fetching messages: $e");
+    }
+
+    _isPollingInProgress = false;
+    if (mounted && _isLoadingMessages) {
+      setState(() => _isLoadingMessages = false);
+    }
+  }
+
+  String _formatMessageTime(String? rawDate) {
+    if (rawDate == null || rawDate.isEmpty || rawDate.toLowerCase() == "null") {
+      return _nowStr();
+    }
+    try {
+      DateTime? dt;
+      if (rawDate.contains("/Date(") && rawDate.contains(")/")) {
+        final numStr = rawDate.replaceAll(RegExp(r'[^\d]'), '');
+        if (numStr.isNotEmpty) {
+          final millis = int.tryParse(numStr);
+          if (millis != null) {
+            dt = DateTime.fromMillisecondsSinceEpoch(millis);
+          }
+        }
+      } else {
+        dt = DateTime.tryParse(rawDate);
+      }
+      if (dt != null) {
+        final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+        final m = dt.minute.toString().padLeft(2, '0');
+        final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+        return '$h:$m $ampm';
+      }
+    } catch (_) {}
+    return rawDate;
+  }
 
   // ─────────────────────────────────────────
   // 🔥 CHECK RESTRICTED INFO
@@ -184,6 +480,9 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+    _focusNode.dispose();
     _ctrl.dispose();
     _chatScroll.dispose();
     super.dispose();
@@ -545,28 +844,42 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
   // ─────────────────────────────────────────
   // 🔥 SEND MESSAGE
   // ─────────────────────────────────────────
-  void _sendMessage(String t) {
+  void _sendMessage(String t) async {
+    final receiverEmail = widget.messageData["email"] ??
+        widget.messageData["EmailAddress"] ??
+        widget.messageData["ActionEmail"] ??
+        "";
+
+    final localMsg = ChatMessage(
+      text: t,
+      isMe: true,
+      time: _nowStr(),
+      status: MessageStatus.sent,
+    );
+
     setState(() {
-      _chats.add(
-        ChatMessage(
-          text: t,
-          isMe: true,
-          time: _nowStr(),
-          status: MessageStatus.sent,
-        ),
-      );
+      _pendingLocalChats.add(localMsg);
+      _chats.add(localMsg);
       _ctrl.clear();
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_chatScroll.hasClients) {
-        _chatScroll.animateTo(
-          _chatScroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOut,
-        );
+    _scrollToBottom(animate: true);
+
+    if (receiverEmail.trim().isNotEmpty) {
+      try {
+        final senderEmail = await SecureStorage().getUserEmail() ?? "";
+        if (senderEmail.trim().isNotEmpty) {
+          final res = await RegisterService().sendChatMessage(
+            senderEmail: senderEmail.trim(),
+            receiverEmail: receiverEmail.trim(),
+            chatMessage: t,
+          );
+          debugPrint("[MessageDetailPage] sendChatMessage response: ${res.statusCode} -> ${res.body}");
+        }
+      } catch (e) {
+        debugPrint("[MessageDetailPage] Error sending chat message: $e");
       }
-    });
+    }
   }
 
   // ─────────────────────────────────────────
@@ -711,19 +1024,114 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
     return '$h:$m ${t.period == DayPeriod.am ? "AM" : "PM"}';
   }
 
+  Future<void> _handleBlockUser() async {
+    final chatListId = _resolvedChatListId ??
+        int.tryParse((widget.messageData["ChatListId"] ??
+                widget.messageData["chatListId"] ??
+                widget.messageData["id"] ??
+                "0")
+            .toString()) ??
+        0;
+
+    try {
+      final myEmail = await SecureStorage().getUserEmail() ?? "";
+      if (myEmail.isNotEmpty) {
+        await RegisterService().blockChatUser(
+          chatListId: chatListId,
+          email: myEmail.trim(),
+        );
+      }
+      if (mounted) {
+        Get.snackbar(
+          'Blocked',
+          'User has been blocked successfully',
+          backgroundColor: const Color(0xFFFF5252).withValues(alpha: 0.85),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 2),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      debugPrint("[MessageDetailPage] Error blocking user: $e");
+    }
+  }
+
   // ─────────────────────────────────────────
   // 🔥 BUILD
   // ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final name = widget.messageData["name"] ?? "User";
-    final image = widget.messageData["image"] ?? "";
+    String name = (widget.messageData["name"] ??
+            widget.messageData["FullName"] ??
+            widget.messageData["Name"] ??
+            "")
+        .toString()
+        .trim();
+    String image = (widget.messageData["image"] ??
+            widget.messageData["Image"] ??
+            widget.messageData["Media"] ??
+            widget.messageData["ProfileImage"] ??
+            "")
+        .toString()
+        .trim();
+
+    final senderName = (widget.messageData["SenderName"] ?? "").toString().trim();
+    final receiverName = (widget.messageData["RecieverName"] ??
+            widget.messageData["ReceiverName"] ??
+            "")
+        .toString()
+        .trim();
+    final senderImage =
+        (widget.messageData["SenderImage"] ?? "").toString().trim();
+    final receiverImage = (widget.messageData["RecieverImage"] ??
+            widget.messageData["ReceiverImage"] ??
+            "")
+        .toString()
+        .trim();
+
+    final bool isSender = widget.messageData["isSender"] == "true";
+
+    if (name.isEmpty || name == "User" || name.contains("@")) {
+      if (isSender && receiverName.isNotEmpty) {
+        name = receiverName;
+      } else if (!isSender && senderName.isNotEmpty) {
+        name = senderName;
+      } else if (senderName.isNotEmpty) {
+        name = senderName;
+      } else if (receiverName.isNotEmpty) {
+        name = receiverName;
+      }
+    }
+
+    if (image.isEmpty) {
+      if (isSender && receiverImage.isNotEmpty) {
+        image = receiverImage;
+      } else if (!isSender && senderImage.isNotEmpty) {
+        image = senderImage;
+      } else if (senderImage.isNotEmpty) {
+        image = senderImage;
+      } else if (receiverImage.isNotEmpty) {
+        image = receiverImage;
+      }
+    }
+
+    if (name.isEmpty) name = "User";
+
     final age = widget.messageData["age"] ?? "";
     final city = widget.messageData["city"] ?? "";
     final flag = widget.messageData["flag"] ?? "";
     final distance = widget.messageData["distance"] ?? "";
     final bool isVerified = widget.messageData["isVerified"] == "true" ||
         widget.messageData["isVerified"] == "1";
+
+    final bool isOnline = widget.messageData["isOnline"] == "true" ||
+        widget.messageData["isOnline"] == "1" ||
+        widget.messageData["IsOnline"] == "true" ||
+        widget.messageData["IsOnline"] == "1";
+    final String lastSeen = widget.messageData["lastSeen"] ??
+        widget.messageData["LastSeen"] ??
+        "";
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -764,19 +1172,171 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
               flag: flag,
               distance: distance,
               isVerified: isVerified,
+              isOnline: isOnline,
+              lastSeen: lastSeen,
+              onBlockUser: _handleBlockUser,
             ),
 
             Expanded(child: _chatArea()),
-            _inputBar(name),
-            if (_showEmojiPicker) _emojiPickerPanel(),
+            if (_isLoadingMessages)
+              const SizedBox.shrink()
+            else if (_blockMessage != null)
+              _blockedNoticeBanner(_blockMessage!)
+            else
+              _inputBar(name),
+            if (!_isLoadingMessages && _showEmojiPicker && _blockMessage == null)
+              _emojiPickerPanel(),
           ],
         ),
       ),
     );
   }
 
+  Widget _blockedNoticeBanner(String msg) {
+    final bool isBlocked = msg.toLowerCase().contains("block");
+    final Color tintColor = isBlocked
+        ? const Color(0xFFFF5252)
+        : (_isSenderPending
+            ? const Color(0xFFFFA726)
+            : const Color(0xFFFF5252));
+    final IconData icon = isBlocked
+        ? Icons.block_rounded
+        : (_isSenderPending
+            ? Icons.hourglass_top_rounded
+            : Icons.info_outline);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+      margin: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 16.h),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E2C),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: tintColor.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: tintColor, size: 20.sp),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: Text(
+              msg,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ─────────────────────────────────────────
   Widget _chatArea() {
+    if (_isLoadingMessages) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF9B59B6),
+          strokeWidth: 2.5,
+        ),
+      );
+    }
+
+    if (_blockMessage != null) {
+      final bool isBlocked = _blockMessage!.toLowerCase().contains("block");
+      final Color tintColor = isBlocked
+          ? const Color(0xFFFF5252)
+          : (_isSenderPending
+              ? const Color(0xFFFFA726)
+              : const Color(0xFFFF5252));
+      final IconData icon = isBlocked
+          ? Icons.block_rounded
+          : (_isSenderPending
+              ? Icons.hourglass_top_rounded
+              : Icons.lock_outline_rounded);
+
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 28.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  color: tintColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: tintColor,
+                  size: 36.sp,
+                ),
+              ),
+              SizedBox(height: 14.h),
+              Text(
+                _blockMessage!,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: Colors.white70,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_chats.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(14.w),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: Colors.white38,
+                  size: 32.sp,
+                ),
+              ),
+              SizedBox(height: 10.h),
+              Text(
+                "No messages yet",
+                style: GoogleFonts.poppins(
+                  color: Colors.white70,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 3.h),
+              Text(
+                "Say hello to start the conversation 👋",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: Colors.white38,
+                  fontSize: 11.sp,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       controller: widget.sheetScrollController ?? _chatScroll,
       padding: EdgeInsets.fromLTRB(
@@ -936,6 +1496,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                   Expanded(
                     child: TextField(
                       controller: _ctrl,
+                      focusNode: _focusNode,
                       onChanged: (v) {},
                       onTap: () {
                         if (_showEmojiPicker) {
@@ -1095,10 +1656,16 @@ class _ProfileCard extends StatelessWidget {
     required this.flag,
     this.distance = "",
     this.isVerified = false,
+    this.isOnline = false,
+    this.lastSeen = "",
+    this.onBlockUser,
   });
 
   final String name, imageUrl, age, city, flag, distance;
   final bool isVerified;
+  final bool isOnline;
+  final String lastSeen;
+  final VoidCallback? onBlockUser;
 
   static const _cardBg = Color(0xFF0F1017);
   static const _cardBorder = Color(0xFF1C1D2A);
@@ -1133,7 +1700,7 @@ class _ProfileCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Photo
+          // Photo + Online Badge
           _photo(),
           SizedBox(width: AppSize.w(12)),
 
@@ -1203,6 +1770,9 @@ class _ProfileCard extends StatelessWidget {
                       subtitle: "They won't be able to message you anymore.",
                       actionLabel: "Block",
                       color: Colors.orangeAccent,
+                      onConfirm: () {
+                        onBlockUser?.call();
+                      },
                     );
                   },
                 ),
@@ -1227,6 +1797,15 @@ class _ProfileCard extends StatelessWidget {
                       subtitle: "We'll review this profile and take action.",
                       actionLabel: "Report",
                       color: Colors.redAccent,
+                      onConfirm: () {
+                        Get.snackbar(
+                          'Reported',
+                          'User report submitted successfully',
+                          backgroundColor: Colors.black87,
+                          colorText: Colors.white,
+                          snackPosition: SnackPosition.BOTTOM,
+                        );
+                      },
                     );
                   },
                 ),
@@ -1247,9 +1826,9 @@ class _ProfileCard extends StatelessWidget {
                       child: Text(
                         "Cancel",
                         style: GoogleFonts.poppins(
-                          color: Colors.white70,
+                          color: Colors.white,
                           fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -1298,6 +1877,7 @@ class _ProfileCard extends StatelessWidget {
     required String subtitle,
     required String actionLabel,
     required Color color,
+    required VoidCallback onConfirm,
   }) {
     showDialog(
       context: context,
@@ -1363,7 +1943,10 @@ class _ProfileCard extends StatelessWidget {
                   SizedBox(width: 10.w),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () {
+                        Navigator.pop(context);
+                        onConfirm();
+                      },
                       child: Container(
                         height: 44.h,
                         decoration: BoxDecoration(
@@ -1413,7 +1996,7 @@ class _ProfileCard extends StatelessWidget {
       }
     }
 
-    return ClipRRect(
+    final avatarImg = ClipRRect(
       borderRadius: BorderRadius.circular(14.r),
       child: imageBytes != null
           ? Image.memory(
@@ -1432,6 +2015,27 @@ class _ProfileCard extends StatelessWidget {
               errorBuilder: (_, _, _) => _fallback(),
             )
           : _fallback(),
+    );
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        avatarImg,
+        if (isOnline)
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: Container(
+              width: 14.w,
+              height: 14.w,
+              decoration: BoxDecoration(
+                color: const Color(0xFF00E676),
+                shape: BoxShape.circle,
+                border: Border.all(color: _cardBg, width: 2.2),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -1478,7 +2082,33 @@ class _ProfileCard extends StatelessWidget {
             ],
           ],
         ),
-        SizedBox(height: AppSize.h(4)),
+        SizedBox(height: AppSize.h(3)),
+
+        // Active Now (only when online)
+        if (isOnline) ...[
+          Row(
+            children: [
+              Container(
+                width: 7.w,
+                height: 7.w,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF00E676),
+                ),
+              ),
+              SizedBox(width: 5.w),
+              Text(
+                "Active now",
+                style: GoogleFonts.poppins(
+                  fontSize: 11.sp,
+                  color: const Color(0xFF00E676),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: AppSize.h(3)),
+        ],
 
         // Age / City / Flag
         if (age.isNotEmpty || city.isNotEmpty || flag.isNotEmpty)

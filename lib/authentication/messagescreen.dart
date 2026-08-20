@@ -7,11 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:xml/xml.dart' as xml;
 
 import '../backend/home_service.dart';
+import '../backend/registerservice.dart';
 import '../backend/secure_storage.dart';
 import '../constant/appsize.dart';
 import '../constant/apptextstyle.dart';
 import '../constant/colors.dart';
-import '../model/messagescreen.dart';
 import 'boomboom.dart';
 import 'messagedetail.dart';
 
@@ -26,13 +26,121 @@ class MessagePageState extends State<MessagePage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  int _selectedTab = 0; // 0: Chats, 1: Pending
+
   List<Map<String, dynamic>> _onlineUsers = [];
   bool _isOnlineLoading = true;
+
+  List<Map<String, dynamic>> _chatList = [];
+  bool _isChatLoading = true;
+
+  List<Map<String, dynamic>> _pendingList = [];
+  bool _isPendingLoading = true;
+
+  String _myEmail = '';
 
   @override
   void initState() {
     super.initState();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    _myEmail = await SecureStorage().getUserEmail() ?? "";
     _fetchOnlineUsers();
+    _fetchChatList();
+    _fetchPendingChats();
+  }
+
+  Future<void> _fetchChatList() async {
+    try {
+      final email = _myEmail.isNotEmpty
+          ? _myEmail
+          : (await SecureStorage().getUserEmail() ?? "");
+      if (email.trim().isEmpty) return;
+      final response = await RegisterService().showChatList(
+        email: email.trim(),
+      );
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowChatListResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            final List list = jsonResult["Data"];
+
+            // Mark delivered for any incoming sent messages
+            for (var item in list) {
+              final sender = (item["Sender"] ?? item["Senderemail"] ?? "").toString().trim();
+              final isMe = sender.isNotEmpty && sender.toLowerCase() == email.toLowerCase();
+              final status = (item["MessageStatus"] ?? "").toString().toLowerCase().trim();
+              if (!isMe && status == "sent") {
+                final msgIdRaw = item["Id"] ?? item["MessageId"] ?? item["id"];
+                final msgId = int.tryParse(msgIdRaw?.toString() ?? "");
+                if (msgId != null && msgId > 0) {
+                  RegisterService().messageDelivered(messageId: msgId, email: email);
+                }
+              }
+            }
+
+            if (mounted) {
+              setState(() {
+                _chatList = list
+                    .map((e) => Map<String, dynamic>.from(e))
+                    .toList();
+                _isChatLoading = false;
+              });
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[MessagePage] Error fetching ShowChatList: $e");
+    }
+    if (mounted) {
+      setState(() => _isChatLoading = false);
+    }
+  }
+
+  Future<void> _fetchPendingChats() async {
+    try {
+      final email = _myEmail.isNotEmpty
+          ? _myEmail
+          : (await SecureStorage().getUserEmail() ?? "");
+      if (email.trim().isEmpty) return;
+      final response = await RegisterService().showPendingChats(
+        email: email.trim(),
+      );
+      if (response.statusCode == 200) {
+        final doc = xml.XmlDocument.parse(response.body);
+        final res = doc.findAllElements('ShowPendingChatsResult');
+        if (res.isNotEmpty) {
+          final Map<String, dynamic> jsonResult = jsonDecode(
+            res.first.innerText,
+          );
+          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
+            final List list = jsonResult["Data"];
+            if (mounted) {
+              setState(() {
+                _pendingList = list
+                    .map((e) => Map<String, dynamic>.from(e))
+                    .toList();
+                _isPendingLoading = false;
+              });
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("[MessagePage] Error fetching ShowPendingChats: $e");
+    }
+    if (mounted) {
+      setState(() => _isPendingLoading = false);
+    }
   }
 
   Future<void> _fetchOnlineUsers() async {
@@ -68,43 +176,63 @@ class MessagePageState extends State<MessagePage> {
     }
   }
 
-  // ── Sample Messages ──
+  Future<void> _handleAcceptChat(Map<String, dynamic> item) async {
+    final chatListIdRaw = item["ChatListId"] ?? item["id"] ?? "0";
+    final chatListId = int.tryParse(chatListIdRaw.toString()) ?? 0;
+    final email = _myEmail.isNotEmpty
+        ? _myEmail
+        : (await SecureStorage().getUserEmail() ?? "");
 
-  // ── Sample Messages ──
-  static final List<MessageModel> messageList = [
-    MessageModel(
-      name: 'Rahul verma',
-      message: 'Heyyy',
-      image: 'https://randomuser.me/api/portraits/men/1.jpg',
-      timestamp: 'now',
-      unreadCount: 1,
-    ),
+    try {
+      final response = await RegisterService().acceptChat(
+        chatListId: chatListId,
+        email: email.trim(),
+      );
+      if (response.statusCode == 200) {
+        Get.snackbar(
+          'Accepted',
+          'Chat request accepted!',
+          backgroundColor: const Color(0xFF00E676).withValues(alpha: 0.8),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 2),
+        );
+        _fetchPendingChats();
+        _fetchChatList();
+      }
+    } catch (e) {
+      debugPrint("[MessagePage] Error accepting chat: $e");
+    }
+  }
 
-    MessageModel(
-      name: 'Priya Sharma',
-      message: 'Hi there! How are you?',
-      image: 'https://randomuser.me/api/portraits/women/1.jpg',
-      timestamp: 'yesterday',
-    ),
+  Future<void> _handleRejectChat(Map<String, dynamic> item) async {
+    final chatListIdRaw = item["ChatListId"] ?? item["id"] ?? "0";
+    final chatListId = int.tryParse(chatListIdRaw.toString()) ?? 0;
+    final email = _myEmail.isNotEmpty
+        ? _myEmail
+        : (await SecureStorage().getUserEmail() ?? "");
 
-    MessageModel(
-      name: 'Amit Kumar',
-      message: 'See you tomorrow 👋',
-      image: 'https://randomuser.me/api/portraits/men/5.jpg',
-      timestamp: '2d ago',
-      unreadCount: 3,
-    ),
-  ];
-
-  final List<MessageModel> _messages = messageList;
-
-  List<MessageModel> get _filteredMessages => _messages
-      .where(
-        (m) =>
-            m.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            m.message.toLowerCase().contains(_searchQuery.toLowerCase()),
-      )
-      .toList();
+    try {
+      final response = await RegisterService().rejectChat(
+        chatListId: chatListId,
+        email: email.trim(),
+      );
+      if (response.statusCode == 200) {
+        Get.snackbar(
+          'Declined',
+          'Chat request declined',
+          backgroundColor: const Color(0xFFFF4D4D).withValues(alpha: 0.8),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 2),
+        );
+        _fetchPendingChats();
+        _fetchChatList();
+      }
+    } catch (e) {
+      debugPrint("[MessagePage] Error rejecting chat: $e");
+    }
+  }
 
   @override
   void dispose() {
@@ -131,14 +259,16 @@ class MessagePageState extends State<MessagePage> {
       children: [
         _buildHeader(),
         _buildSearchBar(),
-        SizedBox(height: AppSize.h(20)),
+        SizedBox(height: AppSize.h(16)),
         _buildSectionLabel('Online Now'),
-        SizedBox(height: AppSize.h(12)),
+        SizedBox(height: AppSize.h(10)),
         _buildActivitiesRow(),
-        SizedBox(height: AppSize.h(20)),
-        _buildSectionLabel('Messages'),
+        SizedBox(height: AppSize.h(16)),
+        _buildTabBar(),
         SizedBox(height: AppSize.h(8)),
-        Expanded(child: _buildMessagesList()),
+        Expanded(
+          child: _selectedTab == 0 ? _buildChatsTab() : _buildPendingTab(),
+        ),
       ],
     );
   }
@@ -147,7 +277,6 @@ class MessagePageState extends State<MessagePage> {
   Widget _buildTabletLayout() {
     return Row(
       children: [
-        // Left: list panel
         SizedBox(
           width: 380.w,
           child: Column(
@@ -155,20 +284,21 @@ class MessagePageState extends State<MessagePage> {
             children: [
               _buildHeader(),
               _buildSearchBar(),
-              SizedBox(height: AppSize.h(20)),
+              SizedBox(height: AppSize.h(16)),
               _buildSectionLabel('Online Now'),
-              SizedBox(height: AppSize.h(12)),
+              SizedBox(height: AppSize.h(10)),
               _buildActivitiesRow(),
-              SizedBox(height: AppSize.h(20)),
-              _buildSectionLabel('Messages'),
+              SizedBox(height: AppSize.h(16)),
+              _buildTabBar(),
               SizedBox(height: AppSize.h(8)),
-              Expanded(child: _buildMessagesList()),
+              Expanded(
+                child:
+                    _selectedTab == 0 ? _buildChatsTab() : _buildPendingTab(),
+              ),
             ],
           ),
         ),
-        // Divider
         Container(width: 1, color: const Color(0xFF2A2A2A)),
-        // Right: chat detail placeholder
         Expanded(
           child: Center(
             child: Text(
@@ -189,45 +319,16 @@ class MessagePageState extends State<MessagePage> {
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: AppSize.w(16),
-        vertical: AppSize.h(16),
+        vertical: AppSize.h(14),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text('Messages', style: AppTextStyles.heading),
-          // _callLogsButton(),
         ],
       ),
     );
   }
-
-  // Widget _callLogsButton() {
-  //   return Container(
-  //     padding: EdgeInsets.symmetric(
-  //       horizontal: AppSize.w(14),
-  //       vertical: AppSize.h(8),
-  //     ),
-  //     decoration: BoxDecoration(
-  //       border: Border.all(color: const Color(0xFF3A3A3A), width: 1.5),
-  //       borderRadius: BorderRadius.circular(20.r),
-  //     ),
-  //     child: Row(
-  //       mainAxisSize: MainAxisSize.min,
-  //       children: [
-  //         Icon(Icons.phone_outlined, color: AppColors.textPrimary, size: 16.sp),
-  //         SizedBox(width: AppSize.w(6)),
-  //         Text(
-  //           'Call logs',
-  //           style: GoogleFonts.poppins(
-  //             fontSize: 13.sp,
-  //             fontWeight: FontWeight.w500,
-  //             color: AppColors.textPrimary,
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   // ─── Search Bar ──────────────────────────
   Widget _buildSearchBar() {
@@ -273,7 +374,7 @@ class MessagePageState extends State<MessagePage> {
     );
   }
 
-  // ─── Activities Row ──────────────────────
+  // ─── Activities Row (Online Users) ───────
   Widget _buildActivitiesRow() {
     if (_isOnlineLoading) {
       return SizedBox(
@@ -310,7 +411,6 @@ class MessagePageState extends State<MessagePage> {
       );
     }
 
-    // Show every online user returned by the API.
     final int count = _onlineUsers.length;
 
     return SizedBox(
@@ -364,7 +464,6 @@ class MessagePageState extends State<MessagePage> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                /// 🔥 PROFILE IMAGE / INITIAL AVATAR
                 Container(
                   width: AppSize.w(60),
                   height: AppSize.h(60),
@@ -393,8 +492,6 @@ class MessagePageState extends State<MessagePage> {
                         : _avatarFallback(fullName),
                   ),
                 ),
-
-                /// 🔥 ONLINE GREEN GLOWING DOT
                 Positioned(
                   bottom: 2,
                   right: 2,
@@ -438,37 +535,665 @@ class MessagePageState extends State<MessagePage> {
     );
   }
 
-  // ─── Messages List ───────────────────────
-  Widget _buildMessagesList() {
-    final list = _filteredMessages;
-
-    if (list.isEmpty) {
-      return Center(
-        child: Text('No messages found', style: AppTextStyles.body),
-      );
-    }
-
-    return ListView.separated(
+  // ─── TAB BAR (Chats vs Pending) ──────────
+  Widget _buildTabBar() {
+    return Padding(
       padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
-      itemCount: list.length,
-      separatorBuilder: (_, _) =>
-          Divider(color: const Color(0xFF2A2A2A), height: 1, thickness: 1),
-      itemBuilder: (context, index) {
-        final msg = list[index];
-        return _messageTile(context, msg, index);
-      },
+      child: Container(
+        height: AppSize.h(42),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1C1E),
+          borderRadius: BorderRadius.circular(22.r),
+        ),
+        padding: EdgeInsets.all(4.w),
+        child: Row(
+          children: [
+            // Chats Tab
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  if (_selectedTab != 0) {
+                    setState(() => _selectedTab = 0);
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: _selectedTab == 0
+                        ? AppColors.accent
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18.r),
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Chats',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.sp,
+                          fontWeight: _selectedTab == 0
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: _selectedTab == 0
+                              ? Colors.white
+                              : Colors.white60,
+                        ),
+                      ),
+                      if (_chatList.isNotEmpty) ...[
+                        SizedBox(width: 6.w),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6.w,
+                            vertical: 1.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _selectedTab == 0
+                                ? Colors.white.withValues(alpha: 0.25)
+                                : Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          child: Text(
+                            '${_chatList.length}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Pending Tab
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  if (_selectedTab != 1) {
+                    setState(() => _selectedTab = 1);
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: _selectedTab == 1
+                        ? AppColors.accent
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18.r),
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Pending',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.sp,
+                          fontWeight: _selectedTab == 1
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: _selectedTab == 1
+                              ? Colors.white
+                              : Colors.white60,
+                        ),
+                      ),
+                      if (_pendingList.isNotEmpty) ...[
+                        SizedBox(width: 6.w),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6.w,
+                            vertical: 1.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF5252),
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          child: Text(
+                            '${_pendingList.length}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _messageTile(BuildContext context, MessageModel msg, int index) {
+  // ─── CHATS TAB ───────────────────────────
+  Widget _buildChatsTab() {
+    if (_isChatLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF9B59B6),
+          strokeWidth: 2.5,
+        ),
+      );
+    }
+
+    final query = _searchQuery.toLowerCase().trim();
+    final myEmailLower = _myEmail.trim().toLowerCase();
+    final list = _chatList.where((item) {
+      final sender = (item["Sender"] ?? "").toString().trim().toLowerCase();
+      final receiver =
+          (item["Reciever"] ?? item["Receiver"] ?? "").toString().trim().toLowerCase();
+      final chatStatus =
+          (item["ChatStatus"] ?? "").toString().trim().toLowerCase();
+
+      // If this is a pending request received by me, it belongs ONLY in the Pending tab, not in Chats!
+      if (chatStatus == "pending" &&
+          receiver == myEmailLower &&
+          sender != myEmailLower) {
+        return false;
+      }
+
+      if (query.isEmpty) return true;
+      final otherUser = (item["OtherUser"] ??
+              item["Sender"] ??
+              item["Reciever"] ??
+              "")
+          .toString()
+          .toLowerCase();
+      final name = (item["FullName"] ?? item["name"] ?? "")
+          .toString()
+          .toLowerCase();
+      final status = (item["ChatMessage"] ?? item["ChatStatus"] ?? "")
+          .toString()
+          .toLowerCase();
+      return otherUser.contains(query) ||
+          name.contains(query) ||
+          status.contains(query);
+    }).toList();
+
+    if (list.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                color: Colors.white38,
+                size: 40.sp,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                "No chats found",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: Colors.white60,
+                  fontSize: 13.sp,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _fetchChatList();
+        await _fetchOnlineUsers();
+      },
+      color: const Color(0xFF9B59B6),
+      backgroundColor: AppColors.primary,
+      child: ListView.separated(
+        padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
+        itemCount: list.length,
+        separatorBuilder: (_, _) =>
+            Divider(color: const Color(0xFF2A2A2A), height: 1, thickness: 1),
+        itemBuilder: (context, index) {
+          final item = list[index];
+          return _apiChatTile(context, item, index);
+        },
+      ),
+    );
+  }
+
+  // ─── PENDING TAB ─────────────────────────
+  Widget _buildPendingTab() {
+    if (_isPendingLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF9B59B6),
+          strokeWidth: 2.5,
+        ),
+      );
+    }
+
+    final query = _searchQuery.toLowerCase().trim();
+    final list = _pendingList.where((item) {
+      if (query.isEmpty) return true;
+      final otherUser = (item["OtherUser"] ??
+              item["Sender"] ??
+              item["Reciever"] ??
+              "")
+          .toString()
+          .toLowerCase();
+      final name = (item["FullName"] ?? item["name"] ?? "")
+          .toString()
+          .toLowerCase();
+      final status = (item["ChatMessage"] ?? item["ChatStatus"] ?? "")
+          .toString()
+          .toLowerCase();
+      return otherUser.contains(query) ||
+          name.contains(query) ||
+          status.contains(query);
+    }).toList();
+
+    if (list.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.mark_chat_unread_outlined,
+                color: Colors.white38,
+                size: 40.sp,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                "No pending chats found",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: Colors.white60,
+                  fontSize: 13.sp,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _fetchPendingChats();
+        await _fetchOnlineUsers();
+      },
+      color: const Color(0xFF9B59B6),
+      backgroundColor: AppColors.primary,
+      child: ListView.separated(
+        padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
+        itemCount: list.length,
+        separatorBuilder: (_, _) =>
+            Divider(color: const Color(0xFF2A2A2A), height: 1, thickness: 1),
+        itemBuilder: (context, index) {
+          final item = list[index];
+          return _apiPendingChatTile(context, item, index);
+        },
+      ),
+    );
+  }
+
+  String _formatChatDate(String? rawDate) {
+    if (rawDate == null || rawDate.isEmpty || rawDate.toLowerCase() == "null") {
+      return "now";
+    }
+    try {
+      DateTime? dt;
+      if (rawDate.contains("/Date(") && rawDate.contains(")/")) {
+        final numStr = rawDate.replaceAll(RegExp(r'[^\d]'), '');
+        if (numStr.isNotEmpty) {
+          final millis = int.tryParse(numStr);
+          if (millis != null) {
+            dt = DateTime.fromMillisecondsSinceEpoch(millis);
+          }
+        }
+      } else {
+        dt = DateTime.tryParse(rawDate);
+      }
+      if (dt != null) {
+        final now = DateTime.now();
+        final diff = now.difference(dt);
+        if (diff.inMinutes < 1) {
+          return 'now';
+        } else if (diff.inHours < 1) {
+          return '${diff.inMinutes}m ago';
+        } else if (diff.inDays < 1 && now.day == dt.day) {
+          final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+          final m = dt.minute.toString().padLeft(2, '0');
+          final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+          return '$h:$m $ampm';
+        } else if (diff.inDays < 2 && now.day - dt.day == 1) {
+          return 'yesterday';
+        } else if (diff.inDays < 7) {
+          return '${diff.inDays}d ago';
+        } else {
+          return '${dt.day}/${dt.month}/${dt.year}';
+        }
+      }
+    } catch (_) {}
+    return rawDate;
+  }
+
+  // ─── CHAT TILE (Chats tab) ───────────────
+  Widget _apiChatTile(
+    BuildContext context,
+    Map<String, dynamic> item,
+    int index,
+  ) {
+    final myEmail = _myEmail.trim().toLowerCase();
+    final sender = (item["Sender"] ?? item["Senderemail"] ?? item["SenderEmail"] ?? "").toString().trim();
+    final receiver = (item["Reciever"] ?? item["RecieverEmail"] ?? item["Receiver"] ?? "").toString().trim();
+    final senderLower = sender.toLowerCase();
+    final receiverLower = receiver.toLowerCase();
+
+    final bool isMeSender = myEmail.isNotEmpty && senderLower == myEmail;
+    final bool isMeReceiver = myEmail.isNotEmpty && receiverLower == myEmail;
+
+    final otherUser = (item["OtherUser"] ??
+            (isMeSender ? receiver : (isMeReceiver ? sender : (sender.isNotEmpty ? sender : receiver))))
+        .toString()
+        .trim();
+
+    String name = "";
+    if (isMeSender) {
+      name = (item["RecieverName"] ?? item["ReceiverName"] ?? item["Receivername"] ?? "").toString().trim();
+    } else if (isMeReceiver) {
+      name = (item["SenderName"] ?? item["Sendername"] ?? "").toString().trim();
+    }
+    if (name.isEmpty || name.toLowerCase() == "null") {
+      name = (item["FullName"] ?? item["name"] ?? item["Name"] ?? "").toString().trim();
+    }
+    if (name.isEmpty || name.toLowerCase() == "null") {
+      name = (otherUser.isNotEmpty ? otherUser.split("@").first : "User");
+    }
+
+    // Last message text: prioritize ChatMessage over status
+    final chatMsg = (item["ChatMessage"] ?? item["Message"] ?? "").toString().trim();
+    final lastMessage = chatMsg.isNotEmpty
+        ? chatMsg
+        : (item["ChatStatus"] == "Accepted" ? "Tap to chat" : (item["ChatStatus"] ?? "Tap to chat"));
+
+    String img = "";
+    if (isMeSender) {
+      img = (item["RecieverImage"] ?? item["ReceiverImage"] ?? item["Receiverimage"] ?? "").toString().trim();
+    } else if (isMeReceiver) {
+      img = (item["SenderImage"] ?? item["Senderimage"] ?? "").toString().trim();
+    }
+    if (img.isEmpty || img.toLowerCase() == "null") {
+      img = (item["Image"] ?? item["Media"] ?? item["image"] ?? item["ProfileImage"] ?? "").toString().trim();
+    }
+
+    final rawDate = item["MessageDateandTime"] ?? item["Date"] ?? item["Time"];
+    final formattedTime = _formatChatDate(rawDate?.toString());
+
+    final unreadRaw = item["UnreadCount"] ?? item["unread"] ?? "0";
+    final int unreadCount = int.tryParse(unreadRaw.toString()) ?? 0;
+
+    final bool isOnline = (item["IsOnline"] == true ||
+            item["IsOnline"] == 1 ||
+            item["IsOnline"] == "true" ||
+            item["IsOnline"] == "1" ||
+            item["Online"] == true ||
+            item["Online"] == "true") ||
+        _onlineUsers.any((u) =>
+            (u["email"] ?? u["Email"] ?? u["OtherUser"] ?? "")
+                .toString()
+                .trim()
+                .toLowerCase() ==
+            otherUser.toLowerCase());
+
+    final bool isSender =
+        sender.isNotEmpty && sender.toLowerCase() == _myEmail.toLowerCase();
+    final Map<String, String> messageMap = <String, String>{
+      "name": name,
+      "email": otherUser,
+      "image": img,
+      "message": lastMessage,
+      "ChatListId":
+          (item["ChatListId"] ?? item["Id"] ?? item["id"] ?? "0").toString(),
+      "Sender": sender,
+      "Reciever": receiver,
+      "SenderName": (item["SenderName"] ?? "").toString(),
+      "RecieverName": (item["RecieverName"] ?? item["ReceiverName"] ?? "").toString(),
+      "SenderImage": (item["SenderImage"] ?? "").toString(),
+      "RecieverImage": (item["RecieverImage"] ?? item["ReceiverImage"] ?? "").toString(),
+      "isSender": isSender.toString(),
+      "isOnline": isOnline.toString(),
+      "status": (item["ChatStatus"] ?? "").toString(),
+    };
+
     return InkWell(
       onTap: () {
-        Navigator.push(
+        MessageDetailPage.show(
           context,
-          MaterialPageRoute(
-            builder: (_) =>
-                MessageDetailPage(index: index, messageData: msg.toMap()),
-          ),
+          index: index,
+          messageData: messageMap,
+        );
+      },
+      borderRadius: BorderRadius.circular(8.r),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: AppSize.h(12)),
+        child: Row(
+          children: [
+            // Avatar + Online Indicator
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: AppSize.w(52),
+                  height: AppSize.h(52),
+                  decoration: const BoxDecoration(shape: BoxShape.circle),
+                  child: ClipOval(
+                    child: img.isNotEmpty &&
+                            (img.startsWith("http://") ||
+                                img.startsWith("https://"))
+                        ? Image.network(
+                            img,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => _avatarFallback(name),
+                          )
+                        : _avatarFallback(name),
+                  ),
+                ),
+                if (isOnline)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 14.w,
+                      height: 14.w,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E676),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.primary,
+                          width: 2.2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(width: AppSize.w(12)),
+
+            // Name + last message
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  SizedBox(height: AppSize.h(3)),
+                  Text(
+                    lastMessage,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12.sp,
+                      color: unreadCount > 0
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                      fontWeight:
+                          unreadCount > 0 ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+
+            // Time + unread badge / pending badge
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  formattedTime,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11.sp,
+                    color: unreadCount > 0
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
+                    fontWeight:
+                        unreadCount > 0 ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+                SizedBox(height: AppSize.h(4)),
+                if (unreadCount > 0)
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSize.w(7),
+                      vertical: AppSize.h(2),
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Text(
+                      '$unreadCount',
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  )
+                else if (item["ChatStatus"] == "Pending")
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSize.w(7),
+                      vertical: AppSize.h(2),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Text(
+                      'Pending',
+                      style: GoogleFonts.poppins(
+                        fontSize: 9.sp,
+                        color: Colors.white60,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── PENDING CHAT TILE (Pending tab with Accept / Decline action UI) ──
+  Widget _apiPendingChatTile(
+    BuildContext context,
+    Map<String, dynamic> item,
+    int index,
+  ) {
+    final myEmail = _myEmail.trim().toLowerCase();
+    final sender = (item["Sender"] ?? item["Senderemail"] ?? item["SenderEmail"] ?? "").toString().trim();
+    final receiver = (item["Reciever"] ?? item["RecieverEmail"] ?? item["Receiver"] ?? "").toString().trim();
+    final senderLower = sender.toLowerCase();
+    final receiverLower = receiver.toLowerCase();
+
+    final bool isMeSender = myEmail.isNotEmpty && senderLower == myEmail;
+    final bool isMeReceiver = myEmail.isNotEmpty && receiverLower == myEmail;
+
+    final otherUser = (item["OtherUser"] ??
+            (isMeSender ? receiver : (isMeReceiver ? sender : (sender.isNotEmpty ? sender : receiver))))
+        .toString()
+        .trim();
+
+    String name = "";
+    if (isMeSender) {
+      name = (item["RecieverName"] ?? item["ReceiverName"] ?? item["Receivername"] ?? "").toString().trim();
+    } else if (isMeReceiver) {
+      name = (item["SenderName"] ?? item["Sendername"] ?? "").toString().trim();
+    }
+    if (name.isEmpty || name.toLowerCase() == "null") {
+      name = (item["FullName"] ?? item["name"] ?? item["Name"] ?? "").toString().trim();
+    }
+    if (name.isEmpty || name.toLowerCase() == "null") {
+      name = (otherUser.isNotEmpty ? otherUser.split("@").first : "User");
+    }
+
+    final status =
+        (item["ChatMessage"] ?? item["ChatStatus"] ?? "Pending request")
+            .toString();
+
+    String img = "";
+    if (isMeSender) {
+      img = (item["RecieverImage"] ?? item["ReceiverImage"] ?? item["Receiverimage"] ?? "").toString().trim();
+    } else if (isMeReceiver) {
+      img = (item["SenderImage"] ?? item["Senderimage"] ?? "").toString().trim();
+    }
+    if (img.isEmpty || img.toLowerCase() == "null") {
+      img = (item["Image"] ?? item["Media"] ?? item["image"] ?? item["ProfileImage"] ?? "").toString().trim();
+    }
+
+    final bool isSender =
+        sender.isNotEmpty && sender.toLowerCase() == _myEmail.toLowerCase();
+    final Map<String, String> messageMap = <String, String>{
+      "name": name,
+      "email": otherUser,
+      "image": img,
+      "message": status,
+      "ChatListId": (item["ChatListId"] ?? item["id"] ?? "0").toString(),
+      "Sender": sender,
+      "Reciever": receiver,
+      "SenderName": (item["SenderName"] ?? "").toString(),
+      "RecieverName": (item["RecieverName"] ?? item["ReceiverName"] ?? "").toString(),
+      "SenderImage": (item["SenderImage"] ?? "").toString(),
+      "RecieverImage": (item["RecieverImage"] ?? item["ReceiverImage"] ?? "").toString(),
+      "isSender": isSender.toString(),
+      "status": "Pending",
+    };
+
+    return InkWell(
+      onTap: () {
+        MessageDetailPage.show(
+          context,
+          index: index,
+          messageData: messageMap,
         );
       },
       borderRadius: BorderRadius.circular(8.r),
@@ -482,25 +1207,25 @@ class MessagePageState extends State<MessagePage> {
               height: AppSize.h(52),
               decoration: const BoxDecoration(shape: BoxShape.circle),
               child: ClipOval(
-                child: Image.network(
-                  msg.image,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _avatarFallback(msg.name),
-                ),
+                child: img.isNotEmpty &&
+                        (img.startsWith("http://") || img.startsWith("https://"))
+                    ? Image.network(
+                        img,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _avatarFallback(name),
+                      )
+                    : _avatarFallback(name),
               ),
             ),
             SizedBox(width: AppSize.w(12)),
 
-            // Name + last message
+            // Name + status
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-
                 children: [
-                  /// 🔥 NAME
                   Text(
-                    msg.name,
-
+                    name,
                     style: GoogleFonts.poppins(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w700,
@@ -508,71 +1233,85 @@ class MessagePageState extends State<MessagePage> {
                       letterSpacing: 0.3,
                     ),
                   ),
-
                   SizedBox(height: AppSize.h(4)),
-
-                  /// 🔥 LAST MESSAGE
                   Text(
-                    msg.message,
-
+                    status,
                     style: GoogleFonts.poppins(
                       fontSize: 12.sp,
                       color: AppColors.textSecondary,
                     ),
-
                     maxLines: 1,
-
                     overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: AppSize.h(2)),
-
-                  /// 🔥 LAST SEEN
-                  Text(
-                    "Last seen 2 min ago",
-
-                    style: GoogleFonts.poppins(
-                      fontSize: 10.sp,
-                      color: Colors.orangeAccent,
-                      fontWeight: FontWeight.w500,
-                    ),
                   ),
                 ],
               ),
             ),
 
-            // Time + unread badge
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.center,
+            // Accept / Decline action UI buttons
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  msg.timestamp,
-                  style: GoogleFonts.poppins(
-                    fontSize: 11.sp,
-                    color: AppColors.textSecondary,
+                // Decline button
+                GestureDetector(
+                  onTap: () => _handleRejectChat(item),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 32.w,
+                        height: 32.w,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFFFF4D4D),
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 18.sp,
+                        ),
+                      ),
+                      SizedBox(height: 3.h),
+                      Text(
+                        'Decline',
+                        style: GoogleFonts.poppins(
+                          fontSize: 9.sp,
+                          color: Colors.white60,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (msg.unreadCount > 0) ...[
-                  SizedBox(height: AppSize.h(4)),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppSize.w(7),
-                      vertical: AppSize.h(2),
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    child: Text(
-                      '${msg.unreadCount}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 10.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                SizedBox(width: 12.w),
+                // Accept button
+                GestureDetector(
+                  onTap: () => _handleAcceptChat(item),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 32.w,
+                        height: 32.w,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF00E676),
+                        ),
+                        child: Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 18.sp,
+                        ),
                       ),
-                    ),
+                      SizedBox(height: 3.h),
+                      Text(
+                        'Accept',
+                        style: GoogleFonts.poppins(
+                          fontSize: 9.sp,
+                          color: Colors.white60,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ],
             ),
           ],

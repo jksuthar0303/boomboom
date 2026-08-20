@@ -481,7 +481,7 @@ class _ActiveuserState extends State<Activeuser> {
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 20.w),
                         child: const Text(
-                          "You're all caught up! New people will appear as they join.",
+                          "No verified profiles available right now.",
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.white60),
                         ),

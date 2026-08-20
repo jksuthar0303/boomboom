@@ -9,10 +9,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:xml/xml.dart' as xml;
-
 import '../../../../authentication/boomboom.dart';
-import '../../../../backend/home_service.dart';
+import '../../../../backend/secure_storage.dart';
+import '../../../../backend/tonight_service.dart';
 
 class NearbyMapScreen extends StatefulWidget {
   const NearbyMapScreen({super.key});
@@ -50,8 +49,9 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
     // ── NEARBY TAB (Index 3): Show Only Online Users ──
     if (_selectedCategory == 3) {
       list = list.where((u) {
-        final onlineStr =
-            (u["IsOnline"] ?? u["isOnline"] ?? "").toString().toLowerCase();
+        final onlineStr = (u["IsOnline"] ?? u["isOnline"] ?? "")
+            .toString()
+            .toLowerCase();
         return onlineStr == "true" || onlineStr == "1";
       }).toList();
       return list;
@@ -59,12 +59,14 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
 
     if (_selectedCategory == 0) return list;
 
-    final selectedCatName =
-        categories[_selectedCategory]["label"].toString().toLowerCase();
+    final selectedCatName = categories[_selectedCategory]["label"]
+        .toString()
+        .toLowerCase();
 
     return list.where((u) {
-      final userCat =
-          (u["Category"] ?? u["category"] ?? "").toString().toLowerCase();
+      final userCat = (u["Category"] ?? u["category"] ?? "")
+          .toString()
+          .toLowerCase();
       if (userCat.isEmpty) return true;
       return userCat.contains(selectedCatName) ||
           selectedCatName.contains(userCat);
@@ -116,55 +118,47 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
     });
 
     try {
-      final response = await HomeService().showNearbyUsers(
-        lat: currentLocation.latitude.toString(),
-        lon: currentLocation.longitude.toString(),
-        radius: _searchRadius.toInt().toString(),
-      );
+      final email = await SecureStorage().getUserEmail() ?? "";
 
-      if (response.statusCode == 200) {
-        final doc = xml.XmlDocument.parse(response.body);
-        final res = doc.findAllElements('ShowNearbyUsersResult');
-        if (res.isNotEmpty) {
-          final Map<String, dynamic> jsonResult = jsonDecode(
-            res.first.innerText,
-          );
-          if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
-            final List list = jsonResult["Data"];
-            if (mounted) {
-              setState(() {
-                _nearbyUsers =
-                    list.map((e) => Map<String, dynamic>.from(e)).toList();
-                _isLoading = false;
-                _errorMessage = null;
-                _updateMarkers();
-              });
-            }
-            return;
-          } else {
-            if (mounted) {
-              setState(() {
-                _nearbyUsers = [];
-                _isLoading = false;
-                _errorMessage = jsonResult["Message"]?.toString() ??
-                    "No nearby users found in this radius";
-                _updateMarkers();
-              });
-            }
-            return;
-          }
-        }
+      String planningFilter = "";
+      if (_selectedCategory == 1) {
+        planningFilter = "Crosspath";
+      } else if (_selectedCategory == 2) {
+        planningFilter = "Free Tonight";
+      } else if (_selectedCategory == 3) {
+        planningFilter = "Nearby";
       }
+
+      final List<Map<String, dynamic>> tonightList = await TonightService()
+          .showTonight(
+            email: email.trim(),
+            radius: _searchRadius,
+            planning: planningFilter,
+          );
 
       if (mounted) {
         setState(() {
+          _nearbyUsers = tonightList.map((e) {
+            final map = Map<String, dynamic>.from(e);
+            if (!map.containsKey("FullName") && map.containsKey("Name")) {
+              map["FullName"] = map["Name"];
+            }
+            if (!map.containsKey("Media")) {
+              map["Media"] =
+                  map["Image"] ??
+                  map["ProfileImage"] ??
+                  map["image"] ??
+                  map["TonightImage"];
+            }
+            return map;
+          }).toList();
           _isLoading = false;
-          _errorMessage = "Unable to fetch nearby users. Please try again.";
+          _errorMessage = null;
           _updateMarkers();
         });
       }
     } catch (e) {
-      debugPrint("[NearbyMap] Error loading nearby users: $e");
+      debugPrint("[NearbyMap] Error loading ShowTonight users: $e");
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -260,8 +254,12 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
         isOverlapping = true;
       } else {
         for (int j = 0; j < index; j++) {
-          final pLat = double.tryParse(currentProfiles[j]["Lat"]?.toString() ?? "");
-          final pLon = double.tryParse(currentProfiles[j]["Lon"]?.toString() ?? "");
+          final pLat = double.tryParse(
+            currentProfiles[j]["Lat"]?.toString() ?? "",
+          );
+          final pLon = double.tryParse(
+            currentProfiles[j]["Lon"]?.toString() ?? "",
+          );
           if (pLat != null && pLon != null) {
             if ((uLat - pLat).abs() < 0.0009 && (uLon - pLon).abs() < 0.0009) {
               isOverlapping = true;
@@ -273,18 +271,22 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
 
       // If overlapping, distribute radially around center point (~350m apart)
       if (isOverlapping) {
-        final double angle = (2 * math.pi * index) / (userCount > 1 ? userCount : 4) + 0.6;
+        final double angle =
+            (2 * math.pi * index) / (userCount > 1 ? userCount : 4) + 0.6;
         const double radiusOffset = 0.0035;
         uLat = uLat + (radiusOffset * math.cos(angle));
         uLon = uLon + (radiusOffset * math.sin(angle));
       }
 
       final point = LatLng(uLat, uLon);
-      final String name = (user["FullName"] ?? user["name"] ?? "User").toString();
-      final String initial =
-          name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : "U";
+      final String name = (user["FullName"] ?? user["name"] ?? "User")
+          .toString();
+      final String initial = name.trim().isNotEmpty
+          ? name.trim()[0].toUpperCase()
+          : "U";
       final String? media = user["Media"]?.toString();
-      final bool isOnline = user["IsOnline"]?.toString().toLowerCase() == "true";
+      final bool isOnline =
+          user["IsOnline"]?.toString().toLowerCase() == "true";
 
       Uint8List? imageBytes;
       bool hasHttp = false;
@@ -310,7 +312,8 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
             onTap: () {
               Get.to(
                 () => BoomProfileScreen(
-                  userEmail: user["EmailAddress"]?.toString() ??
+                  userEmail:
+                      user["EmailAddress"]?.toString() ??
                       user["email"]?.toString(),
                   initialUserData: user,
                 ),
@@ -338,9 +341,9 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFF5E62).withValues(
-                                alpha: 0.50,
-                              ),
+                              color: const Color(
+                                0xFFFF5E62,
+                              ).withValues(alpha: 0.50),
                               blurRadius: 12,
                               spreadRadius: 1,
                             ),
@@ -355,22 +358,22 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                       _avatarFallback(name),
                                 )
                               : hasHttp
-                                  ? Image.network(
-                                      media!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) =>
-                                          _avatarFallback(name),
-                                    )
-                                  : Center(
-                                      child: Text(
-                                        initial,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 18.sp,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
+                              ? Image.network(
+                                  media!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) =>
+                                      _avatarFallback(name),
+                                )
+                              : Center(
+                                  child: Text(
+                                    initial,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 18.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
                                     ),
+                                  ),
+                                ),
                         ),
                       ),
                       if (isOnline)
@@ -462,12 +465,28 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
   }
 
   String _formatDistance(Map<String, dynamic> user) {
-    if (user["Distance"] != null &&
-        user["Distance"].toString().trim().isNotEmpty) {
-      return user["Distance"].toString();
+    final rawDist =
+        (user["DistanceKM"] ??
+                user["Distance"] ??
+                user["DistanceKm"] ??
+                user["distance"] ??
+                "")
+            .toString()
+            .trim();
+    if (rawDist.isNotEmpty && rawDist.toLowerCase() != "null") {
+      final cleanNum = rawDist.replaceAll(RegExp(r'[^\d.]'), '');
+      final d = double.tryParse(cleanNum);
+      if (d != null) {
+        return "${d.toStringAsFixed(1)} km";
+      }
+      return rawDist;
     }
-    final double? uLat = double.tryParse(user["Lat"]?.toString() ?? "");
-    final double? uLon = double.tryParse(user["Lon"]?.toString() ?? "");
+    final double? uLat = double.tryParse(
+      (user["Lat"] ?? user["Latitude"])?.toString() ?? "",
+    );
+    final double? uLon = double.tryParse(
+      (user["Lon"] ?? user["Longitude"])?.toString() ?? "",
+    );
     if (uLat != null && uLon != null && (uLat != 0.0 || uLon != 0.0)) {
       final distMeters = Geolocator.distanceBetween(
         currentLocation.latitude,
@@ -478,12 +497,13 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
       final km = distMeters / 1000.0;
       return "${km.toStringAsFixed(1)} km";
     }
-    return "0.1 km";
+    return "Nearby";
   }
 
   Widget _avatarFallback(String name) {
-    final String initial =
-        name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'U';
+    final String initial = name.trim().isNotEmpty
+        ? name.trim()[0].toUpperCase()
+        : 'U';
     return Container(
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
@@ -502,6 +522,236 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
             color: Colors.white,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _horizontalProfileStrip() {
+    final profiles = filteredProfiles;
+    if (profiles.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 28.h),
+        child: Center(
+          child: Text(
+            "No nearby people found",
+            style: TextStyle(color: Colors.white54, fontSize: 13.sp),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 156.h,
+      child: ListView.separated(
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        scrollDirection: Axis.horizontal,
+        itemCount: profiles.length,
+        separatorBuilder: (_, _) => SizedBox(width: 10.w),
+        itemBuilder: (_, index) {
+          final user = profiles[index];
+          final name = (user["FullName"] ?? user["name"] ?? "User").toString();
+          final media = (user["Media"] ?? "").toString();
+          final onlineValue =
+              (user["IsOnline"] ?? user["isOnline"] ?? user["Online"] ?? "")
+                  .toString()
+                  .toLowerCase()
+                  .trim();
+          final isOnline =
+              onlineValue == "true" ||
+              onlineValue == "1" ||
+              onlineValue == "yes" ||
+              onlineValue == "online";
+
+          return GestureDetector(
+            onTap: () => Get.to(
+              () => BoomProfileScreen(
+                userEmail:
+                    user["EmailAddress"]?.toString() ??
+                    user["email"]?.toString(),
+                initialUserData: user,
+              ),
+              transition: Transition.rightToLeft,
+            ),
+            child: SizedBox(
+              width: 94.w,
+              child: Column(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 82.w,
+                        height: 82.w,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isOnline
+                                ? const Color(0xFF00E676)
+                                : Colors.white24,
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: media.startsWith("http")
+                              ? Image.network(
+                                  media,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) =>
+                                      _avatarFallback(name),
+                                )
+                              : _avatarFallback(name),
+                        ),
+                      ),
+                      Positioned(
+                        right: 5.w,
+                        bottom: 3.h,
+                        child: Container(
+                          width: 13.w,
+                          height: 13.w,
+                          decoration: BoxDecoration(
+                            color: isOnline
+                                ? const Color(0xFF00E676)
+                                : Colors.grey,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFF141420),
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 7.h),
+                  Text(
+                    name.split(" ").first,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        color: Colors.redAccent,
+                        size: 12.sp,
+                      ),
+                      SizedBox(width: 2.w),
+                      Flexible(
+                        child: Text(
+                          _formatDistance(user),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white60,
+                            fontSize: 10.sp,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _emptyNearbyState() {
+    final bool isCrosspath = _selectedCategory == 1;
+    final bool isTonight = _selectedCategory == 2;
+    final bool isNearby = _selectedCategory == 3;
+    final String title = isCrosspath
+        ? "No Crosspath users found"
+        : isTonight
+        ? "No Free Tonight users found"
+        : isNearby
+        ? "No Nearby users found"
+        : "No people nearby";
+    final String subtitle = isCrosspath
+        ? "No one is looking to cross paths right now."
+        : isTonight
+        ? "No one is free tonight in your selected radius."
+        : isNearby
+        ? "Try increasing your search radius to discover more people."
+        : "New people will appear here as they join.";
+    final IconData icon = isCrosspath
+        ? Icons.compare_arrows_rounded
+        : isTonight
+        ? Icons.nights_stay_rounded
+        : isNearby
+        ? Icons.near_me_rounded
+        : Icons.people_alt_rounded;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 34.h),
+      child: Column(
+        children: [
+          Container(
+            width: 76.w,
+            height: 76.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.cyanAccent.withValues(alpha: 0.10),
+              border: Border.all(
+                color: Colors.cyanAccent.withValues(alpha: 0.35),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.cyanAccent.withValues(alpha: 0.16),
+                  blurRadius: 22,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.cyanAccent, size: 38.sp),
+          ),
+          SizedBox(height: 16.h),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 17.sp,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 7.h),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 12.5.sp,
+              height: 1.4,
+            ),
+          ),
+          SizedBox(height: 14.h),
+          TextButton.icon(
+            onPressed: _fetchNearbyUsers,
+            icon: Icon(
+              Icons.refresh_rounded,
+              color: Colors.cyanAccent,
+              size: 18.sp,
+            ),
+            label: Text(
+              "Refresh",
+              style: TextStyle(
+                color: Colors.cyanAccent,
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -704,10 +954,10 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
             DraggableScrollableSheet(
               controller: _sheetController,
               initialChildSize: 0.50,
-              minChildSize: 0.10,
+              minChildSize: 0.25,
               maxChildSize: 0.90,
               snap: true,
-              snapSizes: const [0.10, 0.50, 0.90],
+              snapSizes: const [0.25, 0.50, 0.90],
               builder: (context, scrollController) {
                 return Container(
                   decoration: BoxDecoration(
@@ -790,11 +1040,8 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                             } else if (i == 3) {
                               _searchRadius = 5;
                             }
-                            _updateMarkers();
                           });
-                          if (i == 1 || i == 3) {
-                            _fetchNearbyUsers();
-                          }
+                          _fetchNearbyUsers();
                         },
                       ),
 
@@ -813,7 +1060,9 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                               color: const Color(0xFF22222E),
                               borderRadius: BorderRadius.circular(16.r),
                               border: Border.all(
-                                color: Colors.cyanAccent.withValues(alpha: 0.35),
+                                color: Colors.cyanAccent.withValues(
+                                  alpha: 0.35,
+                                ),
                                 width: 1,
                               ),
                             ),
@@ -836,7 +1085,8 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                 SizedBox(width: 12.w),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         "Crosspath Active",
@@ -848,39 +1098,13 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                       ),
                                       SizedBox(height: 2.h),
                                       Text(
-                                        "Automatically showing people within 1 km",
+                                        "Automatically showing people nearby",
                                         style: TextStyle(
                                           color: Colors.white60,
                                           fontSize: 11.sp,
                                         ),
                                       ),
                                     ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 10.w,
-                                    vertical: 4.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.cyanAccent.withValues(
-                                      alpha: 0.15,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12.r),
-                                    border: Border.all(
-                                      color: Colors.cyanAccent.withValues(
-                                        alpha: 0.4,
-                                      ),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    "1 km",
-                                    style: TextStyle(
-                                      color: Colors.cyanAccent,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12.sp,
-                                    ),
                                   ),
                                 ),
                               ],
@@ -899,9 +1123,9 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                               color: const Color(0xFF22222E),
                               borderRadius: BorderRadius.circular(16.r),
                               border: Border.all(
-                                color: const Color(0xFFFF5E62).withValues(
-                                  alpha: 0.35,
-                                ),
+                                color: const Color(
+                                  0xFFFF5E62,
+                                ).withValues(alpha: 0.35),
                                 width: 1,
                               ),
                             ),
@@ -910,9 +1134,9 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                 Container(
                                   padding: EdgeInsets.all(8.w),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFF5E62).withValues(
-                                      alpha: 0.15,
-                                    ),
+                                    color: const Color(
+                                      0xFFFF5E62,
+                                    ).withValues(alpha: 0.15),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
@@ -924,7 +1148,8 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                 SizedBox(width: 12.w),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         "Nearby Active",
@@ -936,7 +1161,7 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                       ),
                                       SizedBox(height: 2.h),
                                       Text(
-                                        "Automatically showing people within 5 km",
+                                        "Automatically showing people nearby",
                                         style: TextStyle(
                                           color: Colors.white60,
                                           fontSize: 11.sp,
@@ -951,19 +1176,19 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                     vertical: 4.h,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFF5E62).withValues(
-                                      alpha: 0.15,
-                                    ),
+                                    color: const Color(
+                                      0xFFFF5E62,
+                                    ).withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(12.r),
                                     border: Border.all(
-                                      color: const Color(0xFFFF5E62).withValues(
-                                        alpha: 0.4,
-                                      ),
+                                      color: const Color(
+                                        0xFFFF5E62,
+                                      ).withValues(alpha: 0.4),
                                       width: 1,
                                     ),
                                   ),
                                   child: Text(
-                                    "5 km",
+                                    "${_searchRadius.toInt()} km",
                                     style: TextStyle(
                                       color: const Color(0xFFFF5E62),
                                       fontWeight: FontWeight.bold,
@@ -1144,43 +1369,10 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                           ),
                         )
                       else if (filteredProfiles.isEmpty)
-                        Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40.h),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.person_search_rounded,
-                                color: Colors.white38,
-                                size: 44.sp,
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 24.w),
-                                child: Text(
-                                  "You're all caught up! New people will appear as they join.",
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 13.sp,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: 12.h),
-                              TextButton.icon(
-                                onPressed: _fetchNearbyUsers,
-                                icon: const Icon(
-                                  Icons.refresh,
-                                  color: Colors.cyanAccent,
-                                ),
-                                label: const Text(
-                                  "Refresh",
-                                  style: TextStyle(
-                                    color: Colors.cyanAccent,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
+                        _emptyNearbyState()
+                      else if (_sheetController.isAttached &&
+                          _sheetController.size >= 0.55)
+                        _horizontalProfileStrip()
                       else
                         GridView.builder(
                           shrinkWrap: true,
@@ -1196,14 +1388,12 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                               ),
                           itemBuilder: (context, index) {
                             final user = filteredProfiles[index];
-                            final String name = (user["FullName"] ??
-                                    user["name"] ??
-                                    "User")
-                                .toString();
+                            final String name =
+                                (user["FullName"] ?? user["name"] ?? "User")
+                                    .toString();
                             final String? media = user["Media"]?.toString();
-                            final isOnline = user["IsOnline"]
-                                    ?.toString()
-                                    .toLowerCase() ==
+                            final isOnline =
+                                user["IsOnline"]?.toString().toLowerCase() ==
                                 "true";
 
                             Uint8List? imageBytes;
@@ -1230,8 +1420,8 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                               onTap: () {
                                 Get.to(
                                   () => BoomProfileScreen(
-                                    userEmail: user["EmailAddress"]
-                                            ?.toString() ??
+                                    userEmail:
+                                        user["EmailAddress"]?.toString() ??
                                         user["email"]?.toString(),
                                     initialUserData: user,
                                   ),
@@ -1262,16 +1452,13 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                                                         _avatarFallback(name),
                                                   )
                                                 : hasHttp
-                                                    ? Image.network(
-                                                        media!,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder:
-                                                            (_, _, _) =>
-                                                                _avatarFallback(
-                                                                  name,
-                                                                ),
-                                                      )
-                                                    : _avatarFallback(name),
+                                                ? Image.network(
+                                                    media!,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, _, _) =>
+                                                        _avatarFallback(name),
+                                                  )
+                                                : _avatarFallback(name),
                                             if (isOnline)
                                               Positioned(
                                                 top: 8,
@@ -1386,16 +1573,14 @@ class _CategoryRow extends StatelessWidget {
                   curve: Curves.easeInOut,
                   padding: EdgeInsets.symmetric(vertical: 10.h),
                   decoration: BoxDecoration(
-                    color: isSel
-                        ? const Color(0xFFFF5E62)
-                        : Colors.transparent,
+                    color: isSel ? const Color(0xFFFF5E62) : Colors.transparent,
                     borderRadius: BorderRadius.circular(12.r),
                     boxShadow: isSel
                         ? [
                             BoxShadow(
-                              color: const Color(0xFFFF5E62).withValues(
-                                alpha: 0.45,
-                              ),
+                              color: const Color(
+                                0xFFFF5E62,
+                              ).withValues(alpha: 0.45),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -1403,11 +1588,39 @@ class _CategoryRow extends StatelessWidget {
                         : [],
                   ),
                   child: Center(
-                    child: Icon(
-                      categories[i]["icon"],
-                      color: isSel ? Colors.white : Colors.white60,
-                      size: 20.sp,
-                    ),
+                    child: sheetSize >= 0.55
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                categories[i]["icon"],
+                                color: isSel ? Colors.white : Colors.white60,
+                                size: 18.sp,
+                              ),
+                              SizedBox(width: 2.w),
+                              Flexible(
+                                child: Text(
+                                  categories[i]["label"].toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: isSel
+                                        ? Colors.white
+                                        : Colors.white60,
+                                    fontSize: 8.5.sp,
+                                    fontWeight: isSel
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Icon(
+                            categories[i]["icon"],
+                            color: isSel ? Colors.white : Colors.white60,
+                            size: 20.sp,
+                          ),
                   ),
                 ),
               ),

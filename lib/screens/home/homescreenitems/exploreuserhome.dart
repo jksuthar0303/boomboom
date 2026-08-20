@@ -360,7 +360,10 @@ class ExploreUsersScreen extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
 
                               children: [
-                                Text("🇮🇳", style: TextStyle(fontSize: 8.sp)),
+                                Text(
+                                  countryFlag(user["country"]?.toString() ?? ""),
+                                  style: TextStyle(fontSize: 8.sp),
+                                ),
 
                                 SizedBox(width: 1.w),
 

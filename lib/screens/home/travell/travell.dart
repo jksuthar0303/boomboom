@@ -651,7 +651,7 @@ class _TravelAlertScreenState extends State<TravelAlertScreen> {
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 24.w),
                         child: Text(
-                          "You're all caught up! New people will appear as they join.",
+                          "No travel plans found nearby right now.",
                           textAlign: TextAlign.center,
                           style: AppTextStyles.body.copyWith(
                             color: Colors.white60,
