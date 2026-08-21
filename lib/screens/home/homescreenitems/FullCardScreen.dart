@@ -14,6 +14,7 @@ import '../../../constant/appsize.dart';
 import '../../../constant/apptextstyle.dart';
 import '../../../constant/colors.dart';
 import '../../../controller/filter_controller.dart';
+import 'newusersscreen.dart';
 
 class FullCardScreen extends StatefulWidget {
   const FullCardScreen({super.key});
@@ -307,9 +308,118 @@ class _FullCardScreenState extends State<FullCardScreen> {
 
       return ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: displayUsers.length,
+        itemCount: displayUsers.length + 1,
         padding: EdgeInsets.symmetric(horizontal: AppSize.w(10)),
         itemBuilder: (_, index) {
+          if (index == displayUsers.length) {
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NewUsersScreen(),
+                  ),
+                );
+              },
+              child: Container(
+                width: AppSize.w(280),
+                height: AppSize.h(420),
+                margin: EdgeInsets.only(right: AppSize.w(12)),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(25.r),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFFFF8A00),
+                      Color(0xFFFF5200),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF5200).withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 56.w,
+                      height: 56.w,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.arrow_forward,
+                        color: Colors.white,
+                        size: 28.sp,
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+                    Text(
+                      "See All",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22.sp,
+                      ),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      "Explore More Profiles",
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 22.h),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 22.w,
+                        vertical: 8.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(25.r),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "Open",
+                            style: TextStyle(
+                              color: const Color(0xFFFF5200),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.sp,
+                            ),
+                          ),
+                          SizedBox(width: 4.w),
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            color: const Color(0xFFFF5200),
+                            size: 13.sp,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           final user = displayUsers[index];
 
           return GestureDetector(
@@ -508,8 +618,9 @@ class _FullCardScreenState extends State<FullCardScreen> {
                       children: [
                         /// NAME + AGE + VERIFIED
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Expanded(
+                            Flexible(
                               child: Text(
                                 "$fullName, $age",
                                 maxLines: 1,
@@ -525,7 +636,7 @@ class _FullCardScreenState extends State<FullCardScreen> {
                               SizedBox(width: 4.w),
                               Icon(
                                 Icons.verified_rounded,
-                                color: Colors.cyanAccent,
+                                color: Colors.blueAccent,
                                 size: 18.sp,
                               ),
                             ],

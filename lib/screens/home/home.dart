@@ -30,6 +30,7 @@ import 'homescreenitems/FullCardScreen.dart';
 import 'homescreenitems/eventscreens/eventscreens.dart';
 import 'homescreenitems/homefilterscreen.dart';
 import 'homescreenitems/newmatches.dart';
+import 'homescreenitems/newusersscreen.dart';
 import 'homescreenitems/notificationscreen.dart';
 import '../../controller/filter_controller.dart';
 
@@ -47,7 +48,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final PageController _pageController = PageController();
   late final AuthController authController = Get.isRegistered<AuthController>()
       ? Get.find<AuthController>()
@@ -313,186 +315,53 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     },
   ];
 
-  Future<void> _checkAndRequestLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _showLocationServiceDialog();
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        _showPermissionDeniedDialog(
-          "Location permission is denied. It is required to show nearby profiles.",
-        );
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      _showPermissionDeniedDialog(
-        "Location permissions are permanently denied. Please enable them from Settings to use the app.",
-        openSettings: true,
-      );
-      return;
-    }
-
+  Future<void> _fetchAndUpdateLocation({bool requestIfNeeded = true}) async {
     try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      if (mounted) {
-        setState(() => _currentPosition = position);
+      LocationPermission permission;
+      if (requestIfNeeded) {
+        permission = await PermissionService.requestLocationPermission(
+          showRationaleOnPermanentlyDenied: false,
+        );
+      } else {
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) return;
+        permission = await Geolocator.checkPermission();
       }
-      debugPrint(
-        "Current Position: ${position.latitude}, ${position.longitude}",
-      );
 
-      // Update city from coordinates
-      _updateCityFromCoordinates(position.latitude, position.longitude);
+      if (permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse) {
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+        if (mounted) {
+          setState(() => _currentPosition = position);
+        }
+        _updateCityFromCoordinates(position.latitude, position.longitude);
 
-      // Send to server via UpdateLatLon API
-      final email = await SecureStorage().getUserEmail();
-      if (email != null && email.isNotEmpty) {
-        final response = await RegisterService().updateLatLon(
-          email: email,
-          lat: position.latitude.toString(),
-          lon: position.longitude.toString(),
-        );
-        debugPrint(
-          "[Home] UpdateLatLon response status: ${response.statusCode}",
-        );
+        final email = await SecureStorage().getUserEmail();
+        if (email != null && email.isNotEmpty) {
+          final response = await RegisterService().updateLatLon(
+            email: email,
+            lat: position.latitude.toString(),
+            lon: position.longitude.toString(),
+          );
+          debugPrint(
+            "[Home] UpdateLatLon response status: ${response.statusCode}",
+          );
+        }
       }
     } catch (e) {
-      debugPrint("Could not get position or update: $e");
+      debugPrint("[Home] Location update error: $e");
     }
-  }
-
-  void _showLocationServiceDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.secondary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.r),
-            side: const BorderSide(color: AppColors.cardBorder, width: 1.5),
-          ),
-          title: Text(
-            "Location Services Disabled",
-            style: AppTextStyles.subHeading.copyWith(color: AppColors.white),
-          ),
-          content: Text(
-            "Please turn on GPS/Location Services to find people nearby.",
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _checkAndRequestLocation();
-              },
-              child: Text(
-                "Retry",
-                style: AppTextStyles.button.copyWith(color: AppColors.accent),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                await Geolocator.openLocationSettings();
-                _checkAndRequestLocation();
-              },
-              child: Text(
-                "Enable GPS",
-                style: AppTextStyles.button.copyWith(color: AppColors.accent),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showPermissionDeniedDialog(
-    String message, {
-    bool openSettings = false,
-  }) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.secondary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.r),
-            side: const BorderSide(color: AppColors.cardBorder, width: 1.5),
-          ),
-          title: Text(
-            "Location Permission Required",
-            style: AppTextStyles.subHeading.copyWith(color: AppColors.white),
-          ),
-          content: Text(
-            message,
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
-          ),
-          actions: [
-            if (!openSettings)
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _checkAndRequestLocation();
-                },
-                child: Text(
-                  "Grant Permission",
-                  style: AppTextStyles.button.copyWith(color: AppColors.accent),
-                ),
-              ),
-            if (openSettings)
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  await Geolocator.openAppSettings();
-                  _checkAndRequestLocation();
-                },
-                child: Text(
-                  "Open Settings",
-                  style: AppTextStyles.button.copyWith(color: AppColors.accent),
-                ),
-              ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      "Some features may not work without location access.",
-                    ),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-              },
-              child: Text(
-                "Dismiss",
-                style: AppTextStyles.button.copyWith(color: Colors.redAccent),
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
   void initState() {
     super.initState();
     HomeScreen.state = this;
+    WidgetsBinding.instance.addObserver(this);
     _checkLoginAndLoadProfile();
     _fetchEveryoneUsers();
     _fetchOnlineUsers();
@@ -509,6 +378,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         curve: Curves.easeInOut,
       );
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (HomeScreen.state == this) {
+      HomeScreen.state = null;
+    }
+    _autoSlideTimer?.cancel();
+    _pageController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fetchAndUpdateLocation(requestIfNeeded: false);
+    }
   }
 
   Future<void> _checkLoginAndLoadProfile() async {
@@ -564,25 +452,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
 
       // 📍 3. Check & Request Location Permission + Update Current GPS City
-      try {
-        final locPermission = await PermissionService.requestLocationPermission(
-          showRationaleOnPermanentlyDenied: false,
-        );
-        if (locPermission == LocationPermission.always ||
-            locPermission == LocationPermission.whileInUse) {
-          final position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-            ),
-          );
-          if (mounted) {
-            setState(() => _currentPosition = position);
-          }
-          _updateCityFromCoordinates(position.latitude, position.longitude);
-        }
-      } catch (e) {
-        debugPrint("[Home] Location permission error: $e");
-      }
+      await _fetchAndUpdateLocation(requestIfNeeded: true);
     });
 
     // Shared storage mein check karein ki profile data saved hai ya nahi
@@ -881,17 +751,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  @override
-  void dispose() {
-    if (HomeScreen.state == this) {
-      HomeScreen.state = null;
-    }
-    _autoSlideTimer?.cancel();
-    _pageController.dispose();
-    _tabController.dispose();
-    super.dispose();
-  }
-
   void _handleCardTap(String screen) {
     if (screen == "travel") {
       Get.to(() => TravelAlertScreen());
@@ -995,28 +854,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
 
-                        SizedBox(width: 10.w),
+                        // SizedBox(width: 10.w),
 
-                        // Filter Icon — connected to FilterController
-                        GestureDetector(
-                          onTap: () async {
-                            await Get.to(() => const FilterPreferencesScreen());
-                            setState(() {});
-                          },
-                          child: Obx(() {
-                            final isActive =
-                                FilterController.instance.isFilterActive;
-                            return CircleAvatar(
-                              backgroundColor: isActive
-                                  ? const Color(0xFFE8335A)
-                                  : Colors.grey.shade800,
-                              child: const Icon(
-                                Icons.tune_rounded,
-                                color: Colors.white,
-                              ),
-                            );
-                          }),
-                        ),
+                        // Filter Icon — connected to FilterController (Commented out for now)
+                        // GestureDetector(
+                        //   onTap: () async {
+                        //     await Get.to(() => const FilterPreferencesScreen());
+                        //     setState(() {});
+                        //   },
+                        //   child: Obx(() {
+                        //     final isActive =
+                        //         FilterController.instance.isFilterActive;
+                        //     return CircleAvatar(
+                        //       backgroundColor: isActive
+                        //           ? const Color(0xFFE8335A)
+                        //           : Colors.grey.shade800,
+                        //       child: const Icon(
+                        //         Icons.tune_rounded,
+                        //         color: Colors.white,
+                        //       ),
+                        //     );
+                        //   }),
+                        // ),
                       ],
                     ),
                   ],
@@ -1081,8 +940,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 padding: EdgeInsets.symmetric(horizontal: 14.w),
                 child: Container(
                   padding: EdgeInsets.symmetric(
-                    horizontal: 12.w,
-                    vertical: 8.h,
+                    horizontal: 14.w,
+                    vertical: 14.h,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.04),
@@ -1100,35 +959,75 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ],
                   ),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        width: 40.w,
-                        height: 40.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.cyanAccent,
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.cyanAccent.withValues(alpha: 0.5),
-                              blurRadius: 15,
-                              spreadRadius: 1,
+                      Row(
+                        children: [
+                          Container(
+                            width: 40.w,
+                            height: 40.w,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.cyanAccent,
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.cyanAccent.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  blurRadius: 15,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.local_fire_department,
-                          color: Colors.orangeAccent,
-                          size: 18.sp,
-                        ),
+                            child: Icon(
+                              Icons.local_fire_department,
+                              color: Colors.orangeAccent,
+                              size: 18.sp,
+                            ),
+                          ),
+                          SizedBox(width: 14.w),
+                          Text(
+                            "NEW",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 8.w),
-                      Text(
-                        "NEW",
-                        style: AppTextStyles.subHeading.copyWith(
-                          color: Colors.white,
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NewUsersScreen(),
+                          ),
+                        ),
+                        child: Container(
+                          width: 30.w,
+                          height: 30.w,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.cyanAccent,
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.cyanAccent.withValues(alpha: 0.4),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.arrow_forward,
+                            color: Colors.cyanAccent,
+                            size: 15.sp,
+                          ),
                         ),
                       ),
                     ],
@@ -1525,7 +1424,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => Activeuser(initialTab: isActive ? 0 : 1),
+                  builder: (_) => Activeuser(initialTab: isActive ? 1 : 0),
                 ),
               ),
               child: Container(
@@ -1653,16 +1552,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
-                    if (isVerified)
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Icon(
-                          Icons.verified_rounded,
-                          color: Colors.cyanAccent,
-                          size: 16.sp,
-                        ),
-                      ),
+
                     Positioned(
                       bottom: 8,
                       left: 8,
@@ -1817,12 +1707,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _everyoneGridCard(Map<String, dynamic> user) {
     final String fullName = (user["FullName"] ?? "User").toString();
     final int age = _calculateUserAge(user["Dob"]?.toString());
-    final String rawOnlineStatus = (user["OnlineStatus"] ??
-            user["onlineStatus"] ??
-            user["Status"] ??
-            user["status"])
-        ?.toString()
-        .trim() ?? "";
+    final String rawOnlineStatus =
+        (user["OnlineStatus"] ??
+                user["onlineStatus"] ??
+                user["Status"] ??
+                user["status"])
+            ?.toString()
+            .trim() ??
+        "";
     final String onlineValue =
         (user["IsOnline"] ?? user["isOnline"] ?? user["Online"] ?? "")
             .toString()
@@ -1833,14 +1725,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         onlineValue == "1" ||
         onlineValue == "yes" ||
         onlineValue == "online";
-    final String onlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
+    final String onlineStatus =
+        rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
         ? rawOnlineStatus
         : (isOnlineVal ? "Online" : "Offline");
     final String sLower = onlineStatus.toLowerCase();
-    final bool isOnline = (sLower == "online" ||
-        sLower == "online now" ||
-        sLower == "active" ||
-        sLower == "active now") && sLower != "hidden" && sLower != "offline";
+    final bool isOnline =
+        (sLower == "online" ||
+            sLower == "online now" ||
+            sLower == "active" ||
+            sLower == "active now") &&
+        sLower != "hidden" &&
+        sLower != "offline";
     final String verifiedValue =
         (user["IsVerified"] ?? user["isVerified"] ?? "")
             .toString()

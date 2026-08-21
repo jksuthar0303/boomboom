@@ -10,6 +10,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../authentication/boomboom.dart';
+import '../../../../backend/home_service.dart';
 import '../../../../backend/secure_storage.dart';
 import '../../../../backend/tonight_service.dart';
 
@@ -56,7 +57,7 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
       return list;
     }
 
-    if (_selectedCategory == 0) return list;
+    if (_selectedCategory == 0 || _selectedCategory == 2) return list;
 
     final selectedCatName = categories[_selectedCategory]["label"]
         .toString()
@@ -118,26 +119,27 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
 
     try {
       final email = await SecureStorage().getUserEmail() ?? "";
+      List<Map<String, dynamic>> rawList = [];
 
-      String planningFilter = "";
-      if (_selectedCategory == 1) {
-        planningFilter = "Crosspath";
-      } else if (_selectedCategory == 2) {
-        planningFilter = "Free Tonight";
-      } else if (_selectedCategory == 3) {
-        planningFilter = "Nearby";
+      if (_selectedCategory == 2) {
+        // 🔥 1. "Free Tonight" Tab (Index 2) -> Call ShowTonight API
+        rawList = await TonightService().showTonight(
+          email: email.trim(),
+          radius: _searchRadius,
+          planning: "Free Tonight",
+        );
+      } else {
+        // 🌐 2. Other Tabs ("All", "Crosspath", "Nearby") -> Call ShowNearbyUsers API
+        rawList = await HomeService().getNearbyUsersList(
+          lat: currentLocation.latitude.toString(),
+          lon: currentLocation.longitude.toString(),
+          radius: _searchRadius.toInt().toString(),
+        );
       }
-
-      final List<Map<String, dynamic>> tonightList = await TonightService()
-          .showTonight(
-            email: email.trim(),
-            radius: _searchRadius,
-            planning: planningFilter,
-          );
 
       if (mounted) {
         setState(() {
-          _nearbyUsers = tonightList.map((e) {
+          _nearbyUsers = rawList.map((e) {
             final map = Map<String, dynamic>.from(e);
             if (!map.containsKey("FullName") && map.containsKey("Name")) {
               map["FullName"] = map["Name"];
@@ -157,7 +159,7 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
         });
       }
     } catch (e) {
-      debugPrint("[NearbyMap] Error loading ShowTonight users: $e");
+      debugPrint("[NearbyMap] Error loading users: $e");
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -781,7 +783,7 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                 children: [
                   TileLayer(
                     urlTemplate:
-                        'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
+                        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
                     subdomains: const ['a', 'b', 'c', 'd'],
                     userAgentPackageName: 'com.yourapp.nearby',
                   ),
@@ -791,8 +793,8 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                         point: currentLocation,
                         radius: _searchRadius * 1000,
                         useRadiusInMeter: true,
-                        color: Colors.cyanAccent.withValues(alpha: 0.10),
-                        borderColor: Colors.cyanAccent.withValues(alpha: 0.60),
+                        color: Colors.blueAccent.withValues(alpha: 0.12),
+                        borderColor: Colors.blueAccent.withValues(alpha: 0.65),
                         borderStrokeWidth: 1.5,
                       ),
                     ],
@@ -812,15 +814,15 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF181828).withValues(alpha: 0.92),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(30.r),
                         border: Border.all(
-                          color: Colors.cyanAccent.withValues(alpha: 0.25),
-                          width: 1.2,
+                          color: Colors.black.withValues(alpha: 0.08),
+                          width: 1.0,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.45),
+                            color: Colors.black.withValues(alpha: 0.12),
                             blurRadius: 15,
                             offset: const Offset(0, 4),
                           ),
@@ -828,17 +830,22 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                       ),
                       child: TextField(
                         controller: _searchController,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
                         onSubmitted: (_) => _searchLocation(),
                         decoration: InputDecoration(
                           hintText: "Search for places...",
                           hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
+                            color: Colors.black45,
                             fontSize: 14.sp,
                           ),
-                          prefixIcon: const Icon(
+                          prefixIcon: Icon(
                             Icons.search,
-                            color: Colors.cyanAccent,
+                            color: Colors.grey.shade600,
+                            size: 22.sp,
                           ),
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(
@@ -856,95 +863,24 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                       width: 50.w,
                       height: 50.w,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF181828).withValues(alpha: 0.92),
+                        color: Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.cyanAccent.withValues(alpha: 0.25),
-                          width: 1.2,
+                          color: Colors.black.withValues(alpha: 0.08),
+                          width: 1.0,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.cyanAccent.withValues(alpha: 0.15),
-                            blurRadius: 10,
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.my_location,
-                        color: Colors.cyanAccent,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── ZOOM CONTROLS (Floating Right Buttons) ────────
-            Positioned(
-              right: 16,
-              top: 90,
-              child: Column(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      final currentZoom = _mapController.camera.zoom;
-                      _mapController.move(
-                        _mapController.camera.center,
-                        (currentZoom + 1).clamp(3.0, 18.0),
-                      );
-                    },
-                    child: Container(
-                      width: 42.w,
-                      height: 42.w,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF181828).withValues(alpha: 0.92),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  GestureDetector(
-                    onTap: () {
-                      final currentZoom = _mapController.camera.zoom;
-                      _mapController.move(
-                        _mapController.camera.center,
-                        (currentZoom - 1).clamp(3.0, 18.0),
-                      );
-                    },
-                    child: Container(
-                      width: 42.w,
-                      height: 42.w,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF181828).withValues(alpha: 0.92),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.remove,
-                        color: Colors.white,
-                        size: 20,
+                        color: Colors.black87,
+                        size: 22.sp,
                       ),
                     ),
                   ),
@@ -1577,13 +1513,13 @@ class _CategoryRow extends StatelessWidget {
                   curve: Curves.easeInOut,
                   padding: EdgeInsets.symmetric(vertical: 10.h),
                   decoration: BoxDecoration(
-                    color: isSel ? const Color(0xFFFF5E62) : Colors.transparent,
+                    color: isSel ? const Color(0xFFC62828) : Colors.transparent,
                     borderRadius: BorderRadius.circular(12.r),
                     boxShadow: isSel
                         ? [
                             BoxShadow(
                               color: const Color(
-                                0xFFFF5E62,
+                                0xFFC62828,
                               ).withValues(alpha: 0.45),
                               blurRadius: 10,
                               offset: const Offset(0, 3),

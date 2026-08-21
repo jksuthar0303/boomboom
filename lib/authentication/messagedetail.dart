@@ -19,6 +19,8 @@ import '../constant/appconstants.dart';
 import '../constant/appsize.dart';
 import '../constant/colors.dart';
 import '../model/messagedetails.dart';
+import 'package:video_player/video_player.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:video_compress/video_compress.dart';
 
 // ═══════════════════════════════════════════
@@ -617,6 +619,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                     .toLowerCase()
                     .trim();
                 final bool isImg =
+                    text.startsWith("data:image") ||
                     extRaw.contains("png") ||
                     extRaw.contains("jpg") ||
                     extRaw.contains("jpeg") ||
@@ -628,6 +631,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                         !lowerText.endsWith(".mp4"));
 
                 final bool isVid =
+                    text.startsWith("data:video") ||
                     extRaw.contains("mp4") ||
                     lowerText.endsWith(".mp4") ||
                     lowerText.endsWith(".mov") ||
@@ -1252,11 +1256,12 @@ class _MessageDetailPageState extends State<MessageDetailPage>
           final file = File(path);
           final bytes = await file.readAsBytes();
           final base64Image = base64Encode(bytes);
+          final chatMessage = "data:image/jpeg;base64,$base64Image";
 
           final res = await RegisterService().sendChatMessage(
             senderEmail: senderEmail.trim(),
             receiverEmail: receiverEmail.trim(),
-            chatMessage: base64Image,
+            chatMessage: chatMessage,
           );
 
           debugPrint(
@@ -1380,11 +1385,12 @@ class _MessageDetailPageState extends State<MessageDetailPage>
           final File uploadFile = compressed?.file ?? File(path);
           final bytes = await uploadFile.readAsBytes();
           final base64Video = base64Encode(bytes);
+          final chatMessage = "data:video/mp4;base64,$base64Video";
 
           final res = await RegisterService().sendChatMessage(
             senderEmail: senderEmail.trim(),
             receiverEmail: receiverEmail.trim(),
-            chatMessage: base64Video,
+            chatMessage: chatMessage,
           );
 
           debugPrint(
@@ -1557,7 +1563,6 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   // ─────────────────────────────────────────
   // 🔥 MEDIA PICKER (Images & Videos)
   // ─────────────────────────────────────────
-  // ignore: unused_element
   Future<void> _pickMedia() async {
     if (_showEmojiPicker) {
       setState(() => _showEmojiPicker = false);
@@ -2365,113 +2370,119 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                 ],
               ),
               child: c.isImage
-                  ? Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14.r),
-                          child: _buildImageWidget(c),
-                        ),
-                        if (c.isUploading)
-                          Container(
-                            width: 180.w,
-                            height: 230.h,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(14.r),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 32.w,
-                                  height: 32.w,
-                                  child: const CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.8,
-                                  ),
-                                ),
-                                SizedBox(height: 10.h),
-                                Text(
-                                  "Sending image...",
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontSize: 11.5.sp,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  ? GestureDetector(
+                      onTap: () => _openFullScreenImage(c),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(14.r),
+                            child: _buildImageWidget(c),
                           ),
-                      ],
+                          if (c.isUploading)
+                            Container(
+                              width: 180.w,
+                              height: 230.h,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(14.r),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 32.w,
+                                    height: 32.w,
+                                    child: const CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.8,
+                                    ),
+                                  ),
+                                  SizedBox(height: 10.h),
+                                  Text(
+                                    "Sending image...",
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 11.5.sp,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     )
                   : c.isVideo
-                  ? Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 180.w,
-                          height: 230.h,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F1017),
-                            borderRadius: BorderRadius.circular(14.r),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.1),
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.play_circle_fill_rounded,
-                                color: Colors.white,
-                                size: 54.sp,
-                              ),
-                              SizedBox(height: 8.h),
-                              Text(
-                                "Video",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 13.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (c.isUploading)
+                  ? GestureDetector(
+                      onTap: () => _openFullScreenVideo(c),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
                           Container(
                             width: 180.w,
                             height: 230.h,
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.75),
+                              color: const Color(0xFF0F1017),
                               borderRadius: BorderRadius.circular(14.r),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                SizedBox(
-                                  width: 32.w,
-                                  height: 32.w,
-                                  child: const CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.8,
-                                  ),
+                                Icon(
+                                  Icons.play_circle_fill_rounded,
+                                  color: Colors.white,
+                                  size: 54.sp,
                                 ),
-                                SizedBox(height: 10.h),
+                                SizedBox(height: 8.h),
                                 Text(
-                                  "Compressing &\nSending...",
-                                  textAlign: TextAlign.center,
+                                  "Video",
                                   style: GoogleFonts.poppins(
                                     color: Colors.white,
-                                    fontSize: 11.5.sp,
-                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                      ],
+                          if (c.isUploading)
+                            Container(
+                              width: 180.w,
+                              height: 230.h,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.75),
+                                borderRadius: BorderRadius.circular(14.r),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 32.w,
+                                    height: 32.w,
+                                    child: const CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.8,
+                                    ),
+                                  ),
+                                  SizedBox(height: 10.h),
+                                  Text(
+                                    "Compressing &\nSending...",
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 11.5.sp,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     )
                   : Text(
                       c.text,
@@ -2510,6 +2521,20 @@ class _MessageDetailPageState extends State<MessageDetailPage>
     return Icon(icon, size: 13.sp, color: color);
   }
 
+  void _openFullScreenImage(ChatMessage c) {
+    Get.to(
+      () => _FullScreenImageViewer(message: c),
+      transition: Transition.fadeIn,
+    );
+  }
+
+  void _openFullScreenVideo(ChatMessage c) {
+    Get.to(
+      () => _FullScreenVideoViewer(message: c),
+      transition: Transition.fadeIn,
+    );
+  }
+
   Widget _buildImageWidget(ChatMessage c) {
     if (c.localFilePath != null && File(c.localFilePath!).existsSync()) {
       return Image.file(
@@ -2537,7 +2562,8 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             _mediaErrorPlaceholder(Icons.broken_image_rounded),
       );
     }
-    if (c.text.startsWith('/') || c.text.contains('.')) {
+    if (c.text.startsWith('/') ||
+        (c.text.contains('.') && !c.text.startsWith('data:'))) {
       final fullUrl = c.text.startsWith('/')
           ? '${AppConstants.baseUrl}${c.text.substring(1)}'
           : '${AppConstants.baseUrl}${c.text}';
@@ -2551,8 +2577,12 @@ class _MessageDetailPageState extends State<MessageDetailPage>
       );
     }
     try {
+      String rawBase64 = c.text;
+      if (rawBase64.contains(',')) {
+        rawBase64 = rawBase64.split(',').last;
+      }
       return Image.memory(
-        base64Decode(c.text),
+        base64Decode(rawBase64),
         width: 180.w,
         height: 230.h,
         fit: BoxFit.cover,
@@ -2617,8 +2647,8 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             ),
           Row(
             children: [
-              // _circleBtn(icon: Icons.camera_alt_rounded, onTap: _pickMedia),
-              // SizedBox(width: AppSize.w(8)),
+              _circleBtn(icon: Icons.camera_alt_rounded, onTap: _pickMedia),
+              SizedBox(width: AppSize.w(8)),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -3333,4 +3363,444 @@ class _ProfileCard extends StatelessWidget {
     t,
     style: GoogleFonts.poppins(fontSize: 11.sp, color: _grey),
   );
+}
+
+// ═══════════════════════════════════════════
+// 🔥 FULL SCREEN IMAGE VIEWER
+// ═══════════════════════════════════════════
+class _FullScreenImageViewer extends StatelessWidget {
+  final ChatMessage message;
+
+  const _FullScreenImageViewer({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black.withValues(alpha: 0.7),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Get.back(),
+        ),
+        title: Text(
+          message.time,
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: _buildFullImage(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullImage() {
+    final text = message.text.trim();
+    final localPath = message.localFilePath;
+
+    if (localPath != null &&
+        localPath.isNotEmpty &&
+        File(localPath).existsSync()) {
+      return Image.file(
+        File(localPath),
+        fit: BoxFit.contain,
+      );
+    }
+    if (File(text).existsSync()) {
+      return Image.file(
+        File(text),
+        fit: BoxFit.contain,
+      );
+    }
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      return Image.network(
+        text,
+        fit: BoxFit.contain,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.blue),
+          );
+        },
+        errorBuilder: (_, __, ___) => const Center(
+          child: Icon(
+            Icons.broken_image_rounded,
+            color: Colors.white54,
+            size: 48,
+          ),
+        ),
+      );
+    }
+    if (text.startsWith("data:image") ||
+        (!text.startsWith("http") &&
+            !text.startsWith("/") &&
+            text.length > 100)) {
+      try {
+        String rawBase64 = text;
+        if (rawBase64.contains(',')) {
+          rawBase64 = rawBase64.split(',').last;
+        }
+        return Image.memory(
+          base64Decode(rawBase64),
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Center(
+            child: Icon(
+              Icons.broken_image_rounded,
+              color: Colors.white54,
+              size: 48,
+            ),
+          ),
+        );
+      } catch (_) {
+        return const Center(
+          child: Icon(
+            Icons.broken_image_rounded,
+            color: Colors.white54,
+            size: 48,
+          ),
+        );
+      }
+    }
+    final fullUrl = text.startsWith('/')
+        ? '${AppConstants.baseUrl}${text.substring(1)}'
+        : '${AppConstants.baseUrl}$text';
+    return Image.network(
+      fullUrl,
+      fit: BoxFit.contain,
+      loadingBuilder: (_, child, progress) {
+        if (progress == null) return child;
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.blue),
+        );
+      },
+      errorBuilder: (_, __, ___) => const Center(
+        child: Icon(
+          Icons.broken_image_rounded,
+          color: Colors.white54,
+          size: 48,
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════
+// 🔥 FULL SCREEN VIDEO VIEWER
+// ═══════════════════════════════════════════
+class _FullScreenVideoViewer extends StatefulWidget {
+  final ChatMessage message;
+
+  const _FullScreenVideoViewer({required this.message});
+
+  @override
+  State<_FullScreenVideoViewer> createState() => _FullScreenVideoViewerState();
+}
+
+class _FullScreenVideoViewerState extends State<_FullScreenVideoViewer> {
+  VideoPlayerController? _controller;
+  bool _isLoading = true;
+  String? _errorMessage;
+  bool _showControls = true;
+  Timer? _hideControlsTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _initVideo();
+  }
+
+  Future<void> _initVideo() async {
+    try {
+      final text = widget.message.text.trim();
+      final localPath = widget.message.localFilePath;
+
+      debugPrint(
+        "[VideoViewer] Initializing video with text length: ${text.length}, localPath: $localPath",
+      );
+
+      if (localPath != null &&
+          localPath.isNotEmpty &&
+          File(localPath).existsSync()) {
+        debugPrint("[VideoViewer] Playing from localFilePath: $localPath");
+        _controller = VideoPlayerController.file(File(localPath));
+      } else if (File(text).existsSync()) {
+        debugPrint("[VideoViewer] Playing from File(text): $text");
+        _controller = VideoPlayerController.file(File(text));
+      } else if (text.startsWith("data:video") ||
+          (!text.startsWith("http") &&
+              !text.startsWith("/") &&
+              text.length > 100)) {
+        // Base64 video data
+        debugPrint("[VideoViewer] Decoding Base64 video...");
+        String rawBase64 = text;
+        if (rawBase64.contains(",")) {
+          rawBase64 = rawBase64.split(",").last;
+        }
+        final bytes = base64Decode(rawBase64);
+        final tempDir = await getTemporaryDirectory();
+        final tempFile = File(
+          "${tempDir.path}/temp_chat_video_${DateTime.now().millisecondsSinceEpoch}.mp4",
+        );
+        await tempFile.writeAsBytes(bytes);
+        debugPrint("[VideoViewer] Written temp video file: ${tempFile.path}");
+        _controller = VideoPlayerController.file(tempFile);
+      } else if (text.startsWith("http://") || text.startsWith("https://")) {
+        debugPrint("[VideoViewer] Playing from network URL: $text");
+        _controller = VideoPlayerController.networkUrl(Uri.parse(text));
+      } else if (text.startsWith("/")) {
+        final fullUrl = "${AppConstants.baseUrl}${text.substring(1)}";
+        debugPrint("[VideoViewer] Playing from server URL (/): $fullUrl");
+        _controller = VideoPlayerController.networkUrl(Uri.parse(fullUrl));
+      } else {
+        final fullUrl = "${AppConstants.baseUrl}$text";
+        debugPrint("[VideoViewer] Playing from server URL: $fullUrl");
+        _controller = VideoPlayerController.networkUrl(Uri.parse(fullUrl));
+      }
+
+      await _controller!.initialize();
+      await _controller!.play();
+      _controller!.setLooping(true);
+
+      _controller!.addListener(() {
+        if (mounted) setState(() {});
+      });
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _startHideControlsTimer();
+      }
+    } catch (e, stack) {
+      debugPrint("[VideoViewer] Error playing video: $e\n$stack");
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "Could not play video ($e)";
+        });
+      }
+    }
+  }
+
+  void _startHideControlsTimer() {
+    _hideControlsTimer?.cancel();
+    _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && (_controller?.value.isPlaying ?? false)) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _togglePlayPause() {
+    if (_controller == null || !_controller!.value.isInitialized) return;
+    if (_controller!.value.isPlaying) {
+      _controller!.pause();
+      setState(() => _showControls = true);
+    } else {
+      _controller!.play();
+      setState(() => _showControls = true);
+      _startHideControlsTimer();
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  void dispose() {
+    _hideControlsTimer?.cancel();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            setState(() => _showControls = !_showControls);
+            if (_showControls) _startHideControlsTimer();
+          },
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Video display
+              if (_controller != null && _controller!.value.isInitialized)
+                Center(
+                  child: AspectRatio(
+                    aspectRatio: _controller!.value.aspectRatio,
+                    child: VideoPlayer(_controller!),
+                  ),
+                )
+              else if (_isLoading)
+                const Center(
+                  child: CircularProgressIndicator(color: AppColors.blue),
+                )
+              else if (_errorMessage != null)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          color: Colors.redAccent,
+                          size: 48,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 14.sp,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Top Bar (Back Button + Title)
+              AnimatedOpacity(
+                opacity: _showControls ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 12.h,
+                    ),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.black87, Colors.transparent],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Get.back(),
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(
+                          "Video Player",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Center Play / Pause button
+              if (_showControls &&
+                  _controller != null &&
+                  _controller!.value.isInitialized)
+                Center(
+                  child: GestureDetector(
+                    onTap: _togglePlayPause,
+                    child: Container(
+                      padding: EdgeInsets.all(16.w),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _controller!.value.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 48.sp,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Bottom Progress Bar & Time
+              if (_showControls &&
+                  _controller != null &&
+                  _controller!.value.isInitialized)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 14.h,
+                    ),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.black87, Colors.transparent],
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        VideoProgressIndicator(
+                          _controller!,
+                          allowScrubbing: true,
+                          colors: const VideoProgressColors(
+                            playedColor: AppColors.blue,
+                            bufferedColor: Colors.white24,
+                            backgroundColor: Colors.white12,
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 8.h),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _formatDuration(_controller!.value.position),
+                              style: GoogleFonts.poppins(
+                                color: Colors.white70,
+                                fontSize: 12.sp,
+                              ),
+                            ),
+                            Text(
+                              _formatDuration(_controller!.value.duration),
+                              style: GoogleFonts.poppins(
+                                color: Colors.white70,
+                                fontSize: 12.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

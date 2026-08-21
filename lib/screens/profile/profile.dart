@@ -224,8 +224,8 @@ class _PhoneLayout extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _ProfileCard(),
-          SizedBox(height: 20.h),
-          _SpotlightCard(),
+          // SizedBox(height: 20.h),
+          // _SpotlightCard(),
           SizedBox(height: 20.h),
           _TileGroupWidget(tiles: _allTiles(context)[0]),
           SizedBox(height: 18.h),
@@ -370,18 +370,18 @@ List<List<_TileData>> _allTiles(BuildContext context) => [
       subtitle: "Update Your Details",
       onTap: () => Get.to(() => UpdateProfileTabsScreen()),
     ),
-    _TileData(
-      iconBg: _C.yellow,
-      iconBorder: const Color(0xFF362A10),
-      emoji: Text('⭐'),
-      label: 'Subscription Plan',
-      subtitle: "Manage your subscription",
-      onTap: () {
-        // Navigate to Selfie Verification Screen when tapped
-        Get.to(() => SubscriptionScreen());
-      },
-      trailingWidget: const _FreeBadge(),
-    ),
+    // _TileData(
+    //   iconBg: _C.yellow,
+    //   iconBorder: const Color(0xFF362A10),
+    //   emoji: Text('⭐'),
+    //   label: 'Subscription Plan',
+    //   subtitle: "Manage your subscription",
+    //   onTap: () {
+    //     // Navigate to Selfie Verification Screen when tapped
+    //     Get.to(() => SubscriptionScreen());
+    //   },
+    //   trailingWidget: const _FreeBadge(),
+    // ),
     _TileData(
       iconBg: _C.red,
       iconBorder: _C.redBorder,

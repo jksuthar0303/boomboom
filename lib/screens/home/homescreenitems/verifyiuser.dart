@@ -23,7 +23,7 @@ class verifyuser extends StatelessWidget {
 /// =====================================================
 
 class Activeuser extends StatefulWidget {
-  final int initialTab; // 0 = Active, 1 = Verified
+  final int initialTab; // 0 = Verified, 1 = Active
   const Activeuser({super.key, this.initialTab = 0});
 
   @override
@@ -31,8 +31,7 @@ class Activeuser extends StatefulWidget {
 }
 
 class _ActiveuserState extends State<Activeuser> {
-  final TextEditingController searchController = TextEditingController();
-  late int selectedTab;
+  late int selectedTab; // 0 = Verified, 1 = Active
   bool _isLoading = true;
 
   List<Map<String, dynamic>> activeUsers = [];
@@ -113,7 +112,7 @@ class _ActiveuserState extends State<Activeuser> {
         setState(() {
           activeUsers = parsedActive;
           verifiedUsers = parsedVerified;
-          final currentList = selectedTab == 0 ? activeUsers : verifiedUsers;
+          final currentList = selectedTab == 0 ? verifiedUsers : activeUsers;
           filteredUsers = FilterController.instance.applyFilterToUsers(
             currentList,
             userPosition: _currentPosition,
@@ -145,49 +144,87 @@ class _ActiveuserState extends State<Activeuser> {
           .toString();
       final String dob = (rawMap["Dob"] ?? rawMap["dob"] ?? "").toString();
       final int age = _calculateAge(dob);
+
       final String rawOnlineStatus = (rawMap["OnlineStatus"] ??
               rawMap["onlineStatus"] ??
               rawMap["Status"] ??
               rawMap["status"])
           ?.toString()
-          .trim() ?? "";
-      final bool isOnlineVal =
-          rawMap["IsOnline"]?.toString().toLowerCase() == "true" ||
+          .trim()
+          .toLowerCase() ??
+          "";
+
+      final String onlineValue = (rawMap["IsOnline"] ??
+              rawMap["isOnline"] ??
+              rawMap["Online"] ??
+              "")
+          .toString()
+          .toLowerCase()
+          .trim();
+
+      final bool isOnlineVal = onlineValue == "true" ||
+          onlineValue == "1" ||
+          onlineValue == "yes" ||
+          onlineValue == "online" ||
           defaultOnline;
-      final String onlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
-          ? rawOnlineStatus
-          : (isOnlineVal ? "Online" : "Offline");
-      final String sLower = onlineStatus.toLowerCase();
-      final bool isOnline = (sLower == "online" ||
-          sLower == "online now" ||
-          sLower == "active" ||
-          sLower == "active now") && sLower != "hidden" && sLower != "offline";
+
+      String displayStatus = "Offline";
+      bool isActiveNow = false;
+
+      if (rawOnlineStatus == "hidden" || rawOnlineStatus == "hide") {
+        displayStatus = "Offline";
+        isActiveNow = false;
+      } else if (rawOnlineStatus == "online" ||
+          rawOnlineStatus == "online now" ||
+          rawOnlineStatus == "active" ||
+          rawOnlineStatus == "active now" ||
+          isOnlineVal) {
+        displayStatus = "Active now";
+        isActiveNow = true;
+      } else {
+        displayStatus = "Offline";
+        isActiveNow = false;
+      }
+
       final bool isVerified =
           rawMap["IsVerified"]?.toString().toLowerCase() == "true" ||
+          rawMap["IsVerified"]?.toString() == "1" ||
           defaultVerified;
-      final String lookingFor =
-          (rawMap["Lookingfor"] ?? rawMap["lookingFor"] ?? "Serious Love")
-              .toString();
+
+      final String lookingFor = (rawMap["Lookingfor"] ??
+              rawMap["lookingFor"] ??
+              rawMap["LookingFor"] ??
+              "Friendship")
+          .toString();
+
       final String distance = _calculateDistance(
         rawMap["Lat"]?.toString(),
         rawMap["Lon"]?.toString(),
       );
+
       final String media =
           (rawMap["Media"] ?? rawMap["media"] ?? rawMap["Photo"] ?? "")
               .toString();
+
+      final String country = (rawMap["Country"] ??
+              rawMap["country"] ??
+              rawMap["CountryName"] ??
+              "India")
+          .toString();
 
       final Map<String, dynamic> item = Map<String, dynamic>.from(rawMap);
       item.addAll({
         "name": name,
         "FullName": name,
         "age": "$age",
-        "isOnline": isOnline,
-        "onlineStatus": onlineStatus,
+        "isActiveNow": isActiveNow,
+        "displayStatus": displayStatus,
         "isVerified": isVerified,
         "lookingFor": lookingFor,
         "distance": distance,
         "img": media,
         "Media": media,
+        "country": country,
         "liked": false,
         "raw": rawMap,
       });
@@ -220,7 +257,7 @@ class _ActiveuserState extends State<Activeuser> {
         latStr == "0.0" ||
         lonStr == "0.0" ||
         _currentPosition == null) {
-      return "1.2 km";
+      return "50km";
     }
 
     try {
@@ -234,87 +271,82 @@ class _ActiveuserState extends State<Activeuser> {
       );
       final double km = meters / 1000;
       if (km < 1) {
-        return "${meters.toStringAsFixed(0)} m";
+        return "${meters.toStringAsFixed(0)}m";
       } else {
-        return "${km.toStringAsFixed(1)} km";
+        return "${km.toStringAsFixed(0)}km";
       }
     } catch (_) {
-      return "1.2 km";
+      return "50km";
     }
   }
 
-  void searchUsers(String value) {
-    final list = selectedTab == 0 ? activeUsers : verifiedUsers;
-    final filtered = FilterController.instance.applyFilterToUsers(
-      list,
-      userPosition: _currentPosition,
-    );
-    setState(() {
-      final search = value.toLowerCase().trim();
-      if (search.isEmpty) {
-        filteredUsers = filtered;
-      } else {
-        filteredUsers = filtered.where((user) {
-          final name = user["name"].toString().toLowerCase();
-          final lookingFor = user["lookingFor"].toString().toLowerCase();
-          final age = user["age"].toString().toLowerCase();
-
-          return name.contains(search) ||
-              lookingFor.contains(search) ||
-              age.contains(search);
-        }).toList();
-      }
-    });
+  String _getCountryFlag(String country) {
+    final c = country.trim().toLowerCase();
+    if (c.contains("thailand") ||
+        c.contains("thai") ||
+        c.contains("bangkok") ||
+        c.contains("chiang mai")) {
+      return "🇹🇭";
+    }
+    if (c.contains("india") || c.contains("ind")) return "🇮🇳";
+    if (c.contains("usa") ||
+        c.contains("united states") ||
+        c.contains("america")) {
+      return "🇺🇸";
+    }
+    if (c.contains("uk") ||
+        c.contains("united kingdom") ||
+        c.contains("england")) {
+      return "🇬🇧";
+    }
+    if (c.contains("canada")) return "🇨🇦";
+    if (c.contains("australia")) return "🇦🇺";
+    if (c.contains("germany")) return "🇩🇪";
+    if (c.contains("france")) return "🇫🇷";
+    if (c.contains("spain")) return "🇪🇸";
+    if (c.contains("italy")) return "🇮🇹";
+    if (c.contains("japan") || c.contains("tokyo")) return "🇯🇵";
+    if (c.contains("china")) return "🇨🇳";
+    if (c.contains("russia")) return "🇷🇺";
+    if (c.contains("brazil")) return "🇧🇷";
+    if (c.contains("vietnam")) return "🇻🇳";
+    if (c.contains("indonesia") || c.contains("bali")) return "🇮🇩";
+    if (c.contains("philippines")) return "🇵🇭";
+    if (c.contains("singapore")) return "🇸🇬";
+    if (c.contains("malaysia")) return "🇲🇾";
+    if (c.contains("dubai") || c.contains("uae")) return "🇦🇪";
+    return "🌍";
   }
 
-  void toggleLike(int index) {
-    setState(() {
-      filteredUsers[index]["liked"] = !filteredUsers[index]["liked"];
-    });
-  }
-
-  Widget _buildNoImageBackground(String name) {
-    final String initial = name.trim().isNotEmpty
+  Widget _buildNoImageBackground(String? name) {
+    final initial = (name != null && name.trim().isNotEmpty)
         ? name.trim()[0].toUpperCase()
         : "U";
 
     return Container(
-      width: double.infinity,
-      height: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF28133E), Color(0xFF1B1B2F), Color(0xFF110E1D)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2C3E50), Color(0xFF000000)],
         ),
       ),
       child: Center(
         child: Container(
-          width: 60.w,
-          height: 60.w,
+          width: 55.w,
+          height: 55.w,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF9B59B6), Color(0xFF3498DB)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF9B59B6).withValues(alpha: 0.35),
-                blurRadius: 12,
-                spreadRadius: 1,
-              ),
-            ],
+            color: Colors.white.withValues(alpha: 0.1),
+            border: Border.all(color: Colors.white24, width: 1.5),
           ),
-          child: Center(
-            child: Text(
-              initial,
-              style: TextStyle(
-                fontSize: 24.sp,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+          alignment: Alignment.center,
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24.sp,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
@@ -329,55 +361,15 @@ class _ActiveuserState extends State<Activeuser> {
       body: SafeArea(
         child: Column(
           children: [
-            SizedBox(height: 10.h),
+            SizedBox(height: 2.h),
 
-            /// SEARCH BAR
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12.w),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  ),
-                  Expanded(
-                    child: Container(
-                      height: 46.h,
-                      padding: EdgeInsets.symmetric(horizontal: 12.w),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade900,
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: TextField(
-                        controller: searchController,
-                        onChanged: searchUsers,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          icon: Icon(Icons.search, color: Colors.white70),
-                          hintText: "Search name, age, looking for...",
-                          hintStyle: TextStyle(
-                            color: Colors.white54,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 14.h),
-
-            /// TAB SELECTOR
+            /// ── TOP TAB SELECTOR (Verified Profiles / Active Profiles) ──
             Container(
-              margin: EdgeInsets.symmetric(horizontal: 12.w),
+              margin: EdgeInsets.symmetric(horizontal: 14.w, vertical: 2.h),
               padding: EdgeInsets.all(4.w),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(30.r),
+                color: const Color(0xFF141416),
+                borderRadius: BorderRadius.circular(35.r),
               ),
               child: Row(
                 children: [
@@ -386,46 +378,31 @@ class _ActiveuserState extends State<Activeuser> {
                       onTap: () {
                         setState(() {
                           selectedTab = 0;
-                          searchController.clear();
                           filteredUsers = FilterController.instance
                               .applyFilterToUsers(
-                                activeUsers,
+                                verifiedUsers,
                                 userPosition: _currentPosition,
                               );
                         });
                       },
                       child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 10.h),
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
                         decoration: BoxDecoration(
                           color: selectedTab == 0
-                              ? const Color(0xFF00E676)
+                              ? const Color(0xFF2563EB)
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(25.r),
+                          borderRadius: BorderRadius.circular(30.r),
                         ),
                         child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8.w,
-                                height: 8.w,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              SizedBox(width: 6.w),
-                              Text(
-                                "Active Profiles",
-                                style: TextStyle(
-                                  color: selectedTab == 0
-                                      ? Colors.black
-                                      : Colors.white70,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13.sp,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            "Verified Profiles",
+                            style: TextStyle(
+                              color: selectedTab == 0
+                                  ? Colors.white
+                                  : Colors.white70,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14.5.sp,
+                            ),
                           ),
                         ),
                       ),
@@ -436,41 +413,31 @@ class _ActiveuserState extends State<Activeuser> {
                       onTap: () {
                         setState(() {
                           selectedTab = 1;
-                          searchController.clear();
                           filteredUsers = FilterController.instance
                               .applyFilterToUsers(
-                                verifiedUsers,
+                                activeUsers,
                                 userPosition: _currentPosition,
                               );
                         });
                       },
                       child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 10.h),
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
                         decoration: BoxDecoration(
                           color: selectedTab == 1
-                              ? const Color(0xFF2D7DFF)
+                              ? const Color(0xFF2563EB)
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(25.r),
+                          borderRadius: BorderRadius.circular(30.r),
                         ),
                         child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.verified_rounded,
-                                color: Colors.white,
-                                size: 14.sp,
-                              ),
-                              SizedBox(width: 4.w),
-                              Text(
-                                "Verified Profiles",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13.sp,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            "Active Profiles",
+                            style: TextStyle(
+                              color: selectedTab == 1
+                                  ? Colors.white
+                                  : Colors.white70,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14.5.sp,
+                            ),
                           ),
                         ),
                       ),
@@ -480,14 +447,14 @@ class _ActiveuserState extends State<Activeuser> {
               ),
             ),
 
-            SizedBox(height: 15.h),
+            SizedBox(height: 8.h),
 
-            /// GRID
+            /// ── 2-COLUMN GRID ──
             Expanded(
               child: _isLoading
                   ? const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF9B59B6),
+                        color: Color(0xFF2563EB),
                         strokeWidth: 2.5,
                       ),
                     )
@@ -495,25 +462,26 @@ class _ActiveuserState extends State<Activeuser> {
                   ? Center(
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 20.w),
-                        child: const Text(
-                          "No verified profiles available right now.",
+                        child: Text(
+                          selectedTab == 0
+                              ? "No verified profiles available right now."
+                              : "No active profiles available right now.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white60),
+                          style: const TextStyle(color: Colors.white60),
                         ),
                       ),
                     )
                   : GridView.builder(
-                      padding: EdgeInsets.only(
-                        left: 6.w,
-                        right: 6.w,
-                        bottom: 100.h,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10.w,
+                        vertical: 6.h,
                       ),
                       itemCount: filteredUsers.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        crossAxisSpacing: 6.w,
-                        mainAxisSpacing: 6.h,
-                        childAspectRatio: 0.62,
+                        crossAxisSpacing: 8.w,
+                        mainAxisSpacing: 10.h,
+                        childAspectRatio: 0.58,
                       ),
                       itemBuilder: (_, index) {
                         final user = filteredUsers[index];
@@ -522,8 +490,14 @@ class _ActiveuserState extends State<Activeuser> {
                             img.isNotEmpty &&
                             img.toLowerCase() != "null" &&
                             (img.startsWith("http") || img.startsWith("https"));
-                        final bool isOnline = user["isOnline"] == true;
+                        final bool isActiveNow = user["isActiveNow"] == true;
+                        final String displayStatus =
+                            (user["displayStatus"] ?? "Offline").toString();
                         final bool isVerified = user["isVerified"] == true;
+                        final bool isLiked = user["liked"] == true;
+                        final String country =
+                            (user["country"] ?? "India").toString();
+                        final String flag = _getCountryFlag(country);
 
                         return GestureDetector(
                           onTap: () {
@@ -542,23 +516,20 @@ class _ActiveuserState extends State<Activeuser> {
                           },
                           child: Container(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(18.r),
+                              borderRadius: BorderRadius.circular(22.r),
                               color: const Color(0xFF151515),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.08),
-                                width: 1,
-                              ),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withValues(alpha: 0.45),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
                                 ),
                               ],
                             ),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(18.r),
+                              borderRadius: BorderRadius.circular(22.r),
                               child: Stack(
+                                fit: StackFit.expand,
                                 children: [
                                   /// BACKGROUND IMAGE / AVATAR
                                   Positioned.fill(
@@ -585,54 +556,103 @@ class _ActiveuserState extends State<Activeuser> {
                                             Colors.black.withValues(
                                               alpha: 0.95,
                                             ),
-                                            Colors.black.withValues(alpha: 0.2),
+                                            Colors.black.withValues(
+                                              alpha: 0.35,
+                                            ),
                                             Colors.transparent,
                                           ],
+                                          stops: const [0.0, 0.5, 0.85],
                                         ),
                                       ),
                                     ),
                                   ),
 
-                                  /// TOP LEFT STATUS
+                                  /// TOP-LEFT "NEW" BADGE
                                   Positioned(
                                     top: 10.h,
                                     left: 10.w,
                                     child: Container(
                                       padding: EdgeInsets.symmetric(
-                                        horizontal: 8.w,
-                                        vertical: 4.h,
+                                        horizontal: 10.w,
+                                        vertical: 3.5.h,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.5,
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF2563EB),
+                                            Color(0xFF1D4ED8),
+                                          ],
                                         ),
                                         borderRadius: BorderRadius.circular(
                                           20.r,
                                         ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 6.w,
-                                            height: 6.w,
-                                            decoration: BoxDecoration(
-                                              color: isOnline
-                                                  ? const Color(0xFF00E676)
-                                                  : Colors.grey,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          SizedBox(width: 4.w),
-                                          Text(
-                                            (user["onlineStatus"] ?? (isOnline ? "Online" : "Offline")).toString(),
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 9.sp,
-                                            ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(
+                                              0xFF2563EB,
+                                            ).withValues(alpha: 0.5),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
                                           ),
                                         ],
+                                      ),
+                                      child: Text(
+                                        "NEW",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 9.sp,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  /// TOP-RIGHT HEART/LIKE BUTTON
+                                  Positioned(
+                                    top: 10.h,
+                                    right: 10.w,
+                                    child: GestureDetector(
+                                      onTap: () async {
+                                        setState(() {
+                                          user["liked"] = !isLiked;
+                                        });
+                                        try {
+                                          final myEmail =
+                                              await SecureStorage()
+                                                  .getUserEmail() ??
+                                              "";
+                                          final otherEmail =
+                                              user["EmailAddress"]?.toString() ??
+                                              user["email"]?.toString() ??
+                                              "";
+                                          if (myEmail.isNotEmpty &&
+                                              otherEmail.isNotEmpty) {
+                                            HomeService().favoriteLikeViewInsert(
+                                              myEmail: myEmail.trim(),
+                                              actionEmail: otherEmail.trim(),
+                                              action: "like",
+                                            );
+                                          }
+                                        } catch (_) {}
+                                      },
+                                      child: Container(
+                                        padding: EdgeInsets.all(4.w),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.black.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          isLiked
+                                              ? Icons.favorite_rounded
+                                              : Icons.favorite_border_rounded,
+                                          color: isLiked
+                                              ? Colors.redAccent
+                                              : Colors.white,
+                                          size: 22.sp,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -645,9 +665,11 @@ class _ActiveuserState extends State<Activeuser> {
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        /// NAME & AGE
+                                        /// NAME + AGE + VERIFIED BADGE
                                         Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Flexible(
                                               child: Text(
@@ -656,16 +678,16 @@ class _ActiveuserState extends State<Activeuser> {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: Colors.white,
-                                                  fontWeight: FontWeight.w900,
+                                                  fontWeight: FontWeight.bold,
                                                   fontSize: 13.sp,
                                                 ),
                                               ),
                                             ),
                                             if (isVerified) ...[
-                                              SizedBox(width: 3.w),
+                                              SizedBox(width: 4.w),
                                               Icon(
                                                 Icons.verified_rounded,
-                                                color: Colors.cyanAccent,
+                                                color: Colors.blueAccent,
                                                 size: 13.sp,
                                               ),
                                             ],
@@ -674,57 +696,133 @@ class _ActiveuserState extends State<Activeuser> {
 
                                         SizedBox(height: 4.h),
 
-                                        /// DISTANCE & LOOKING FOR
+                                        /// COUNTRY PILL
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 6.w,
+                                            vertical: 2.h,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.5,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12.r,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            "$flag $country",
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9.sp,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+
+                                        SizedBox(height: 3.h),
+
+                                        /// DISTANCE PILL
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 6.w,
+                                            vertical: 2.h,
+                                              ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.5,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12.r,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.location_on_outlined,
+                                                color: Colors.white70,
+                                                size: 9.sp,
+                                              ),
+                                              SizedBox(width: 2.w),
+                                              Text(
+                                                "${user["distance"]} away",
+                                                style: TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 9.sp,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        SizedBox(height: 4.h),
+
+                                        /// STATUS + RELATIONSHIP GOAL
                                         Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 6.w,
-                                                vertical: 2.h,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black.withValues(
-                                                  alpha: 0.45,
+                                            /// STATUS (Active now / Offline)
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 6.w,
+                                                  height: 6.w,
+                                                  decoration: BoxDecoration(
+                                                    color: isActiveNow
+                                                        ? const Color(
+                                                            0xFF00E676,
+                                                          )
+                                                        : Colors.grey,
+                                                    shape: BoxShape.circle,
+                                                    boxShadow: isActiveNow
+                                                        ? [
+                                                            BoxShadow(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF00E676,
+                                                                  ).withValues(
+                                                                    alpha: 0.6,
+                                                                  ),
+                                                              blurRadius: 6,
+                                                            ),
+                                                          ]
+                                                        : null,
+                                                  ),
                                                 ),
-                                                borderRadius:
-                                                    BorderRadius.circular(12.r),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons.location_on,
-                                                    color: Colors.purpleAccent,
-                                                    size: 9.sp,
+                                                SizedBox(width: 4.w),
+                                                Text(
+                                                  displayStatus,
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 8.5.sp,
                                                   ),
-                                                  SizedBox(width: 2.w),
-                                                  Text(
-                                                    "${user["distance"]}",
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 9.sp,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                                ),
+                                              ],
                                             ),
+
+                                            /// RELATIONSHIP GOAL CHIP (Solid Blue Border)
                                             Container(
                                               padding: EdgeInsets.symmetric(
-                                                horizontal: 6.w,
+                                                horizontal: 7.w,
                                                 vertical: 2.h,
                                               ),
                                               decoration: BoxDecoration(
                                                 color: Colors.black.withValues(
-                                                  alpha: 0.45,
+                                                  alpha: 0.5,
                                                 ),
                                                 borderRadius:
                                                     BorderRadius.circular(12.r),
                                                 border: Border.all(
-                                                  color: Colors.cyanAccent
-                                                      .withValues(alpha: 0.4),
-                                                  width: 0.8,
+                                                  color: const Color(
+                                                    0xFF2563EB,
+                                                  ),
+                                                  width: 1.2,
                                                 ),
                                               ),
                                               child: Text(
@@ -732,7 +830,7 @@ class _ActiveuserState extends State<Activeuser> {
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
-                                                  color: Colors.cyanAccent,
+                                                  color: Colors.white,
                                                   fontSize: 8.5.sp,
                                                   fontWeight: FontWeight.w700,
                                                 ),

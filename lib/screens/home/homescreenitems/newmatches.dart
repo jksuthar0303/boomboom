@@ -322,31 +322,40 @@ class _MatchesScreenState extends State<MatchesScreen> {
               final String dob = (rawMap["Dob"] ?? rawMap["dob"] ?? "")
                   .toString();
               final int age = _calculateAge(dob);
-              final String rawOnlineStatus = (rawMap["OnlineStatus"] ??
-                      rawMap["onlineStatus"] ??
-                      rawMap["Status"] ??
-                      rawMap["status"])
-                  ?.toString()
-                  .trim() ?? "";
-              final String onlineValue = (rawMap["IsOnline"] ??
-                      rawMap["isOnline"] ??
-                      rawMap["Online"] ??
-                      "")
-                  .toString()
-                  .toLowerCase()
-                  .trim();
-              final bool isOnlineVal = onlineValue == "true" ||
+              final String rawOnlineStatus =
+                  (rawMap["OnlineStatus"] ??
+                          rawMap["onlineStatus"] ??
+                          rawMap["Status"] ??
+                          rawMap["status"])
+                      ?.toString()
+                      .trim() ??
+                  "";
+              final String onlineValue =
+                  (rawMap["IsOnline"] ??
+                          rawMap["isOnline"] ??
+                          rawMap["Online"] ??
+                          "")
+                      .toString()
+                      .toLowerCase()
+                      .trim();
+              final bool isOnlineVal =
+                  onlineValue == "true" ||
                   onlineValue == "1" ||
                   onlineValue == "yes" ||
                   onlineValue == "online";
-              final String onlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
+              final String onlineStatus =
+                  rawOnlineStatus.isNotEmpty &&
+                      rawOnlineStatus.toLowerCase() != "null"
                   ? rawOnlineStatus
                   : (isOnlineVal ? "Online" : "Offline");
               final String sLower = onlineStatus.toLowerCase();
-              final bool isOnline = (sLower == "online" ||
-                  sLower == "online now" ||
-                  sLower == "active" ||
-                  sLower == "active now") && sLower != "hidden" && sLower != "offline";
+              final bool isOnline =
+                  (sLower == "online" ||
+                      sLower == "online now" ||
+                      sLower == "active" ||
+                      sLower == "active now") &&
+                  sLower != "hidden" &&
+                  sLower != "offline";
               final bool isVerified =
                   rawMap["IsVerified"]?.toString().toLowerCase() == "true";
               final String lookingFor =
@@ -376,11 +385,12 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 "distance": distance,
                 "img": media,
                 "Media": media,
-                "country": (rawMap["Country"] ??
-                        rawMap["country"] ??
-                        rawMap["CountryName"] ??
-                        "India")
-                    .toString(),
+                "country":
+                    (rawMap["Country"] ??
+                            rawMap["country"] ??
+                            rawMap["CountryName"] ??
+                            "India")
+                        .toString(),
                 "liked": false,
                 "raw": rawMap,
               });
@@ -564,33 +574,65 @@ class _MatchesScreenState extends State<MatchesScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            SizedBox(height: 10.h),
-
-            /// SEARCH BAR
+            /// SEARCH BAR WITH BACK BUTTON
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12.w),
-              child: Container(
-                height: 48.h,
-                padding: EdgeInsets.symmetric(horizontal: 12.w),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade900,
-                  borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: TextField(
-                  controller: searchController,
-                  onChanged: searchUsers,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    icon: Icon(Icons.search, color: Colors.white70),
-                    hintText: "country, name, age, district",
-                    hintStyle: TextStyle(color: Colors.white54),
+              padding: EdgeInsets.fromLTRB(4.w, 2.h, 8.w, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
-                ),
+                  SizedBox(width: 6.w),
+                  Expanded(
+                    child: Container(
+                      height: 44.h,
+                      padding: EdgeInsets.symmetric(horizontal: 12.w),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade900,
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Center(
+                        child: TextField(
+                          controller: searchController,
+                          onChanged: searchUsers,
+                          textAlignVertical: TextAlignVertical.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.5.sp,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 10.h,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                            prefixIconConstraints: BoxConstraints(
+                              minWidth: 30.w,
+                              minHeight: 20,
+                            ),
+                            hintText: "Search by Country, Name or Age",
+                            hintStyle: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 13.sp,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: 15.h),
+            SizedBox(height: 6.h),
 
             /// GRID
             Expanded(
@@ -665,9 +707,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                     height: 78.w,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: Colors.cyanAccent.withValues(alpha: 0.10),
+                                      color: Colors.cyanAccent.withValues(
+                                        alpha: 0.10,
+                                      ),
                                       border: Border.all(
-                                        color: Colors.cyanAccent.withValues(alpha: 0.35),
+                                        color: Colors.cyanAccent.withValues(
+                                          alpha: 0.35,
+                                        ),
                                         width: 1.5,
                                       ),
                                     ),
@@ -730,9 +776,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
-                                crossAxisSpacing: 6.w,
-                                mainAxisSpacing: 6.h,
-                                childAspectRatio: 0.62,
+                                crossAxisSpacing: 8.w,
+                                mainAxisSpacing: 8.h,
+                                childAspectRatio: 0.58,
                               ),
                           itemBuilder: (_, index) {
                             final user = displayList[index];
@@ -744,8 +790,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                     img.startsWith("https"));
                             final bool isOnline = user["isOnline"] == true;
                             final bool isVerified = user["isVerified"] == true;
-                            final String country =
-                                (user["country"] ?? "India").toString();
+                            final String country = (user["country"] ?? "India")
+                                .toString();
 
                             return GestureDetector(
                               onTap: () {
@@ -858,7 +904,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                               ),
                                               SizedBox(width: 4.w),
                                               Text(
-                                                (user["onlineStatus"] ?? (isOnline ? "Online" : "Offline")).toString(),
+                                                (user["onlineStatus"] ??
+                                                        (isOnline
+                                                            ? "Online"
+                                                            : "Offline"))
+                                                    .toString(),
                                                 style: TextStyle(
                                                   color: Colors.white,
                                                   fontWeight: FontWeight.bold,
@@ -894,10 +944,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                       Positioned(
                                         left: 8.w,
                                         right: 8.w,
-                                        bottom: 10.h,
+                                        bottom: 8.h,
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
                                             /// NAME & AGE
                                             Row(
@@ -963,88 +1014,104 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                               ),
                                             ),
 
-                                            SizedBox(height: 4.h),
+                                            SizedBox(height: 3.h),
 
-                                            /// DISTANCE & LOOKING FOR
+                                            /// DISTANCE & LOOKING FOR ROW
                                             Row(
                                               mainAxisAlignment:
                                                   MainAxisAlignment
                                                       .spaceBetween,
                                               children: [
-                                                Container(
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 6.w,
-                                                    vertical: 2.h,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.black
-                                                        .withValues(
-                                                          alpha: 0.45,
+                                                /// Left: Distance
+                                                Flexible(
+                                                  child: Container(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                          horizontal: 6.w,
+                                                          vertical: 2.h,
                                                         ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12.r,
-                                                        ),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.location_on,
-                                                        color:
-                                                            Colors.purpleAccent,
-                                                        size: 9.sp,
-                                                      ),
-                                                      SizedBox(width: 2.w),
-                                                      Text(
-                                                        "${user["distance"]}"
-                                                                .toLowerCase()
-                                                                .contains(
-                                                                  "away",
-                                                                )
-                                                            ? "${user["distance"]}"
-                                                            : "${user["distance"]} away",
-                                                        style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 9.sp,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Container(
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 6.w,
-                                                    vertical: 2.h,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.black
-                                                        .withValues(
-                                                          alpha: 0.45,
-                                                        ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12.r,
-                                                        ),
-                                                    border: Border.all(
-                                                      color: Colors.cyanAccent
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.black
                                                           .withValues(
-                                                            alpha: 0.4,
+                                                            alpha: 0.45,
                                                           ),
-                                                      width: 0.8,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            12.r,
+                                                          ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.location_on,
+                                                          color: Colors
+                                                              .purpleAccent,
+                                                          size: 9.sp,
+                                                        ),
+                                                        SizedBox(width: 2.w),
+                                                        Flexible(
+                                                          child: Text(
+                                                            "${user["distance"]}"
+                                                                    .toLowerCase()
+                                                                    .contains(
+                                                                      "away",
+                                                                    )
+                                                                ? "${user["distance"]}"
+                                                                : "${user["distance"]} away",
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .white70,
+                                                              fontSize: 9.sp,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                  child: Text(
-                                                    "${user["lookingFor"]}",
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      color: Colors.cyanAccent,
-                                                      fontSize: 8.5.sp,
-                                                      fontWeight:
-                                                          FontWeight.w700,
+                                                ),
+                                                SizedBox(width: 4.w),
+
+                                                /// Right: Relationship Goal Chip (Truncated with Ellipsis)
+                                                Flexible(
+                                                  child: Container(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                          horizontal: 6.w,
+                                                          vertical: 2.h,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.black
+                                                          .withValues(
+                                                            alpha: 0.45,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            12.r,
+                                                          ),
+                                                      border: Border.all(
+                                                        color: const Color(
+                                                          0xFF2563EB,
+                                                        ),
+                                                        width: 1.0,
+                                                      ),
+                                                    ),
+                                                    child: Text(
+                                                      "${user["lookingFor"]}",
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 8.5.sp,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),

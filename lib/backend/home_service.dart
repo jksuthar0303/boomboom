@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:xml/xml.dart' as xml;
 import 'xml_api_client.dart';
 import '../constant/appconstants.dart';
 
@@ -248,5 +251,70 @@ class HomeService {
         'SOAPAction': '"${namespace}ShowNearbyUsers"',
       },
     );
+  }
+
+  /// SOAP ShowNearbyUsers parsed list (Nearby Map Screen)
+  Future<List<Map<String, dynamic>>> getNearbyUsersList({
+    required String lat,
+    required String lon,
+    required String radius,
+    String? token,
+  }) async {
+    final response = await showNearbyUsers(
+      lat: lat,
+      lon: lon,
+      radius: radius,
+      token: token,
+    );
+
+    if (response.statusCode == 200) {
+      final body = response.body.trim();
+
+      // 1. Direct JSON check
+      try {
+        final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(body);
+        if (jsonMatch != null) {
+          final decoded = jsonDecode(jsonMatch.group(0)!);
+          if (decoded is Map && decoded["Data"] is List) {
+            return List<Map<String, dynamic>>.from(
+              (decoded["Data"] as List).map((e) => Map<String, dynamic>.from(e)),
+            );
+          } else if (decoded is List) {
+            return List<Map<String, dynamic>>.from(
+              decoded.map((e) => Map<String, dynamic>.from(e)),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint("Direct JSON parse error in ShowNearbyUsers: $e");
+      }
+
+      // 2. XML SOAP result element check
+      try {
+        if (body.contains("<")) {
+          final doc = xml.XmlDocument.parse(body);
+          final resultEl = doc.findAllElements('ShowNearbyUsersResult');
+          if (resultEl.isNotEmpty) {
+            final inner = resultEl.first.innerText.trim();
+            final decoded = jsonDecode(inner);
+            if (decoded is Map && decoded["Data"] is List) {
+              return List<Map<String, dynamic>>.from(
+                (decoded["Data"] as List).map((e) => Map<String, dynamic>.from(e)),
+              );
+            } else if (decoded is List) {
+              return List<Map<String, dynamic>>.from(
+                decoded.map((e) => Map<String, dynamic>.from(e)),
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("XML doc parse error in ShowNearbyUsers: $e");
+      }
+
+      return [];
+    } else {
+      throw Exception("Server returned status: ${response.statusCode}");
+    }
   }
 }

@@ -411,6 +411,43 @@ class MessagePageState extends State<MessagePage> {
       );
     }
 
+    if (_onlineUsers.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: AppSize.w(16)),
+        child: Container(
+          width: double.infinity,
+          height: AppSize.h(48),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.people_outline_rounded,
+                size: 18.sp,
+                color: Colors.white60,
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                'No people online',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: Colors.white60,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final int count = _onlineUsers.length;
 
     return SizedBox(

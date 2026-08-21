@@ -1162,24 +1162,26 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           data["IsVerified"]?.toString().toLowerCase() == "true" ||
           data["isVerified"] == true ||
           data["isVerified"]?.toString().toLowerCase() == "true";
-      final String rawOnlineStatus = (data["OnlineStatus"] ??
-              data["onlineStatus"] ??
-              data["Status"] ??
-              data["status"])
-          ?.toString()
-          .trim() ?? "";
-      final String onlineValue = (data["IsOnline"] ??
-              data["isOnline"] ??
-              data["Online"] ??
-              "")
-          .toString()
-          .trim()
-          .toLowerCase();
-      final bool isOnline = onlineValue == "true" ||
+      final String rawOnlineStatus =
+          (data["OnlineStatus"] ??
+                  data["onlineStatus"] ??
+                  data["Status"] ??
+                  data["status"])
+              ?.toString()
+              .trim() ??
+          "";
+      final String onlineValue =
+          (data["IsOnline"] ?? data["isOnline"] ?? data["Online"] ?? "")
+              .toString()
+              .trim()
+              .toLowerCase();
+      final bool isOnline =
+          onlineValue == "true" ||
           onlineValue == "1" ||
           onlineValue == "yes" ||
           onlineValue == "online";
-      final String onlineStatus = rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
+      final String onlineStatus =
+          rawOnlineStatus.isNotEmpty && rawOnlineStatus.toLowerCase() != "null"
           ? rawOnlineStatus
           : (isOnline ? "Online" : "Offline");
       final String city =
@@ -1203,8 +1205,9 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                     longitude <= 98.0
                 ? 'India'
                 : '');
-      final String apiDistance =
-          (data["Distance"] ?? data["distance"] ?? "").toString().trim();
+      final String apiDistance = (data["Distance"] ?? data["distance"] ?? "")
+          .toString()
+          .trim();
       final String distance = apiDistance.isNotEmpty && apiDistance != "0"
           ? apiDistance
           : _distanceFromCurrentPosition(latitude, longitude);
@@ -1902,17 +1905,18 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         ? _liveProfiles.length
         : sampleProfiles.length;
     final int currentProfileIndex = _currentIndex.clamp(0, profileCount - 1);
-    
+
     String targetEmail = "";
     if (widget.userEmail != null && widget.userEmail!.trim().isNotEmpty) {
       targetEmail = widget.userEmail!.trim();
     } else if (widget.initialUserData != null) {
-      targetEmail = (widget.initialUserData!["EmailAddress"] ??
-              widget.initialUserData!["email"] ??
-              widget.initialUserData!["ActionEmail"] ??
-              "")
-          .toString()
-          .trim();
+      targetEmail =
+          (widget.initialUserData!["EmailAddress"] ??
+                  widget.initialUserData!["email"] ??
+                  widget.initialUserData!["ActionEmail"] ??
+                  "")
+              .toString()
+              .trim();
     } else if (_liveProfiles.isNotEmpty &&
         currentProfileIndex < _liveProfileEmails.length &&
         _liveProfileEmails[currentProfileIndex] != null) {
@@ -1924,10 +1928,13 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
         : flagForCity(p.city);
 
     final String statusLower = p.onlineStatus.toLowerCase();
-    final bool isOnlineActive = (statusLower == 'online' ||
-        statusLower == 'online now' ||
-        statusLower == 'active now' ||
-        statusLower == 'active') && statusLower != 'hidden' && statusLower != 'offline';
+    final bool isOnlineActive =
+        (statusLower == 'online' ||
+            statusLower == 'online now' ||
+            statusLower == 'active now' ||
+            statusLower == 'active') &&
+        statusLower != 'hidden' &&
+        statusLower != 'offline';
     final String displayOnlineStatus = p.onlineStatus.isNotEmpty
         ? p.onlineStatus
         : (isOnlineActive ? "Online" : "Offline");
@@ -2512,28 +2519,15 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
 
     final List<Widget> badgeWidgets = [];
 
-    // 1. 🇮🇳 Country
-    if (displayCountry.isNotEmpty) {
-      badgeWidgets.add(
-        _buildBadgeContainer(
-          child: Text(
-            "$resolvedFlag  $displayCountry",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      );
-    }
-
-    // 2. 🟢 Online / Offline Status
+    // 1. 🟢 Online / Offline Status (Pehle)
     final String statusLower = p.onlineStatus.toLowerCase();
-    final bool isOnlineActive = (statusLower == 'online' ||
-        statusLower == 'online now' ||
-        statusLower == 'active now' ||
-        statusLower == 'active') && statusLower != 'hidden' && statusLower != 'offline';
+    final bool isOnlineActive =
+        (statusLower == 'online' ||
+            statusLower == 'online now' ||
+            statusLower == 'active now' ||
+            statusLower == 'active') &&
+        statusLower != 'hidden' &&
+        statusLower != 'offline';
     final String displayOnlineStatus = p.onlineStatus.isNotEmpty
         ? p.onlineStatus
         : (isOnlineActive ? "Online" : "Offline");
@@ -2566,7 +2560,7 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       ),
     );
 
-    // 3. 📍 Distance (km away)
+    // 2. 📍 Distance (km away - Phir)
     badgeWidgets.add(
       _buildBadgeContainer(
         child: Row(
@@ -2593,7 +2587,23 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
       ),
     );
 
-    // 4. ❤️ Looking for
+    // 3. 🇮🇳 Country (Phir India / Country)
+    if (displayCountry.isNotEmpty) {
+      badgeWidgets.add(
+        _buildBadgeContainer(
+          child: Text(
+            "$resolvedFlag  $displayCountry",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isTablet ? AppSize.sp(12) : AppSize.sp(11),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 4. ❤️ Looking for (Long Term etc. - Phir)
     if (p.lookingFor.isNotEmpty) {
       badgeWidgets.add(
         _buildBadgeContainer(
@@ -3036,6 +3046,409 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
   // );
 
   // ════════════════════════════════════════
+  //  REPORT / ACTION SHEET (Mockup UI)
+  // ════════════════════════════════════════
+  void _reportSheet() {
+    final p = _profile;
+    final String targetEmail =
+        widget.userEmail ??
+        widget.initialUserData?['EmailAddress']?.toString() ??
+        widget.initialUserData?['email']?.toString() ??
+        widget.initialUserData?['ActionEmail']?.toString() ??
+        widget.initialUserData?['OtherUser']?.toString() ??
+        '';
+
+    final String trimmedName = p.name.trim();
+    final String initials = trimmedName.isNotEmpty
+        ? (trimmedName.split(' ').length > 1
+            ? '${trimmedName.split(' ')[0][0]}${trimmedName.split(' ')[1][0]}'.toUpperCase()
+            : (trimmedName.length >= 2
+                ? trimmedName.substring(0, 2).toUpperCase()
+                : trimmedName.toUpperCase()))
+        : 'U';
+
+    final heroMedia = p.media.isEmpty
+        ? null
+        : p.media.firstWhere(
+            (m) => m.type == MediaType.image,
+            orElse: () => p.media.first,
+          );
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF14141E),
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 14.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── TOP DRAG HANDLE ──
+              Center(
+                child: Container(
+                  width: 44.w,
+                  height: 4.5.h,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                ),
+              ),
+              SizedBox(height: 14.h),
+
+              // ── MORE OPTIONS HEADER ──
+              Center(
+                child: Text(
+                  'MORE OPTIONS',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              SizedBox(height: 14.h),
+
+              // ── USER PROFILE PREVIEW CARD ──
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 14.w,
+                  vertical: 12.h,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E2C),
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.07),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // AVATAR
+                    Container(
+                      width: 46.w,
+                      height: 46.w,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF3F3D56),
+                      ),
+                      child: ClipOval(
+                        child:
+                            heroMedia != null &&
+                                    heroMedia.type == MediaType.image
+                                ? (heroMedia.isBytes
+                                    ? Image.memory(
+                                      heroMedia.bytes!,
+                                      fit: BoxFit.cover,
+                                    )
+                                    : CachedNetworkImage(
+                                      imageUrl: heroMedia.url,
+                                      fit: BoxFit.cover,
+                                      placeholder:
+                                          (_, _) => Center(
+                                            child: Text(
+                                              initials,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 15.sp,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                      errorWidget:
+                                          (_, _, _) => Center(
+                                            child: Text(
+                                              initials,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 15.sp,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                    ))
+                                : Center(
+                                  child: Text(
+                                    initials,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15.sp,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${p.name}, ${p.age}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15.sp,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 3.h),
+                          Text(
+                            p.job.isNotEmpty && p.job != 'Not specified'
+                                ? '${p.job} · ${p.distance.isNotEmpty ? p.distance : "Nearby"}'
+                                : (p.distance.isNotEmpty
+                                    ? p.distance
+                                    : 'Nearby'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 18.h),
+
+              // ── ACTIONS HEADER ──
+              Text(
+                'ACTIONS',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              SizedBox(height: 10.h),
+
+              // ── 1. BLOCK USER ──
+              GestureDetector(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  if (targetEmail.isNotEmpty) {
+                    try {
+                      final myEmail =
+                          await SecureStorage().getUserEmail() ?? '';
+                      await RegisterService().blockageReport(
+                        actionFrom: myEmail.trim(),
+                        actionTo: targetEmail.trim(),
+                      );
+                    } catch (_) {}
+                  }
+                  _showSnack('${p.name} has been blocked.', Colors.redAccent);
+                  if (mounted) {
+                    Navigator.maybePop(context);
+                  }
+                },
+                child: Container(
+                  margin: EdgeInsets.only(bottom: 10.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14.w,
+                    vertical: 13.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E2C),
+                    borderRadius: BorderRadius.circular(14.r),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(8.w),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.block_rounded,
+                          color: Colors.redAccent,
+                          size: 18.sp,
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Block user',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 13.5.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            SizedBox(height: 2.h),
+                            Text(
+                              "They won't see your profile anymore",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 11.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white24,
+                        size: 20.sp,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── 2. REPORT USER ──
+              GestureDetector(
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  if (targetEmail.isNotEmpty) {
+                    try {
+                      final myEmail =
+                          await SecureStorage().getUserEmail() ?? '';
+                      await RegisterService().blockageReport(
+                        actionFrom: myEmail.trim(),
+                        actionTo: targetEmail.trim(),
+                      );
+                    } catch (_) {}
+                  }
+                  _showSnack(
+                    'Report submitted. Thank you for making our community safe.',
+                    Colors.amber,
+                  );
+                },
+                child: Container(
+                  margin: EdgeInsets.only(bottom: 16.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14.w,
+                    vertical: 13.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E2C),
+                    borderRadius: BorderRadius.circular(14.r),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(8.w),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.14),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.flag_rounded,
+                          color: Colors.amber,
+                          size: 18.sp,
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Report user',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13.5.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            SizedBox(height: 2.h),
+                            Text(
+                              'Report suspicious or inappropriate behavior',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 11.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white24,
+                        size: 20.sp,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── CANCEL BUTTON ──
+              GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                child: Container(
+                  width: double.infinity,
+                  height: 48.h,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E2C),
+                    borderRadius: BorderRadius.circular(14.r),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 8.h),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ════════════════════════════════════════
   //  HELPERS
   // ════════════════════════════════════════
   Widget _circleBtn(IconData icon, bool isTablet, {VoidCallback? onTap}) =>
@@ -3056,408 +3469,6 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
           ),
         ),
       );
-
-  void _reportSheet() {
-    final int profileCount = _liveProfiles.isNotEmpty
-        ? _liveProfiles.length
-        : sampleProfiles.length;
-    final int currentProfileIndex = _currentIndex.clamp(0, profileCount - 1);
-
-    String targetEmail = "";
-    if (widget.userEmail != null && widget.userEmail!.trim().isNotEmpty) {
-      targetEmail = widget.userEmail!.trim();
-    } else if (widget.initialUserData != null) {
-      targetEmail = (widget.initialUserData!["EmailAddress"] ??
-              widget.initialUserData!["email"] ??
-              widget.initialUserData!["ActionEmail"] ??
-              "")
-          .toString()
-          .trim();
-    } else if (_liveProfiles.isNotEmpty &&
-        currentProfileIndex < _liveProfileEmails.length &&
-        _liveProfileEmails[currentProfileIndex] != null) {
-      targetEmail = _liveProfileEmails[currentProfileIndex]!.trim();
-    }
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.60),
-      isScrollControlled: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28.r)),
-      ),
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F0F1A),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28.r)),
-          border: Border(
-            top: BorderSide(
-              color: Colors.white.withValues(alpha: 0.10),
-              width: 0.5,
-            ),
-          ),
-        ),
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + AppSize.h(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── Handle + label ──
-            Padding(
-              padding: EdgeInsets.fromLTRB(0, AppSize.h(14), 0, AppSize.h(18)),
-              child: Column(
-                children: [
-                  Container(
-                    width: AppSize.w(38),
-                    height: AppSize.h(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(2.r),
-                    ),
-                  ),
-                  SizedBox(height: AppSize.h(12)),
-                  Text(
-                    'MORE OPTIONS',
-                    style: TextStyle(
-                      fontSize: AppSize.sp(10),
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.30),
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Profile strip ──
-            Container(
-              margin: EdgeInsets.fromLTRB(
-                AppSize.w(20),
-                0,
-                AppSize.w(20),
-                AppSize.h(20),
-              ),
-              padding: EdgeInsets.symmetric(
-                horizontal: AppSize.w(16),
-                vertical: AppSize.h(14),
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: AppSize.w(46),
-                    height: AppSize.h(46),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF4B4FD9), Color(0xFFA06CF5)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _profile.name
-                            .split(' ')
-                            .map((e) => e.isNotEmpty ? e[0] : '')
-                            .take(2)
-                            .join(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: AppSize.w(14)),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${_profile.name}, ${_profile.age}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: AppSize.h(2)),
-                      Text(
-                        '${_profile.job.split(' at ').first} · ${_profile.distance}',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.40),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            Container(
-              height: 0.5,
-              color: Colors.white.withValues(alpha: 0.07),
-              margin: EdgeInsets.fromLTRB(
-                AppSize.w(20),
-                0,
-                AppSize.w(20),
-                AppSize.h(14),
-              ),
-            ),
-
-            // ── Section label ──
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: AppSize.w(20),
-                  bottom: AppSize.h(10),
-                ),
-                child: Text(
-                  'ACTIONS',
-                  style: TextStyle(
-                    fontSize: AppSize.sp(10),
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 1.0,
-                    color: Colors.white.withValues(alpha: 0.25),
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Options ──
-            ...[
-              (
-                '🚫',
-                'Block user',
-                'They won\'t see your profile anymore',
-                const Color(0xFFFF5F5F),
-                const Color(0x22DC3232),
-              ),
-              (
-                '⚑',
-                'Fake profile',
-                'Report suspicious or impersonated account',
-                Colors.orange,
-                const Color(0x1FFF8C00),
-              ),
-              (
-                '⚑',
-                'Inappropriate content',
-                'Report offensive photos or bio',
-                Colors.orange,
-                const Color(0x1FFF8C00),
-              ),
-              (
-                '⚑',
-                'Spam',
-                'Promotional messages or bots',
-                const Color(0xFFA06CF5),
-                const Color(0x22821BE6),
-              ),
-            ].map(
-              (opt) => GestureDetector(
-                onTap: () async {
-                  Navigator.pop(context);
-                  final actionName = opt.$2;
-
-                  if (actionName == 'Block user') {
-                    _showSnack('User blocked successfully ✓', AppColors.purple);
-                    if (mounted) {
-                      if (widget.userEmail != null ||
-                          widget.initialUserData != null ||
-                          widget.isOwnProfile) {
-                        Navigator.pop(context);
-                      } else {
-                        _swipeOut(toLike: false);
-                      }
-                    }
-                    return;
-                  }
-
-                  try {
-                    final loginEmail =
-                        await SecureStorage().getUserEmail() ?? "";
-                    if (loginEmail.trim().isNotEmpty &&
-                        targetEmail.isNotEmpty) {
-                      final res = await RegisterService().blockageReport(
-                        actionFrom: loginEmail.trim(),
-                        actionTo: targetEmail.trim(),
-                      );
-                      debugPrint(
-                        "[Blockage_Report] response: ${res.statusCode} -> ${res.body}",
-                      );
-
-                      if (res.statusCode == 200) {
-                        try {
-                          final doc = xml.XmlDocument.parse(res.body);
-                          String innerText = "";
-                          final resultNodes =
-                              doc.findAllElements('Blockage_ReportResult');
-                          if (resultNodes.isNotEmpty) {
-                            innerText = resultNodes.first.innerText;
-                          } else {
-                            final stringNodes = doc.findAllElements('string');
-                            if (stringNodes.isNotEmpty) {
-                              innerText = stringNodes.first.innerText;
-                            } else {
-                              innerText = doc.rootElement.innerText;
-                            }
-                          }
-
-                          if (innerText.trim().isNotEmpty) {
-                            final apiResult = jsonDecode(innerText.trim());
-                            final msg = (apiResult is Map
-                                    ? (apiResult["Message"] ??
-                                        (apiResult["Data"] is Map
-                                            ? apiResult["Data"]["Message"]
-                                            : null))
-                                    : null)
-                                ?.toString();
-                            _showSnack(
-                              msg ?? 'User reported successfully.',
-                              AppColors.purple,
-                            );
-                          } else {
-                            _showSnack(
-                              'User reported successfully.',
-                              AppColors.purple,
-                            );
-                          }
-                        } catch (_) {
-                          _showSnack(
-                            'User reported successfully.',
-                            AppColors.purple,
-                          );
-                        }
-                      } else {
-                        _showSnack(
-                          'Action submitted successfully.',
-                          AppColors.purple,
-                        );
-                      }
-                    } else {
-                      _showSnack('$actionName reported ✓', AppColors.purple);
-                    }
-                  } catch (e) {
-                    debugPrint("[Blockage_Report] Error: $e");
-                    _showSnack('$actionName reported ✓', AppColors.purple);
-                  }
-                },
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(
-                    AppSize.w(20),
-                    0,
-                    AppSize.w(20),
-                    AppSize.h(8),
-                  ),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppSize.w(16),
-                    vertical: AppSize.h(14),
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.07),
-                    ),
-                    borderRadius: BorderRadius.circular(14.r),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: AppSize.w(36),
-                        height: AppSize.h(36),
-                        decoration: BoxDecoration(
-                          color: opt.$5,
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Center(
-                          child: Text(
-                            opt.$1,
-                            style: TextStyle(fontSize: AppSize.sp(16)),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: AppSize.w(14)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              opt.$2,
-                              style: TextStyle(
-                                color: opt.$2 == 'Block user'
-                                    ? const Color(0xFFFF5F5F)
-                                    : Colors.white,
-                                fontSize: AppSize.sp(14),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            SizedBox(height: AppSize.h(2)),
-                            Text(
-                              opt.$3,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.35),
-                                fontSize: AppSize.sp(11),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white.withValues(alpha: 0.18),
-                        size: AppSize.sp(18),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Cancel ──
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                margin: EdgeInsets.fromLTRB(
-                  AppSize.w(20),
-                  AppSize.h(4),
-                  AppSize.w(20),
-                  0,
-                ),
-                padding: EdgeInsets.symmetric(vertical: AppSize.h(15)),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.09),
-                  ),
-                  borderRadius: BorderRadius.circular(14.r),
-                ),
-                child: Center(
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      fontSize: AppSize.sp(14),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ════════════════════════════════════════════════════
