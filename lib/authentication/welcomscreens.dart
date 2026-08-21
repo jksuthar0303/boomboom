@@ -461,51 +461,51 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
 
-              SizedBox(height: AppSize.h(22)),
+              // SizedBox(height: AppSize.h(22)),
 
-              /// ── Or continue with ──
-              _orDivider(text: "Or continue with"),
+              // /// ── Or continue with ──
+              // _orDivider(text: "Or continue with"),
 
-              SizedBox(height: AppSize.h(18)),
+              // SizedBox(height: AppSize.h(18)),
 
-              /// 🌐 Social Buttons: Facebook + Google
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _socialCircleButton(
-                    onTap: () {},
-                    child: ClipOval(
-                      child: Image.network(
-                        "https://cdn-icons-png.flaticon.com/512/733/733547.png",
-                        height: AppSize.w(38),
-                        width: AppSize.w(38),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: AppSize.w(20)),
-                  _socialCircleButton(
-                    onTap: _isGoogleLoading ? () {} : _handleGoogleSignIn,
-                    child: _isGoogleLoading
-                        ? SizedBox(
-                            width: AppSize.w(24),
-                            height: AppSize.w(24),
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF9B59B6),
-                              ),
-                            ),
-                          )
-                        : Image.network(
-                            "https://cdn-icons-png.flaticon.com/512/300/300221.png",
-                            height: AppSize.w(26),
-                          ),
-                  ),
-                ],
-              ),
+              // /// 🌐 Social Buttons: Facebook + Google
+              // Row(
+              //   mainAxisAlignment: MainAxisAlignment.center,
+              //   children: [
+              //     _socialCircleButton(
+              //       onTap: () {},
+              //       child: ClipOval(
+              //         child: Image.network(
+              //           "https://cdn-icons-png.flaticon.com/512/733/733547.png",
+              //           height: AppSize.w(38),
+              //           width: AppSize.w(38),
+              //           fit: BoxFit.cover,
+              //         ),
+              //       ),
+              //     ),
+              //     SizedBox(width: AppSize.w(20)),
+              //     _socialCircleButton(
+              //       onTap: _isGoogleLoading ? () {} : _handleGoogleSignIn,
+              //       child: _isGoogleLoading
+              //           ? SizedBox(
+              //               width: AppSize.w(24),
+              //               height: AppSize.w(24),
+              //               child: const CircularProgressIndicator(
+              //                 strokeWidth: 2.5,
+              //                 valueColor: AlwaysStoppedAnimation<Color>(
+              //                   Color(0xFF9B59B6),
+              //                 ),
+              //               ),
+              //             )
+              //           : Image.network(
+              //               "https://cdn-icons-png.flaticon.com/512/300/300221.png",
+              //               height: AppSize.w(26),
+              //             ),
+              //     ),
+              //   ],
+              // ),
 
-              SizedBox(height: AppSize.h(20)),
+              SizedBox(height: AppSize.h(24)),
 
               /// 🔒 Bottom Safety Text
               Row(
