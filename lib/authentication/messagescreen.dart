@@ -18,6 +18,12 @@ import 'messagedetail.dart';
 class MessagePage extends StatefulWidget {
   const MessagePage({super.key});
 
+  static MessagePageState? state;
+
+  static void refreshChats() {
+    state?._loadAll();
+  }
+
   @override
   State<MessagePage> createState() => MessagePageState();
 }
@@ -42,7 +48,17 @@ class MessagePageState extends State<MessagePage> {
   @override
   void initState() {
     super.initState();
+    MessagePage.state = this;
     _loadAll();
+  }
+
+  @override
+  void dispose() {
+    if (MessagePage.state == this) {
+      MessagePage.state = null;
+    }
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAll() async {
@@ -234,11 +250,6 @@ class MessagePageState extends State<MessagePage> {
     }
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {

@@ -15,7 +15,9 @@ import 'package:xml/xml.dart' as xml;
 import '../constant/appsize.dart';
 import '../constant/apptextstyle.dart';
 import '../constant/colors.dart';
+import '../screens/home/home.dart';
 import 'messagedetail.dart';
+import 'messagescreen.dart';
 
 // ────────────────────────────────────────
 //  Helpers
@@ -3252,12 +3254,22 @@ class _BoomProfileScreenState extends State<BoomProfileScreen>
                     try {
                       final myEmail =
                           await SecureStorage().getUserEmail() ?? '';
-                      await RegisterService().blockageReport(
-                        actionFrom: myEmail.trim(),
-                        actionTo: targetEmail.trim(),
-                      );
-                    } catch (_) {}
+                      if (myEmail.isNotEmpty) {
+                        await RegisterService().blockChatUser(
+                          email: myEmail.trim(),
+                          blockEmail: targetEmail.trim(),
+                        );
+                        await RegisterService().blockageReport(
+                          actionFrom: myEmail.trim(),
+                          actionTo: targetEmail.trim(),
+                        );
+                      }
+                    } catch (e) {
+                      debugPrint("[BoomProfile] Error blocking user: $e");
+                    }
                   }
+                  HomeScreen.refreshHomeData();
+                  MessagePage.refreshChats();
                   _showSnack('${p.name} has been blocked.', Colors.redAccent);
                   if (mounted) {
                     Navigator.maybePop(context);

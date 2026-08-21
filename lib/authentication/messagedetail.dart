@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:boomboom/authentication/boomboom.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,6 +23,8 @@ import '../model/messagedetails.dart';
 import 'package:video_player/video_player.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_compress/video_compress.dart';
+import '../screens/home/home.dart';
+import 'messagescreen.dart';
 
 // ═══════════════════════════════════════════
 // 🔥 STATIC METHOD TO OPEN AS DRAGGABLE SHEET
@@ -492,8 +495,26 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             }
             _isPollingInProgress = false;
             return;
-          } else if (jsonResult["Status"] == 1 && jsonResult["Data"] is List) {
-            final List list = jsonResult["Data"];
+          } else if (jsonResult["Status"] == 1) {
+            final List list = [];
+            if (jsonResult["Data"] is List) {
+              list.addAll(jsonResult["Data"] as List);
+            } else if (jsonResult["Data"] is Map) {
+              final mapData = jsonResult["Data"] as Map;
+              if (mapData.containsKey("ChatMessage") ||
+                  mapData.containsKey("Senderemail") ||
+                  mapData.containsKey("SenderEmail") ||
+                  mapData.containsKey("Id") ||
+                  mapData.containsKey("id")) {
+                list.add(mapData);
+              }
+              if (mapData["ChatListId"] != null) {
+                final idVal = int.tryParse(mapData["ChatListId"].toString());
+                if (idVal != null && idVal > 0) {
+                  _resolvedChatListId = idVal;
+                }
+              }
+            }
 
             // A successful response can still represent a pending request.
             // In that case the API message is the conversation state; do not
@@ -651,15 +672,33 @@ class _MessageDetailPageState extends State<MessageDetailPage>
             }
 
             // Remove server-confirmed messages from local pending list
-            _pendingLocalChats.removeWhere(
-              (pending) => loadedChats.any(
+            _pendingLocalChats.removeWhere((pending) {
+              if (pending.isUploading) return false;
+              if (pending.isImage) {
+                return loadedChats.any((s) => s.isMe && s.isImage);
+              }
+              if (pending.isVideo) {
+                return loadedChats.any((s) => s.isMe && s.isVideo);
+              }
+              return loadedChats.any(
                 (s) => s.isMe && s.text.trim() == pending.text.trim(),
-              ),
-            );
+              );
+            });
 
             final combinedChats = List<ChatMessage>.from(loadedChats);
-            // Append any pending local messages that server has not returned yet
-            combinedChats.addAll(_pendingLocalChats);
+            // Append only pending messages that are not already present
+            for (final pending in _pendingLocalChats) {
+              final alreadyInLoaded = loadedChats.any(
+                (s) =>
+                    s.isMe &&
+                    (s.text.trim() == pending.text.trim() ||
+                        (pending.isImage && s.isImage) ||
+                        (pending.isVideo && s.isVideo)),
+              );
+              if (!alreadyInLoaded) {
+                combinedChats.add(pending);
+              }
+            }
 
             // Detect if count, text, or tick status changed
             final bool hasChanged =
@@ -1192,12 +1231,21 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                     });
                     _showTopMessage(apiMessage);
                   }
+                  return;
                 }
               }
             } catch (e) {
               debugPrint(
                 "[MessageDetailPage] Could not parse send response: $e",
               );
+            }
+            if (mounted) {
+              setState(() {
+                _pendingLocalChats.removeWhere(
+                  (message) => identical(message, localMsg),
+                );
+              });
+              _fetchChatMessages(isInitial: false);
             }
           } else {
             if (mounted) {
@@ -1304,20 +1352,10 @@ class _MessageDetailPageState extends State<MessageDetailPage>
 
             if (mounted) {
               setState(() {
-                final idx = _chats.indexWhere((m) => identical(m, localMsg));
-                if (idx != -1) {
-                  _chats[idx] = _chats[idx].copyWith(isUploading: false);
-                }
-                final pendingIdx = _pendingLocalChats.indexWhere(
-                  (m) => identical(m, localMsg),
-                );
-                if (pendingIdx != -1) {
-                  _pendingLocalChats[pendingIdx] =
-                      _pendingLocalChats[pendingIdx].copyWith(
-                        isUploading: false,
-                      );
-                }
+                _chats.removeWhere((m) => identical(m, localMsg));
+                _pendingLocalChats.removeWhere((m) => identical(m, localMsg));
               });
+              _fetchChatMessages(isInitial: false);
             }
           } else {
             if (mounted) {
@@ -1433,20 +1471,10 @@ class _MessageDetailPageState extends State<MessageDetailPage>
 
             if (mounted) {
               setState(() {
-                final idx = _chats.indexWhere((m) => identical(m, localMsg));
-                if (idx != -1) {
-                  _chats[idx] = _chats[idx].copyWith(isUploading: false);
-                }
-                final pendingIdx = _pendingLocalChats.indexWhere(
-                  (m) => identical(m, localMsg),
-                );
-                if (pendingIdx != -1) {
-                  _pendingLocalChats[pendingIdx] =
-                      _pendingLocalChats[pendingIdx].copyWith(
-                        isUploading: false,
-                      );
-                }
+                _chats.removeWhere((m) => identical(m, localMsg));
+                _pendingLocalChats.removeWhere((m) => identical(m, localMsg));
               });
+              _fetchChatMessages(isInitial: false);
             }
           } else {
             if (mounted) {
@@ -1722,24 +1750,24 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   }
 
   Future<void> _handleBlockOrReport(bool isBlock) async {
-    if (isBlock) {
-      final chatListId =
-          _resolvedChatListId ??
-          int.tryParse(
-            (widget.messageData["ChatListId"] ??
-                    widget.messageData["chatListId"] ??
-                    widget.messageData["id"] ??
-                    "0")
-                .toString(),
-          ) ??
-          0;
+    final targetEmail =
+        (widget.messageData["email"] ??
+                widget.messageData["EmailAddress"] ??
+                widget.messageData["ActionEmail"] ??
+                widget.messageData["OtherUser"] ??
+                widget.messageData["Reciever"] ??
+                widget.messageData["Sender"] ??
+                "")
+            .toString()
+            .trim();
 
+    if (isBlock) {
       try {
         final myEmail = await SecureStorage().getUserEmail() ?? "";
-        if (myEmail.isNotEmpty) {
+        if (myEmail.isNotEmpty && targetEmail.isNotEmpty) {
           final res = await RegisterService().blockChatUser(
-            chatListId: chatListId,
             email: myEmail.trim(),
+            blockEmail: targetEmail.trim(),
           );
           debugPrint(
             "[MessageDetailPage] BlockChatUser response: ${res.statusCode} -> ${res.body}",
@@ -1801,25 +1829,20 @@ class _MessageDetailPageState extends State<MessageDetailPage>
           }
         }
         if (mounted) {
+          HomeScreen.refreshHomeData();
+          MessagePage.refreshChats();
           Navigator.of(context).pop();
         }
       } catch (e) {
         debugPrint("[MessageDetailPage] Error blocking user: $e");
         if (mounted) {
+          HomeScreen.refreshHomeData();
+          MessagePage.refreshChats();
           Navigator.of(context).pop();
         }
       }
       return;
     }
-
-    final targetEmail =
-        (widget.messageData["email"] ??
-                widget.messageData["EmailAddress"] ??
-                widget.messageData["ActionEmail"] ??
-                widget.messageData["OtherUser"] ??
-                "")
-            .toString()
-            .trim();
 
     try {
       final myEmail = await SecureStorage().getUserEmail() ?? "";
@@ -1889,13 +1912,14 @@ class _MessageDetailPageState extends State<MessageDetailPage>
   }
 
   Future<void> _handleUnblockUser() async {
-    final targetEmail = (widget.messageData["email"] ??
-            widget.messageData["EmailAddress"] ??
-            widget.messageData["ActionEmail"] ??
-            widget.messageData["OtherUser"] ??
-            "")
-        .toString()
-        .trim();
+    final targetEmail =
+        (widget.messageData["email"] ??
+                widget.messageData["EmailAddress"] ??
+                widget.messageData["ActionEmail"] ??
+                widget.messageData["OtherUser"] ??
+                "")
+            .toString()
+            .trim();
 
     try {
       final myEmail = await SecureStorage().getUserEmail() ?? "";
@@ -1926,19 +1950,21 @@ class _MessageDetailPageState extends State<MessageDetailPage>
 
             if (innerText.trim().isNotEmpty) {
               final apiResult = jsonDecode(innerText.trim());
-              final msg = (apiResult is Map
-                      ? (apiResult["Message"] ??
-                          (apiResult["Data"] is Map
-                              ? apiResult["Data"]["Message"]
-                              : null))
-                      : null)
-                  ?.toString();
+              final msg =
+                  (apiResult is Map
+                          ? (apiResult["Message"] ??
+                                (apiResult["Data"] is Map
+                                    ? apiResult["Data"]["Message"]
+                                    : null))
+                          : null)
+                      ?.toString();
               if (mounted) {
                 Get.snackbar(
                   'Unblocked',
                   msg ?? 'User unblocked successfully',
-                  backgroundColor:
-                      const Color(0xFF1E2E20).withValues(alpha: 0.95),
+                  backgroundColor: const Color(
+                    0xFF1E2E20,
+                  ).withValues(alpha: 0.95),
                   colorText: Colors.white,
                   snackPosition: SnackPosition.BOTTOM,
                   duration: const Duration(seconds: 2),
@@ -1950,8 +1976,9 @@ class _MessageDetailPageState extends State<MessageDetailPage>
               Get.snackbar(
                 'Unblocked',
                 'User unblocked successfully',
-                backgroundColor:
-                    const Color(0xFF1E2E20).withValues(alpha: 0.95),
+                backgroundColor: const Color(
+                  0xFF1E2E20,
+                ).withValues(alpha: 0.95),
                 colorText: Colors.white,
                 snackPosition: SnackPosition.BOTTOM,
                 duration: const Duration(seconds: 2),
@@ -2147,8 +2174,34 @@ class _MessageDetailPageState extends State<MessageDetailPage>
               isOnline: isOnline,
               onlineStatus: displayStatus,
               lastSeen: lastSeen,
-              isBlocked: _blockMessage != null &&
+              isBlocked:
+                  _blockMessage != null &&
                   _blockMessage!.toLowerCase().contains("block"),
+              onTapProfile: () {
+                final bool isBlocked =
+                    _blockMessage != null &&
+                    _blockMessage!.toLowerCase().contains("block");
+                if (isBlocked) return;
+                final email =
+                    (widget.messageData["email"] ??
+                            widget.messageData["EmailAddress"] ??
+                            widget.messageData["ActionEmail"] ??
+                            widget.messageData["OtherUser"] ??
+                            widget.messageData["Reciever"] ??
+                            widget.messageData["Sender"] ??
+                            "")
+                        .toString()
+                        .trim();
+                if (email.isNotEmpty) {
+                  Get.to(
+                    () => BoomProfileScreen(
+                      userEmail: email,
+                      initialUserData: widget.messageData,
+                    ),
+                    transition: Transition.rightToLeft,
+                  );
+                }
+              },
               onBlockUser: () => _handleBlockOrReport(true),
               onUnblockUser: _handleUnblockUser,
               onReportUser: () => _handleBlockOrReport(false),
@@ -2400,7 +2453,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                                   ),
                                   SizedBox(height: 10.h),
                                   Text(
-                                    "Sending image...",
+                                    "Sending...",
                                     style: GoogleFonts.poppins(
                                       color: Colors.white,
                                       fontSize: 11.5.sp,
@@ -2470,7 +2523,7 @@ class _MessageDetailPageState extends State<MessageDetailPage>
                                   ),
                                   SizedBox(height: 10.h),
                                   Text(
-                                    "Compressing &\nSending...",
+                                    "Sending...",
                                     textAlign: TextAlign.center,
                                     style: GoogleFonts.poppins(
                                       color: Colors.white,
@@ -2858,6 +2911,7 @@ class _ProfileCard extends StatelessWidget {
     this.onlineStatus = "Offline",
     this.lastSeen = "",
     this.isBlocked = false,
+    this.onTapProfile,
     this.onBlockUser,
     this.onUnblockUser,
     this.onReportUser,
@@ -2869,6 +2923,7 @@ class _ProfileCard extends StatelessWidget {
   final String onlineStatus;
   final String lastSeen;
   final bool isBlocked;
+  final VoidCallback? onTapProfile;
   final VoidCallback? onBlockUser;
   final VoidCallback? onUnblockUser;
   final VoidCallback? onReportUser;
@@ -2906,12 +2961,20 @@ class _ProfileCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Photo + Online Badge
-          _photo(),
-          SizedBox(width: AppSize.w(12)),
-
-          // Info
-          Expanded(child: _info()),
+          // Photo + Online Badge + Info (Tappable to view Profile if not blocked)
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTapProfile,
+              child: Row(
+                children: [
+                  _photo(),
+                  SizedBox(width: AppSize.w(12)),
+                  Expanded(child: _info()),
+                ],
+              ),
+            ),
+          ),
 
           // 3 dot menu
           GestureDetector(
@@ -2974,7 +3037,8 @@ class _ProfileCard extends StatelessWidget {
                       _confirmAction(
                         context,
                         title: "Unblock $name?",
-                        subtitle: "You will be able to exchange messages again.",
+                        subtitle:
+                            "You will be able to exchange messages again.",
                         actionLabel: "Unblock",
                         color: Colors.lightGreenAccent,
                         onConfirm: () {
@@ -3381,7 +3445,10 @@ class _FullScreenImageViewer extends StatelessWidget {
         backgroundColor: Colors.black.withValues(alpha: 0.7),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+          ),
           onPressed: () => Get.back(),
         ),
         title: Text(
@@ -3410,16 +3477,10 @@ class _FullScreenImageViewer extends StatelessWidget {
     if (localPath != null &&
         localPath.isNotEmpty &&
         File(localPath).existsSync()) {
-      return Image.file(
-        File(localPath),
-        fit: BoxFit.contain,
-      );
+      return Image.file(File(localPath), fit: BoxFit.contain);
     }
     if (File(text).existsSync()) {
-      return Image.file(
-        File(text),
-        fit: BoxFit.contain,
-      );
+      return Image.file(File(text), fit: BoxFit.contain);
     }
     if (text.startsWith('http://') || text.startsWith('https://')) {
       return Image.network(

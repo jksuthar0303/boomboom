@@ -871,8 +871,8 @@ class RegisterService {
 
   /// SOAP BlockChatUser request
   Future<XmlResponse> blockChatUser({
-    required int chatListId,
     required String email,
+    required String blockEmail,
   }) async {
     final String xmlBody =
         '''<?xml version="1.0" encoding="utf-8"?>
@@ -880,8 +880,8 @@ class RegisterService {
   <soap:Body>
     <BlockChatUser xmlns="$namespace">
       <token>${AppConstants.dummyToken}</token>
-      <ChatListId>$chatListId</ChatListId>
       <Email>$email</Email>
+      <BlockEmail>$blockEmail</BlockEmail>
     </BlockChatUser>
   </soap:Body>
 </soap:Envelope>'''

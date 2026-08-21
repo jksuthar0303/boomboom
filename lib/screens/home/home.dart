@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:boomboom/authentication/messagescreen.dart';
 import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
@@ -42,6 +43,13 @@ class HomeScreen extends StatefulWidget {
 
   static void refreshProfile() {
     state?._checkLoginAndLoadProfile();
+  }
+
+  static void refreshHomeData() {
+    state?._fetchEveryoneUsers();
+    state?._fetchOnlineUsers();
+    state?._fetchVerifiedUsers();
+    state?._fetchAndUpdateLocation(requestIfNeeded: false);
   }
 
   @override
@@ -1488,16 +1496,20 @@ class _HomeScreenState extends State<HomeScreen>
               : "U";
 
           return GestureDetector(
-            onTap: () => Get.to(
-              () => BoomProfileScreen(
-                userEmail:
-                    user["EmailAddress"]?.toString() ??
-                    user["email"]?.toString(),
-                initialUserData: user,
-                showLike: false,
-              ),
-              transition: Transition.rightToLeft,
-            ),
+            onTap: () async {
+              await Get.to(
+                () => BoomProfileScreen(
+                  userEmail:
+                      user["EmailAddress"]?.toString() ??
+                      user["email"]?.toString(),
+                  initialUserData: user,
+                  showLike: false,
+                ),
+                transition: Transition.rightToLeft,
+              );
+              HomeScreen.refreshHomeData();
+              MessagePage.refreshChats();
+            },
             child: Container(
               width: 130.w,
               margin: EdgeInsets.only(right: 5.w),
@@ -1755,14 +1767,18 @@ class _HomeScreenState extends State<HomeScreen>
         : "U";
 
     return GestureDetector(
-      onTap: () => Get.to(
-        () => BoomProfileScreen(
-          userEmail:
-              user["EmailAddress"]?.toString() ?? user["email"]?.toString(),
-          initialUserData: user,
-        ),
-        transition: Transition.rightToLeft,
-      ),
+      onTap: () async {
+        await Get.to(
+          () => BoomProfileScreen(
+            userEmail:
+                user["EmailAddress"]?.toString() ?? user["email"]?.toString(),
+            initialUserData: user,
+          ),
+          transition: Transition.rightToLeft,
+        );
+        HomeScreen.refreshHomeData();
+        MessagePage.refreshChats();
+      },
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14.r),

@@ -692,28 +692,29 @@ class _LikesScreenState extends State<LikesScreen> {
                 ),
               ),
 
-              // ── TOP RIGHT HEART BUTTON ──
-              Positioned(
-                top: 8.h,
-                right: 8.w,
-                child: GestureDetector(
-                  onTap: () => _toggleLike(index),
-                  child: Container(
-                    padding: EdgeInsets.all(6.w),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.40),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isLiked
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      color: isLiked ? const Color(0xFFFF3B5C) : Colors.white,
-                      size: 20.sp,
+              // ── TOP RIGHT HEART BUTTON (Hidden in Who Liked & Who Viewed) ──
+              if (selectedTab != 1 && selectedTab != 2)
+                Positioned(
+                  top: 8.h,
+                  right: 8.w,
+                  child: GestureDetector(
+                    onTap: () => _toggleLike(index),
+                    child: Container(
+                      padding: EdgeInsets.all(6.w),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.40),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isLiked
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: isLiked ? const Color(0xFFFF3B5C) : Colors.white,
+                        size: 20.sp,
+                      ),
                     ),
                   ),
                 ),
-              ),
 
               // ── BOTTOM OVERLAY DETAILS ──
               Positioned(
