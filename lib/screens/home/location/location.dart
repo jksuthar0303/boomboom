@@ -527,6 +527,139 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
     );
   }
 
+  Widget _buildRoundProfileItem(Map<String, dynamic> user, {double avatarSize = 82}) {
+    final name = (user["FullName"] ?? user["name"] ?? "User").toString();
+    final media = (user["Media"] ?? "").toString();
+    final onlineValue =
+        (user["IsOnline"] ?? user["isOnline"] ?? user["Online"] ?? "")
+            .toString()
+            .toLowerCase()
+            .trim();
+    final rawStatus =
+        (user["OnlineStatus"] ?? user["onlineStatus"] ?? "").toString().trim();
+    final isOnline =
+        rawStatus.toLowerCase() == "online" ||
+        rawStatus.toLowerCase() == "active" ||
+        onlineValue == "true" ||
+        onlineValue == "1" ||
+        onlineValue == "yes" ||
+        onlineValue == "online";
+
+    Uint8List? imageBytes;
+    bool hasHttp = false;
+
+    if (media.isNotEmpty && media.toLowerCase() != "null") {
+      final m = media.trim();
+      if (m.startsWith("http://") || m.startsWith("https://")) {
+        hasHttp = true;
+      } else if (m.length > 50) {
+        try {
+          final cleanB64 = m.contains(",") ? m.split(",").last.trim() : m;
+          imageBytes = base64Decode(cleanB64);
+        } catch (_) {}
+      }
+    }
+
+    return GestureDetector(
+      onTap: () => Get.to(
+        () => BoomProfileScreen(
+          userEmail:
+              user["EmailAddress"]?.toString() ?? user["email"]?.toString(),
+          initialUserData: user,
+        ),
+        transition: Transition.rightToLeft,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: avatarSize.w,
+                height: avatarSize.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isOnline
+                        ? const Color(0xFF00E676)
+                        : Colors.white24,
+                    width: 2,
+                  ),
+                ),
+                child: ClipOval(
+                  child: imageBytes != null
+                      ? Image.memory(
+                          imageBytes,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => _avatarFallback(name),
+                        )
+                      : hasHttp
+                      ? Image.network(
+                          media,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => _avatarFallback(name),
+                        )
+                      : _avatarFallback(name),
+                ),
+              ),
+              Positioned(
+                right: 3.w,
+                bottom: 2.h,
+                child: Container(
+                  width: 14.w,
+                  height: 14.w,
+                  decoration: BoxDecoration(
+                    color: isOnline ? const Color(0xFF00E676) : Colors.grey,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF141420),
+                      width: 2.2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 7.h),
+          Text(
+            name.split(" ").first,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 2.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.location_on,
+                color: Colors.redAccent,
+                size: 12.sp,
+              ),
+              SizedBox(width: 2.w),
+              Flexible(
+                child: Text(
+                  _formatDistance(user),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white60,
+                    fontSize: 10.sp,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _horizontalProfileStrip() {
     final profiles = filteredProfiles;
     if (profiles.isEmpty) {
@@ -549,119 +682,9 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
         itemCount: profiles.length,
         separatorBuilder: (_, _) => SizedBox(width: 10.w),
         itemBuilder: (_, index) {
-          final user = profiles[index];
-          final name = (user["FullName"] ?? user["name"] ?? "User").toString();
-          final media = (user["Media"] ?? "").toString();
-          final onlineValue =
-              (user["IsOnline"] ?? user["isOnline"] ?? user["Online"] ?? "")
-                  .toString()
-                  .toLowerCase()
-                  .trim();
-          final rawStatus = (user["OnlineStatus"] ?? user["onlineStatus"] ?? "").toString().trim();
-          final isOnline =
-              rawStatus.toLowerCase() == "online" ||
-              rawStatus.toLowerCase() == "active" ||
-              onlineValue == "true" ||
-              onlineValue == "1" ||
-              onlineValue == "yes" ||
-              onlineValue == "online";
-
-          return GestureDetector(
-            onTap: () => Get.to(
-              () => BoomProfileScreen(
-                userEmail:
-                    user["EmailAddress"]?.toString() ??
-                    user["email"]?.toString(),
-                initialUserData: user,
-              ),
-              transition: Transition.rightToLeft,
-            ),
-            child: SizedBox(
-              width: 94.w,
-              child: Column(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 82.w,
-                        height: 82.w,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isOnline
-                                ? const Color(0xFF00E676)
-                                : Colors.white24,
-                            width: 2,
-                          ),
-                        ),
-                        child: ClipOval(
-                          child: media.startsWith("http")
-                              ? Image.network(
-                                  media,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) =>
-                                      _avatarFallback(name),
-                                )
-                              : _avatarFallback(name),
-                        ),
-                      ),
-                      Positioned(
-                        right: 5.w,
-                        bottom: 3.h,
-                        child: Container(
-                          width: 13.w,
-                          height: 13.w,
-                          decoration: BoxDecoration(
-                            color: isOnline
-                                ? const Color(0xFF00E676)
-                                : Colors.grey,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF141420),
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 7.h),
-                  Text(
-                    name.split(" ").first,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  SizedBox(height: 2.h),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: Colors.redAccent,
-                        size: 12.sp,
-                      ),
-                      SizedBox(width: 2.w),
-                      Flexible(
-                        child: Text(
-                          _formatDistance(user),
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white60,
-                            fontSize: 10.sp,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+          return SizedBox(
+            width: 94.w,
+            child: _buildRoundProfileItem(profiles[index]),
           );
         },
       ),
@@ -1310,155 +1333,29 @@ class _NearbyMapScreenState extends State<NearbyMapScreen> {
                         _emptyNearbyState()
                       else if (_sheetController.isAttached &&
                           _sheetController.size >= 0.55)
-                        _horizontalProfileStrip()
-                      else
                         GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14.w,
+                            vertical: 8.h,
+                          ),
                           itemCount: filteredProfiles.length,
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                childAspectRatio: 0.70,
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 12,
-                              ),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            childAspectRatio: 0.72,
+                            crossAxisSpacing: 10.w,
+                            mainAxisSpacing: 16.h,
+                          ),
                           itemBuilder: (context, index) {
-                            final user = filteredProfiles[index];
-                            final String name =
-                                (user["FullName"] ?? user["name"] ?? "User")
-                                    .toString();
-                            final String? media = user["Media"]?.toString();
-                            final rawStatus = (user["OnlineStatus"] ?? user["onlineStatus"] ?? "").toString().toLowerCase();
-                            final isOnline =
-                                rawStatus == "online" ||
-                                rawStatus == "active" ||
-                                user["IsOnline"]?.toString().toLowerCase() == "true";
-
-                            Uint8List? imageBytes;
-                            bool hasHttp = false;
-
-                            if (media != null &&
-                                media.isNotEmpty &&
-                                media.toLowerCase() != "null") {
-                              final m = media.trim();
-                              if (m.startsWith("http://") ||
-                                  m.startsWith("https://")) {
-                                hasHttp = true;
-                              } else if (m.length > 50) {
-                                try {
-                                  final cleanB64 = m.contains(",")
-                                      ? m.split(",").last.trim()
-                                      : m;
-                                  imageBytes = base64Decode(cleanB64);
-                                } catch (_) {}
-                              }
-                            }
-
-                            return GestureDetector(
-                              onTap: () {
-                                Get.to(
-                                  () => BoomProfileScreen(
-                                    userEmail:
-                                        user["EmailAddress"]?.toString() ??
-                                        user["email"]?.toString(),
-                                    initialUserData: user,
-                                  ),
-                                  transition: Transition.rightToLeft,
-                                );
-                              },
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(18),
-                                        border: Border.all(
-                                          color: Colors.white12,
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(18),
-                                        child: Stack(
-                                          fit: StackFit.expand,
-                                          children: [
-                                            imageBytes != null
-                                                ? Image.memory(
-                                                    imageBytes,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (_, _, _) =>
-                                                        _avatarFallback(name),
-                                                  )
-                                                : hasHttp
-                                                ? Image.network(
-                                                    media!,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (_, _, _) =>
-                                                        _avatarFallback(name),
-                                                  )
-                                                : _avatarFallback(name),
-                                            if (isOnline)
-                                              Positioned(
-                                                top: 8,
-                                                right: 8,
-                                                child: Container(
-                                                  width: 12,
-                                                  height: 12,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.greenAccent,
-                                                    shape: BoxShape.circle,
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Colors
-                                                            .greenAccent
-                                                            .withValues(
-                                                              alpha: 0.8,
-                                                            ),
-                                                        blurRadius: 6,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    name.split(" ").first,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.location_on,
-                                        color: Colors.red,
-                                        size: 13,
-                                      ),
-                                      Text(
-                                        _formatDistance(user),
-                                        style: const TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                            return _buildRoundProfileItem(
+                              filteredProfiles[index],
+                              avatarSize: 76,
                             );
                           },
-                        ),
+                        )
+                      else
+                        _horizontalProfileStrip(),
                       const SizedBox(height: 120),
                     ],
                   ),

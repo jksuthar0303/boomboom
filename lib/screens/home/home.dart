@@ -862,28 +862,28 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
 
-                        // SizedBox(width: 10.w),
+                        SizedBox(width: 10.w),
 
-                        // Filter Icon — connected to FilterController (Commented out for now)
-                        // GestureDetector(
-                        //   onTap: () async {
-                        //     await Get.to(() => const FilterPreferencesScreen());
-                        //     setState(() {});
-                        //   },
-                        //   child: Obx(() {
-                        //     final isActive =
-                        //         FilterController.instance.isFilterActive;
-                        //     return CircleAvatar(
-                        //       backgroundColor: isActive
-                        //           ? const Color(0xFFE8335A)
-                        //           : Colors.grey.shade800,
-                        //       child: const Icon(
-                        //         Icons.tune_rounded,
-                        //         color: Colors.white,
-                        //       ),
-                        //     );
-                        //   }),
-                        // ),
+                        // Filter Icon — connected to FilterController
+                        GestureDetector(
+                          onTap: () async {
+                            await Get.to(() => const FilterPreferencesScreen());
+                            setState(() {});
+                          },
+                          child: Obx(() {
+                            final isActive =
+                                FilterController.instance.isFilterActive;
+                            return CircleAvatar(
+                              backgroundColor: isActive
+                                  ? const Color(0xFFE8335A)
+                                  : Colors.grey.shade800,
+                              child: const Icon(
+                                Icons.tune_rounded,
+                                color: Colors.white,
+                              ),
+                            );
+                          }),
+                        ),
                       ],
                     ),
                   ],
